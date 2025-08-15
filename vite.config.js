@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: ['favicon.ico'],
       manifest: {
         name: 'UW Street Smart - NL Activity Tracker',
         short_name: 'Street Smart',
@@ -21,44 +21,8 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'icons/icon-72x72.png',
-            sizes: '72x72',
-            type: 'image/png',
-            purpose: 'maskable any'
-          },
-          {
-            src: 'icons/icon-96x96.png',
-            sizes: '96x96',
-            type: 'image/png',
-            purpose: 'maskable any'
-          },
-          {
-            src: 'icons/icon-128x128.png',
-            sizes: '128x128',
-            type: 'image/png',
-            purpose: 'maskable any'
-          },
-          {
-            src: 'icons/icon-144x144.png',
-            sizes: '144x144',
-            type: 'image/png',
-            purpose: 'maskable any'
-          },
-          {
-            src: 'icons/icon-152x152.png',
-            sizes: '152x152',
-            type: 'image/png',
-            purpose: 'maskable any'
-          },
-          {
             src: 'icons/icon-192x192.png',
             sizes: '192x192',
-            type: 'image/png',
-            purpose: 'maskable any'
-          },
-          {
-            src: 'icons/icon-384x384.png',
-            sizes: '384x384',
             type: 'image/png',
             purpose: 'maskable any'
           },
@@ -69,32 +33,7 @@ export default defineConfig({
             purpose: 'maskable any'
           }
         ],
-        shortcuts: [
-          {
-            name: 'New Campaign',
-            short_name: 'Campaign',
-            description: 'Create a new neighbourhood campaign',
-            url: '/?action=new-campaign',
-            icons: [
-              {
-                src: 'icons/shortcut-campaign.png',
-                sizes: '96x96'
-              }
-            ]
-          },
-          {
-            name: "Today's Follow-ups",
-            short_name: 'Follow-ups',
-            description: 'View today\'s scheduled follow-ups',
-            url: '/?action=follow-ups',
-            icons: [
-              {
-                src: 'icons/shortcut-followup.png',
-                sizes: '96x96'
-              }
-            ]
-          }
-        ]
+
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
