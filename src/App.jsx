@@ -213,6 +213,9 @@ export default function App() {
   const [showPropertyManagerModal, setShowPropertyManagerModal] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState(null);
   const [editingStreet, setEditingStreet] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
+  const [showSuccessTips, setShowSuccessTips] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
@@ -222,29 +225,122 @@ export default function App() {
   // Derived stats for dashboard
   const stats = useMemo(() => {
     let letters = 0, convos = 0, interested = 0, followups = 0;
+    let outcomes = {
+      interested: 0,
+      customer_signed: 0,
+      appointment_booked: 0,
+      no_for_now: 0,
+      already_uw: 0,
+      not_interested: 0
+    };
+    
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    
     activeCampaign?.streets.forEach(s => {
       s.properties.forEach(p => {
-        if (p.dropped) letters++;
-        if (p.spoke) convos++;
-        if (p.result === "maybe" || p.result === "interested") interested++;
-        if (p.followUpAt) followups++;
+        // Check if activity was logged today
+        const droppedToday = p.dropped && p.droppedAt === today;
+        const spokeToday = p.spoke && p.spokeAt === today;
+        const resultToday = p.result && p.resultAt === today;
+        const followUpToday = p.followUpAt && p.followUpAt.startsWith(today);
+        
+        if (droppedToday) letters++;
+        if (spokeToday) convos++;
+        if (resultToday && (p.result === "interested" || p.result === "customer_signed" || p.result === "appointment_booked")) interested++;
+        if (followUpToday) followups++;
+        
+        // Track today's outcomes
+        if (resultToday && p.result !== 'none') {
+          outcomes[p.result] = (outcomes[p.result] || 0) + 1;
+        }
       });
     });
-    return { letters, convos, interested, followups };
+    return { letters, convos, interested, followups, outcomes };
   }, [activeCampaign]);
 
   const setProperty = (updates) => {
+    const today = new Date().toISOString().split('T')[0];
+    
     setCampaigns(prev => prev.map(c => {
       if (c.id !== activeCampaignId) return c;
-      return {
+      
+      // Update the campaign's streets and properties
+      const updatedCampaign = {
         ...c,
         streets: c.streets.map(s => {
           if (s.id !== activeStreetId) return s;
           return {
             ...s,
-            properties: s.properties.map(p => p.id === activePropertyId ? { ...p, ...updates } : p)
+            properties: s.properties.map(p => {
+              if (p.id === activePropertyId) {
+                const newUpdates = { ...updates };
+                // Add timestamp for result changes
+                if (updates.result) {
+                  newUpdates.resultAt = today;
+                }
+                // Add timestamp for followUpAt changes
+                if (updates.followUpAt) {
+                  newUpdates.followUpAt = updates.followUpAt;
+                }
+                return { ...p, ...newUpdates };
+              }
+              return p;
+            })
           };
         })
+      };
+      
+      // Auto-update campaign status based on activity
+      const totalProperties = updatedCampaign.streets.reduce((total, street) => total + street.properties.length, 0);
+      const droppedProperties = updatedCampaign.streets.reduce((total, street) => 
+        total + street.properties.filter(p => p.dropped).length, 0);
+      const spokeProperties = updatedCampaign.streets.reduce((total, street) => 
+        total + street.properties.filter(p => p.spoke).length, 0);
+      
+      let newStatus = updatedCampaign.status;
+      
+      // Update to "active" if any properties have been dropped
+      if (droppedProperties > 0 && newStatus === "draft") {
+        newStatus = "active";
+      }
+      
+      // Update to "completed" if all properties have been handled (spoke OR not interested OR unreachable)
+      const handledProperties = updatedCampaign.streets.reduce((total, street) => 
+        total + street.properties.filter(p => p.spoke || p.result === "not_interested" || p.result === "unreachable").length, 0);
+      
+      if (totalProperties > 0 && handledProperties === totalProperties) {
+        newStatus = "completed";
+      }
+      
+      // Also update street status
+      const updatedStreets = updatedCampaign.streets.map(street => {
+        const streetTotalProperties = street.properties.length;
+        const streetDroppedProperties = street.properties.filter(p => p.dropped).length;
+        const streetSpokeProperties = street.properties.filter(p => p.spoke).length;
+        
+        let streetStatus = street.status;
+        
+        // Update to "in_progress" if any properties have been dropped
+        if (streetDroppedProperties > 0 && streetStatus === "not_started") {
+          streetStatus = "in_progress";
+        }
+        
+        // Update to "completed" if all properties have been handled (spoke OR not interested OR unreachable)
+        const streetHandledProperties = street.properties.filter(p => p.spoke || p.result === "not_interested" || p.result === "unreachable").length;
+        if (streetTotalProperties > 0 && streetHandledProperties === streetTotalProperties) {
+          streetStatus = "completed";
+        }
+        
+        return {
+          ...street,
+          status: streetStatus
+        };
+      });
+      
+      return {
+        ...updatedCampaign,
+        streets: updatedStreets,
+        status: newStatus
       };
     }));
   };
@@ -365,10 +461,20 @@ export default function App() {
     
     setCampaigns(prev => prev.map(c => {
       if (c.id === activeCampaignId) {
-        return {
+        const updatedCampaign = {
           ...c,
           streets: [...c.streets, newStreet]
         };
+        
+        // Auto-update campaign status to "active" when first street is added
+        if (c.streets.length === 0 && updatedCampaign.status === "draft") {
+          return {
+            ...updatedCampaign,
+            status: "active"
+          };
+        }
+        
+        return updatedCampaign;
       }
       return c;
     }));
@@ -470,12 +576,16 @@ export default function App() {
   // Property management functions
   const addProperty = (propertyLabel) => {
     const newProperty = {
-      id: `property-${Date.now()}`,
+      id: `property-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       label: propertyLabel,
       dropped: false,
       knocked: false,
       spoke: false,
-      result: "none"
+      result: "none",
+      droppedAt: null,
+      knockedAt: null,
+      spokeAt: null,
+      resultAt: null
     };
     
     setCampaigns(prev => prev.map(c => {
@@ -546,6 +656,8 @@ export default function App() {
 
   // Toggle property status (allows removing status)
   const togglePropertyStatus = (propertyId, status) => {
+    const today = new Date().toISOString().split('T')[0];
+    
     setCampaigns(prev => prev.map(c => {
       if (c.id === activeCampaignId) {
         return {
@@ -556,7 +668,13 @@ export default function App() {
                 ...s,
                 properties: s.properties.map(p => {
                   if (p.id === propertyId) {
-                    return { ...p, [status]: !p[status] };
+                    const newValue = !p[status];
+                    const timestampKey = `${status}At`;
+                    return { 
+                      ...p, 
+                      [status]: newValue,
+                      [timestampKey]: newValue ? today : null // Set timestamp when enabling, clear when disabling
+                    };
                   }
                   return p;
                 })
@@ -620,6 +738,12 @@ export default function App() {
               {dark ? <Sun className="w-5 h-5"/> : <Moon className="w-5 h-5"/>}
             </button>
             <button 
+              onClick={() => setShowHelp(true)}
+              className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </button>
+            <button 
               onClick={() => setShowSettings(true)}
               className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
@@ -634,11 +758,11 @@ export default function App() {
         {/* Sidebar */}
         <div className="lg:col-span-1 space-y-3">
           <SectionCard title="Navigate" icon={FolderOpen}>
-            <div className="grid grid-cols-2 gap-2">
-              <NavButton icon={<BarChart3 className="w-4 h-4"/>} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
-              <NavButton icon={<Target className="w-4 h-4"/>} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
-              <NavButton icon={<MapPin className="w-4 h-4"/>} label="Streets" active={view === "streets"} onClick={() => setView("streets")} />
-              <NavButton icon={<FileText className="w-4 h-4"/>} label="Reports" active={view === "reports"} onClick={() => setView("reports")} />
+            <div className="grid grid-cols-2 gap-2 min-w-0">
+              <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
+              <NavButton icon={<Target className="w-4 h-4 flex-shrink-0"/>} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
+              <NavButton icon={<MapPin className="w-4 h-4 flex-shrink-0"/>} label="Streets" active={view === "streets"} onClick={() => setView("streets")} />
+              <NavButton icon={<FileText className="w-4 h-4 flex-shrink-0"/>} label="Reports" active={view === "reports"} onClick={() => setView("reports")} />
             </div>
             <div className="mt-3 text-xs opacity-70">
               Active: <strong>{activeCampaign?.name}</strong>
@@ -646,9 +770,9 @@ export default function App() {
           </SectionCard>
 
           <SectionCard title="Quick Drawers" icon={Share2}>
-            <div className="grid grid-cols-2 gap-2">
-              <NavButton icon={<MessageSquare className="w-4 h-4"/>} label="Scripts" onClick={() => setShowScripts(true)} />
-              <NavButton icon={<Link2 className="w-4 h-4"/>} label="Links" onClick={() => setShowLinks(true)} />
+            <div className="grid grid-cols-2 gap-2 min-w-0">
+              <NavButton icon={<MessageSquare className="w-4 h-4 flex-shrink-0"/>} label="Scripts" onClick={() => setShowScripts(true)} />
+              <NavButton icon={<Link2 className="w-4 h-4 flex-shrink-0"/>} label="Links" onClick={() => setShowLinks(true)} />
             </div>
             <div className="mt-3 text-xs opacity-70">
               Open while on a property to speed up calls and messages.
@@ -656,22 +780,30 @@ export default function App() {
           </SectionCard>
 
           <SectionCard 
-            title="Printables" 
-            icon={QrCode}
+            title="Success Tips" 
+            icon={Target}
             actions={
-              <button className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                <Download className="w-4 h-4"/> Export CSV
+              <button 
+                onClick={() => setShowSuccessTips(true)}
+                className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm flex items-center gap-2 hover:bg-primary-700 transition-colors"
+              >
+                <HelpCircle className="w-4 h-4"/> View All
               </button>
             }
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm">Campaign QR (UTM‑tagged)</div>
-                <div className="text-xs opacity-70">Scan → tracks street responses</div>
+            <div className="space-y-2">
+              <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                <div className="text-xs font-medium text-green-800 dark:text-green-200">🎯 Best Time to Drop</div>
+                <div className="text-xs text-green-700 dark:text-green-300">Evenings 6-8pm, weekends 10am-2pm</div>
               </div>
-              <button className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm flex items-center gap-2 hover:bg-primary-700 transition-colors">
-                <QrCode className="w-4 h-4"/> Generate
-              </button>
+              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <div className="text-xs font-medium text-blue-800 dark:text-blue-200">📝 Follow Up Timing</div>
+                <div className="text-xs text-blue-700 dark:text-blue-300">Return 2-3 days after dropping letters</div>
+              </div>
+              <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                <div className="text-xs font-medium text-purple-800 dark:text-purple-200">💡 Conversation Starters</div>
+                <div className="text-xs text-purple-700 dark:text-purple-300">"Hi, I'm local and helping neighbours save money..."</div>
+              </div>
             </div>
           </SectionCard>
         </div>
@@ -740,6 +872,21 @@ export default function App() {
           onImport={importData}
           onReset={resetData}
         />
+      </Drawer>
+
+      {/* Help Modal */}
+      <Drawer open={showHelp} onClose={()=>setShowHelp(false)} title="Help & FAQ" size="large">
+        <HelpPanel />
+      </Drawer>
+
+      {/* About Modal */}
+      <Drawer open={showAbout} onClose={()=>setShowAbout(false)} title="About" size="small">
+        <AboutPanel />
+      </Drawer>
+
+      {/* Success Tips Modal */}
+      <Drawer open={showSuccessTips} onClose={()=>setShowSuccessTips(false)} title="Success Tips for NLs" size="large">
+        <SuccessTipsPanel />
       </Drawer>
 
       {/* Reset Confirmation Modal */}
@@ -817,14 +964,14 @@ function NavButton({ icon, label, active, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm border transition-all ${
+      className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm border transition-all min-w-0 ${
         active 
           ? "bg-primary-600 text-white border-primary-600 shadow-md" 
           : "bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800"
       }`}
     >
-      {icon}
-      {label}
+      <span className="flex-shrink-0">{icon}</span>
+      <span className="truncate">{label}</span>
     </button>
   );
 }
@@ -850,7 +997,7 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
   return (
     <div className="space-y-4">
       <SectionCard 
-        title="Today at a glance" 
+        title="Today's Activity" 
         icon={Home} 
         actions={
           hasData ? (
@@ -872,10 +1019,10 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
       >
         {hasData ? (
           <div className="grid md:grid-cols-4 gap-3">
-            <Stat icon={UploadCloud} label="Letters dropped" value={stats.letters} />
-            <Stat icon={MessageSquare} label="Conversations" value={stats.convos} />
-            <Stat icon={CheckCircle} label="Interested / Maybe" value={stats.interested} />
-            <Stat icon={CalendarClock} label="Follow‑ups due" value={stats.followups} />
+            <Stat icon={UploadCloud} label="Letters dropped today" value={stats.letters} />
+            <Stat icon={MessageSquare} label="Conversations today" value={stats.convos} />
+            <Stat icon={CheckCircle} label="Interested today" value={stats.interested} />
+            <Stat icon={CalendarClock} label="Follow‑ups scheduled today" value={stats.followups} />
           </div>
         ) : (
           <div className="text-center py-8">
@@ -893,6 +1040,42 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
           </div>
         )}
       </SectionCard>
+
+      {hasData && stats.outcomes && (
+        <SectionCard title="Conversation Outcomes" icon={MessageSquare}>
+          <div className="grid md:grid-cols-2 gap-3">
+            <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+              <div className="text-lg font-semibold text-green-700 dark:text-green-300">{stats.outcomes.interested}</div>
+              <div className="text-sm text-green-600 dark:text-green-400">Interested</div>
+            </div>
+            <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+              <div className="text-lg font-semibold text-green-700 dark:text-green-300">{stats.outcomes.customer_signed}</div>
+              <div className="text-sm text-green-600 dark:text-green-400">Customer Signed</div>
+            </div>
+            <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+              <div className="text-lg font-semibold text-green-700 dark:text-green-300">{stats.outcomes.appointment_booked}</div>
+              <div className="text-sm text-green-600 dark:text-green-400">Appointment Booked</div>
+            </div>
+            <div className="p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+              <div className="text-lg font-semibold text-yellow-700 dark:text-yellow-300">{stats.outcomes.no_for_now}</div>
+              <div className="text-sm text-yellow-600 dark:text-yellow-400">No for Now</div>
+            </div>
+            <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <div className="text-lg font-semibold text-blue-700 dark:text-blue-300">{stats.outcomes.already_uw}</div>
+              <div className="text-sm text-blue-600 dark:text-blue-400">Already with UW</div>
+            </div>
+            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <div className="text-lg font-semibold text-red-700 dark:text-red-300">{stats.outcomes.not_interested}</div>
+              <div className="text-sm text-red-600 dark:text-red-400">Not Interested</div>
+            </div>
+            <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800">
+              <div className="text-lg font-semibold text-gray-700 dark:text-gray-300">{stats.outcomes.unreachable || 0}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Unreachable</div>
+            </div>
+
+          </div>
+        </SectionCard>
+      )}
 
       <SectionCard title="Active campaign" icon={MapPin}>
         {activeCampaign ? (
@@ -923,6 +1106,39 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
 }
 
 function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelete }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("name");
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filter and sort campaigns
+  const filteredCampaigns = useMemo(() => {
+    let filtered = campaigns.filter(c => {
+      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           c.area.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+
+    // Sort campaigns
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "name":
+          return a.name.localeCompare(b.name);
+        case "date":
+          return new Date(b.created_at) - new Date(a.created_at);
+        case "streets":
+          return b.streets.length - a.streets.length;
+        case "status":
+          return a.status.localeCompare(b.status);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [campaigns, searchTerm, statusFilter, sortBy]);
+
   return (
     <div className="space-y-3">
       <SectionCard 
@@ -941,8 +1157,74 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
           Create a new neighbourhood letters campaign to start tracking activity.
         </div>
       </SectionCard>
+
+      <SectionCard 
+        title="Search & Filter" 
+        icon={Search}
+        actions={
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+          >
+            {showFilters ? <ChevronRight className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+            {showFilters ? 'Hide' : 'Show'} Filters
+          </button>
+        }
+      >
+        {showFilters && (
+          <div className="space-y-3">
+            {/* Search */}
+            <div>
+              <label className="text-xs opacity-70">Search campaigns</label>
+              <input 
+                type="text" 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by name or area..."
+                className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              {/* Status Filter */}
+              <div>
+                <label className="text-xs opacity-70">Status</label>
+                <select 
+                  value={statusFilter} 
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                >
+                  <option value="all">All Status</option>
+                  <option value="draft">Draft</option>
+                  <option value="active">Active</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+              
+              {/* Sort By */}
+              <div>
+                <label className="text-xs opacity-70">Sort by</label>
+                <select 
+                  value={sortBy} 
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                >
+                  <option value="name">Name</option>
+                  <option value="date">Date Created</option>
+                  <option value="streets">Number of Streets</option>
+                  <option value="status">Status</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="text-xs opacity-70">
+              Showing {filteredCampaigns.length} of {campaigns.length} campaigns
+            </div>
+          </div>
+        )}
+      </SectionCard>
       
-      {campaigns.map(c => (
+      {filteredCampaigns.map(c => (
         <SectionCard key={c.id} title={c.name} icon={MapPin} actions={
           <div className="flex gap-2">
             <button 
@@ -957,6 +1239,33 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
             >
               Edit
             </button>
+            {c.status !== 'completed' && (
+              <button 
+                className="px-3 py-1.5 rounded-xl bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-sm hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors border border-green-200 dark:border-green-800"
+                onClick={() => {
+                  if (confirm('Mark this campaign as completed? This will set all remaining properties as "Unreachable".')) {
+                    // Mark all unhandled properties as unreachable
+                    setCampaigns(prev => prev.map(campaign => {
+                      if (campaign.id === c.id) {
+                        const updatedStreets = campaign.streets.map(street => ({
+                          ...street,
+                          properties: street.properties.map(property => {
+                            if (!property.spoke && property.result === 'none') {
+                              return { ...property, result: 'unreachable' };
+                            }
+                            return property;
+                          })
+                        }));
+                        return { ...campaign, streets: updatedStreets, status: 'completed' };
+                      }
+                      return campaign;
+                    }));
+                  }
+                }}
+              >
+                Mark Complete
+              </button>
+            )}
             <button 
               className="px-3 py-1.5 rounded-xl bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors border border-red-200 dark:border-red-800"
               onClick={() => onDelete(c.id)}
@@ -983,6 +1292,39 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
 }
 
 function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onAddStreet, onEditStreet, onDeleteStreet, onManageProperties }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("name");
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filter and sort streets
+  const filteredStreets = useMemo(() => {
+    let filtered = campaign.streets.filter(s => {
+      const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           s.postcode.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === "all" || s.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+
+    // Sort streets
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "name":
+          return a.name.localeCompare(b.name);
+        case "properties":
+          return b.properties.length - a.properties.length;
+        case "status":
+          return a.status.localeCompare(b.status);
+        case "postcode":
+          return a.postcode.localeCompare(b.postcode);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [campaign.streets, searchTerm, statusFilter, sortBy]);
+
   return (
     <div className="space-y-4">
       <SectionCard 
@@ -997,9 +1339,74 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
           </button>
         }
       >
-        {campaign.streets.length > 0 ? (
+        <SectionCard 
+          title="Search & Filter" 
+          icon={Search}
+          actions={
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+            >
+              {showFilters ? <ChevronRight className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+              {showFilters ? 'Hide' : 'Show'} Filters
+            </button>
+          }
+        >
+          {showFilters && (
+            <div className="space-y-3">
+              {/* Search */}
+              <div>
+                <label className="text-xs opacity-70">Search streets</label>
+                <input 
+                  type="text" 
+                  value={searchTerm} 
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search by street name or postcode..."
+                  className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {/* Status Filter */}
+                <div>
+                  <label className="text-xs opacity-70">Status</label>
+                  <select 
+                    value={statusFilter} 
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="not_started">Not Started</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+                
+                {/* Sort By */}
+                <div>
+                  <label className="text-xs opacity-70">Sort by</label>
+                  <select 
+                    value={sortBy} 
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                  >
+                    <option value="name">Street Name</option>
+                    <option value="properties">Number of Properties</option>
+                    <option value="status">Status</option>
+                    <option value="postcode">Postcode</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="text-xs opacity-70">
+                Showing {filteredStreets.length} of {campaign.streets.length} streets
+              </div>
+            </div>
+          )}
+        </SectionCard>
+        {filteredStreets.length > 0 ? (
           <div className="grid md:grid-cols-2 gap-3">
-            {campaign.streets.map(s => (
+            {filteredStreets.map(s => (
             <div 
               key={s.id} 
               className={`rounded-2xl border p-4 bg-white/70 dark:bg-gray-900/70 transition-all ${
@@ -1024,31 +1431,44 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
               {/* Property buttons with better layout */}
               <div className="mb-3">
                 <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
-                  {s.properties.map(p => (
-                    <button 
-                      key={p.id} 
-                      onClick={()=>onOpenProperty(s.id, p.id)} 
-                      className={`px-2 py-1 rounded-lg text-xs border transition-colors flex-shrink-0 ${
-                        p.spoke 
-                          ? 'border-secondary-400 bg-secondary-50 dark:bg-secondary-900/20' 
-                          : p.dropped 
-                            ? 'border-warning-400 bg-warning-50 dark:bg-warning-900/20' 
-                            : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
+                  {s.properties.map(p => {
+                    // Determine button styling based on progression and outcome
+                    let buttonStyle = 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600';
+                    
+                    // Priority: Outcomes > Spoke > Knocked > Dropped
+                    if (p.result === 'interested' || p.result === 'customer_signed' || p.result === 'appointment_booked') {
+                      buttonStyle = 'border-green-400 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300';
+                    } else if (p.result === 'no_for_now') {
+                      buttonStyle = 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300';
+                    } else if (p.result === 'already_uw') {
+                      buttonStyle = 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300';
+                    } else if (p.result === 'not_interested') {
+                      buttonStyle = 'border-red-400 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300';
+                    } else if (p.result === 'unreachable') {
+                      buttonStyle = 'border-gray-400 bg-gray-50 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300';
+                    } else if (p.spoke) {
+                      buttonStyle = 'border-green-400 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300';
+                    } else if (p.knocked) {
+                      buttonStyle = 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300';
+                    } else if (p.dropped) {
+                      buttonStyle = 'border-orange-400 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300';
+                    }
+                    
+                    return (
+                      <button 
+                        key={p.id} 
+                        onClick={()=>onOpenProperty(s.id, p.id)} 
+                        className={`px-2 py-1 rounded-lg text-xs border transition-colors flex-shrink-0 ${buttonStyle}`}
+                        title={p.result ? `Outcome: ${p.result.replace('_', ' ')}` : ''}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               
               <div className="flex items-center gap-2">
-                <button 
-                  onClick={()=>onSelectStreet(s.id)} 
-                  className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                >
-                  Select
-                </button>
                 <button 
                   onClick={() => onManageProperties(s)}
                   className="px-3 py-1.5 rounded-xl bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-sm hover:bg-blue-200 dark:hover:bg-blue-900/30 transition-colors border border-blue-200 dark:border-blue-800"
@@ -1071,6 +1491,20 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
             </div>
           ))}
         </div>
+        ) : searchTerm || statusFilter !== "all" ? (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
+              <Search className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">No streets found</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">Try adjusting your search or filter criteria</p>
+            <button 
+              onClick={() => { setSearchTerm(""); setStatusFilter("all"); }}
+              className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              Clear Filters
+            </button>
+          </div>
         ) : (
           <div className="text-center py-8">
             <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
@@ -1182,14 +1616,71 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
             rows={3} 
             placeholder="e.g., 'best after 6pm', 'steep steps'"
           />
-          <div className="flex items-center justify-between mt-2">
-            <ToggleRow 
-              label="Mark as interested" 
-              value={property.result === 'interested'} 
-              onChange={(v)=>onUpdate({ result: v ? 'interested' : 'maybe' })} 
-            />
+          <div className="mt-4">
+            <label className="text-xs opacity-70 mb-2 block">Conversation Outcome</label>
+            <div className="grid grid-cols-2 gap-2">
+                             <OutcomeButton 
+                 label="Interested" 
+                 value="interested" 
+                 current={property.result} 
+                 onClick={() => onUpdate({ result: 'interested' })}
+                 variant="success"
+               />
+               <OutcomeButton 
+                 label="Customer Signed" 
+                 value="customer_signed" 
+                 current={property.result} 
+                 onClick={() => onUpdate({ result: 'customer_signed' })}
+                 variant="success"
+               />
+               <OutcomeButton 
+                 label="Appointment Booked" 
+                 value="appointment_booked" 
+                 current={property.result} 
+                 onClick={() => onUpdate({ result: 'appointment_booked' })}
+                 variant="success"
+               />
+               <OutcomeButton 
+                 label="No for Now" 
+                 value="no_for_now" 
+                 current={property.result} 
+                 onClick={() => onUpdate({ result: 'no_for_now' })}
+                 variant="warning"
+               />
+              <OutcomeButton 
+                label="Already with UW" 
+                value="already_uw" 
+                current={property.result} 
+                onClick={() => onUpdate({ result: 'already_uw' })}
+                variant="info"
+              />
+              <OutcomeButton 
+                label="Not Interested" 
+                value="not_interested" 
+                current={property.result} 
+                onClick={() => onUpdate({ result: 'not_interested' })}
+                variant="error"
+              />
+              <OutcomeButton 
+                label="Unreachable" 
+                value="unreachable" 
+                current={property.result} 
+                onClick={() => onUpdate({ result: 'unreachable' })}
+                variant="default"
+              />
+              
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between mt-4">
             <button className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
               Attach photo
+            </button>
+            <button 
+              onClick={() => onUpdate({ result: 'none' })}
+              className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              Clear outcome
             </button>
           </div>
         </div>
@@ -1215,6 +1706,37 @@ function ActionButton({ icon: Icon, label, active, onClick }) {
       }`}
     >
       <Icon className="w-4 h-4" /> {label}
+    </button>
+  );
+}
+
+function OutcomeButton({ label, value, current, onClick, variant = "default" }) {
+  const isActive = current === value;
+  
+  const variantStyles = {
+    success: isActive 
+      ? 'bg-green-50 dark:bg-green-900/20 border-green-400 text-green-700 dark:text-green-300' 
+      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-green-300 dark:hover:border-green-700',
+    warning: isActive 
+      ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400 text-yellow-700 dark:text-yellow-300' 
+      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-yellow-300 dark:hover:border-yellow-700',
+    error: isActive 
+      ? 'bg-red-50 dark:bg-red-900/20 border-red-400 text-red-700 dark:text-red-300' 
+      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-red-300 dark:hover:border-red-700',
+    info: isActive 
+      ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 text-blue-700 dark:text-blue-300' 
+      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700',
+    default: isActive 
+      ? 'bg-gray-50 dark:bg-gray-800/60 border-gray-400 text-gray-700 dark:text-gray-300' 
+      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
+  };
+
+  return (
+    <button 
+      onClick={onClick} 
+      className={`px-3 py-2 rounded-xl border text-sm transition-all ${variantStyles[variant]}`}
+    >
+      {label}
     </button>
   );
 }
@@ -1423,11 +1945,11 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
       
       <div className="space-y-2">
         <h4 className="font-medium">Support</h4>
-        <button className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2">
-          <HelpCircle className="w-4 h-4" />
-          Help & FAQ
-        </button>
-        <button className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2">
+
+        <button 
+          onClick={() => setShowAbout(true)}
+          className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+        >
           <Info className="w-4 h-4" />
           About
         </button>
@@ -1438,6 +1960,480 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
           <LogOut className="w-4 h-4" />
           Sign out
         </button>
+      </div>
+    </div>
+  );
+}
+
+function HelpPanel() {
+  const [expandedSections, setExpandedSections] = useState({
+    quickStart: true, // Start with Quick Start expanded
+    workflow: false,
+    status: false,
+    outcomes: false,
+    tips: false,
+    faq: false
+  });
+
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Quick Start Guide */}
+      <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+        <button 
+          onClick={() => toggleSection('quickStart')}
+          className="w-full p-4 bg-gray-50 dark:bg-gray-900/20 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-900/30 transition-colors"
+        >
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Target className="w-5 h-5" />
+            Quick Start Guide
+          </h3>
+          <ChevronRight className={`w-5 h-5 transition-transform ${expandedSections.quickStart ? 'rotate-90' : ''}`} />
+        </button>
+        {expandedSections.quickStart && (
+          <div className="p-4 space-y-3">
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+              <div className="font-medium text-blue-800 dark:text-blue-200 mb-2">1. Create Your First Campaign</div>
+              <div className="text-blue-700 dark:text-blue-300">
+                • Go to <strong>Campaigns</strong> tab<br/>
+                • Click <strong>"Create New Campaign"</strong><br/>
+                • Enter campaign name, area, and your UW links
+              </div>
+            </div>
+            
+            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
+              <div className="font-medium text-green-800 dark:text-green-200 mb-2">2. Add Streets & Properties</div>
+              <div className="text-green-700 dark:text-green-300">
+                • Go to <strong>Streets</strong> tab<br/>
+                • Click <strong>"Add New Street"</strong><br/>
+                • Enter street name, postcode, and property numbers/names (comma-separated)
+              </div>
+            </div>
+            
+            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+              <div className="font-medium text-purple-800 dark:text-purple-200 mb-2">3. Track Your Activity</div>
+              <div className="text-purple-700 dark:text-purple-300">
+                • Click on any property number to open it<br/>
+                • Mark as <strong>Dropped</strong> (letter delivered)<br/>
+                • Mark as <strong>Knocked</strong> (door knocked)<br/>
+                • Mark as <strong>Spoke</strong> (conversation had)<br/>
+                • Select conversation outcome
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Daily Workflow */}
+      <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+        <button 
+          onClick={() => toggleSection('workflow')}
+          className="w-full p-4 bg-gray-50 dark:bg-gray-900/20 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-900/30 transition-colors"
+        >
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <BarChart3 className="w-5 h-5" />
+            Daily Workflow
+          </h3>
+          <ChevronRight className={`w-5 h-5 transition-transform ${expandedSections.workflow ? 'rotate-90' : ''}`} />
+        </button>
+        {expandedSections.workflow && (
+          <div className="p-4 space-y-2 text-sm">
+            <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-900/20 rounded-xl">
+              <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
+              <div>
+                <div className="font-medium">Start Your Day</div>
+                <div className="text-gray-600 dark:text-gray-400">Check the Dashboard for today's follow-ups and review yesterday's activity</div>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-900/20 rounded-xl">
+              <div className="w-6 h-6 rounded-full bg-green-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
+              <div>
+                <div className="font-medium">Drop Letters</div>
+                <div className="text-gray-600 dark:text-gray-400">Go to Streets tab, select your target street, and mark properties as "Dropped"</div>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-900/20 rounded-xl">
+              <div className="w-6 h-6 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">3</div>
+              <div>
+                <div className="font-medium">Follow Up</div>
+                <div className="text-gray-600 dark:text-gray-400">Return to properties where letters were dropped, knock doors, and have conversations</div>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-900/20 rounded-xl">
+              <div className="w-6 h-6 rounded-full bg-purple-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">4</div>
+              <div>
+                <div className="font-medium">Record Outcomes</div>
+                <div className="text-gray-600 dark:text-gray-400">Mark properties as "Spoke" and select the appropriate conversation outcome</div>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-900/20 rounded-xl">
+              <div className="w-6 h-6 rounded-full bg-red-500 text-white text-xs flex items-center justify-center flex-shrink-0 mt-0.5">5</div>
+              <div>
+                <div className="font-medium">Schedule Follow-ups</div>
+                <div className="text-gray-600 dark:text-gray-400">Set reminders for interested prospects and review your daily progress</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Property Status Guide */}
+      <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+        <button 
+          onClick={() => toggleSection('status')}
+          className="w-full p-4 bg-gray-50 dark:bg-gray-900/20 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-900/30 transition-colors"
+        >
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Check className="w-5 h-5" />
+            Property Status Guide
+          </h3>
+          <ChevronRight className={`w-5 h-5 transition-transform ${expandedSections.status ? 'rotate-90' : ''}`} />
+        </button>
+        {expandedSections.status && (
+          <div className="p-4">
+            <div className="grid md:grid-cols-2 gap-3 text-sm">
+              <div className="p-3 border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
+                <div className="font-medium text-orange-800 dark:text-orange-200">Dropped</div>
+                <div className="text-orange-700 dark:text-orange-300">Letter delivered through letterbox</div>
+              </div>
+              <div className="p-3 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                <div className="font-medium text-blue-800 dark:text-blue-200">Knocked</div>
+                <div className="text-blue-700 dark:text-blue-300">Door knocked, no answer or brief interaction</div>
+              </div>
+              <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                <div className="font-medium text-green-800 dark:text-green-200">Spoke</div>
+                <div className="text-green-700 dark:text-green-300">Full conversation had with resident</div>
+              </div>
+              <div className="p-3 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/20 rounded-xl">
+                <div className="font-medium text-gray-800 dark:text-gray-200">Not Started</div>
+                <div className="text-gray-700 dark:text-gray-300">No activity recorded yet</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Conversation Outcomes */}
+      <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+        <button 
+          onClick={() => toggleSection('outcomes')}
+          className="w-full p-4 bg-gray-50 dark:bg-gray-900/20 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-900/30 transition-colors"
+        >
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <MessageSquare className="w-5 h-5" />
+            Conversation Outcomes
+          </h3>
+          <ChevronRight className={`w-5 h-5 transition-transform ${expandedSections.outcomes ? 'rotate-90' : ''}`} />
+        </button>
+        {expandedSections.outcomes && (
+          <div className="p-4">
+            <div className="grid md:grid-cols-2 gap-3 text-sm">
+              <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                <div className="font-medium text-green-800 dark:text-green-200">Interested</div>
+                <div className="text-green-700 dark:text-green-300">Wants to learn more about UW</div>
+              </div>
+              <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                <div className="font-medium text-green-800 dark:text-green-200">Customer Signed</div>
+                <div className="text-green-700 dark:text-green-300">Successfully signed up with UW</div>
+              </div>
+              <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                <div className="font-medium text-green-800 dark:text-green-200">Appointment Booked</div>
+                <div className="text-green-700 dark:text-green-300">Meeting scheduled for follow-up</div>
+              </div>
+              <div className="p-3 border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl">
+                <div className="font-medium text-yellow-800 dark:text-yellow-200">No for Now</div>
+                <div className="text-yellow-700 dark:text-yellow-300">Not interested at this time</div>
+              </div>
+              <div className="p-3 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                <div className="font-medium text-blue-800 dark:text-blue-200">Already with UW</div>
+                <div className="text-blue-700 dark:text-blue-300">Customer is already a UW member</div>
+              </div>
+                        <div className="p-3 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 rounded-xl">
+            <div className="font-medium text-red-800 dark:text-red-200">Not Interested</div>
+            <div className="text-red-700 dark:text-red-300">Definitely not interested</div>
+          </div>
+          <div className="p-3 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/20 rounded-xl">
+            <div className="font-medium text-gray-800 dark:text-gray-200">Unreachable</div>
+            <div className="text-gray-700 dark:text-gray-300">Unable to contact after multiple attempts</div>
+          </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Tips & Best Practices */}
+      <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+        <button 
+          onClick={() => toggleSection('tips')}
+          className="w-full p-4 bg-gray-50 dark:bg-gray-900/20 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-900/30 transition-colors"
+        >
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Info className="w-5 h-5" />
+            Tips & Best Practices
+          </h3>
+          <ChevronRight className={`w-5 h-5 transition-transform ${expandedSections.tips ? 'rotate-90' : ''}`} />
+        </button>
+        {expandedSections.tips && (
+          <div className="p-4 space-y-2 text-sm">
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+              <div className="font-medium text-amber-800 dark:text-amber-200 mb-1">📱 Use Scripts & Links</div>
+              <div className="text-amber-700 dark:text-amber-300">Open the Scripts and Links drawers while on a property for quick access to talking points and UW resources.</div>
+            </div>
+            
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+              <div className="font-medium text-blue-800 dark:text-blue-200 mb-1">📊 Daily Tracking</div>
+              <div className="text-blue-700 dark:text-blue-300">The Dashboard shows only today's activity. Use Reports for overall campaign progress and historical data.</div>
+            </div>
+            
+            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
+              <div className="font-medium text-green-800 dark:text-green-200 mb-1">🏠 Property Names</div>
+              <div className="text-green-700 dark:text-green-300">You can use house names (e.g., "Birch Tree House") in addition to numbers. Separate multiple properties with commas.</div>
+            </div>
+            
+            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+              <div className="font-medium text-purple-800 dark:text-purple-200 mb-1">🔄 Status Updates</div>
+              <div className="text-purple-700 dark:text-purple-300">You can toggle statuses on/off if you make a mistake. Click the same button again to remove a status.</div>
+            </div>
+            
+            <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800">
+              <div className="font-medium text-indigo-800 dark:text-indigo-200 mb-1">💾 Data Backup</div>
+              <div className="text-indigo-700 dark:text-indigo-300">Regularly export your data from Settings to keep a backup of your campaigns and progress.</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* FAQ */}
+      <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+        <button 
+          onClick={() => toggleSection('faq')}
+          className="w-full p-4 bg-gray-50 dark:bg-gray-900/20 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-900/30 transition-colors"
+        >
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <HelpCircle className="w-5 h-5" />
+            Frequently Asked Questions
+          </h3>
+          <ChevronRight className={`w-5 h-5 transition-transform ${expandedSections.faq ? 'rotate-90' : ''}`} />
+        </button>
+        {expandedSections.faq && (
+          <div className="p-4 space-y-3 text-sm">
+            <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+              <div className="p-3 bg-gray-50 dark:bg-gray-900/20 font-medium">How do I add a new street to an existing campaign?</div>
+              <div className="p-3">Go to the Streets tab and click "Add New Street". Enter the street name, postcode, and property numbers separated by commas.</div>
+            </div>
+            
+            <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+              <div className="p-3 bg-gray-50 dark:bg-gray-900/20 font-medium">Can I edit property numbers after creating a street?</div>
+              <div className="p-3">Yes! Click the "Properties" button on any street card to open the Property Manager where you can add, remove, or edit individual properties.</div>
+            </div>
+            
+            <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+              <div className="p-3 bg-gray-50 dark:bg-gray-900/20 font-medium">What's the difference between Dashboard and Reports?</div>
+              <div className="p-3">Dashboard shows today's activity only, perfect for daily tracking. Reports shows all-time data and campaign overviews.</div>
+            </div>
+            
+            <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+              <div className="p-3 bg-gray-50 dark:bg-gray-900/20 font-medium">How do I search and filter campaigns/streets?</div>
+              <div className="p-3">Use the "Search & Filter" section in Campaigns and Streets tabs. You can search by name, filter by status, and sort by different criteria.</div>
+            </div>
+            
+            <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+              <div className="p-3 bg-gray-50 dark:bg-gray-900/20 font-medium">Can I use this app offline?</div>
+              <div className="p-3">Yes! This is a Progressive Web App (PWA) that works offline. Your data is stored locally on your device.</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AboutPanel() {
+  return (
+    <div className="space-y-4">
+      <div className="text-center">
+        <div className="w-16 h-16 rounded-2xl bg-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg">
+          <span className="text-white font-bold text-xl">UW</span>
+        </div>
+        <h3 className="text-lg font-semibold mb-2">UW Street Smart</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Neighbourhood Letters Activity Tracker
+        </p>
+      </div>
+
+      <div className="space-y-3 text-sm">
+        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+          <div className="font-medium text-blue-800 dark:text-blue-200 mb-1">Version</div>
+          <div className="text-blue-700 dark:text-blue-300">1.0.0</div>
+        </div>
+
+        <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
+          <div className="font-medium text-green-800 dark:text-green-200 mb-1">Built For</div>
+          <div className="text-green-700 dark:text-green-300">UW Partners making a difference in their communities</div>
+        </div>
+
+        <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+          <div className="font-medium text-purple-800 dark:text-purple-200 mb-1">Features</div>
+          <div className="text-purple-700 dark:text-purple-300 space-y-1">
+            <div>• Campaign & street management</div>
+            <div>• Property activity tracking</div>
+            <div>• Conversation outcomes</div>
+            <div>• Offline-first PWA</div>
+            <div>• Daily progress dashboard</div>
+            <div>• Data export/import</div>
+          </div>
+        </div>
+
+        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+          <div className="font-medium text-amber-800 dark:text-amber-200 mb-1">Privacy</div>
+          <div className="text-amber-700 dark:text-amber-300">
+            Your data is stored locally on your device. No personal information is sent to external servers.
+          </div>
+        </div>
+
+        <div className="text-center text-xs text-gray-500 dark:text-gray-400 pt-4 border-t border-gray-200 dark:border-gray-800">
+          Built with React, Vite, and Tailwind CSS<br/>
+          Progressive Web App technology
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SuccessTipsPanel() {
+  return (
+    <div className="space-y-6">
+      {/* Timing & Strategy */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <Clock className="w-5 h-5" />
+          Timing & Strategy
+        </h3>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
+            <div className="font-medium text-green-800 dark:text-green-200 mb-2">🎯 Best Drop Times</div>
+            <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
+              <div>• <strong>Evenings:</strong> 6-8pm (people home from work)</div>
+              <div>• <strong>Weekends:</strong> 10am-2pm (avoid meal times)</div>
+              <div>• <strong>Avoid:</strong> Monday mornings, Friday evenings</div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+            <div className="font-medium text-blue-800 dark:text-blue-200 mb-2">📝 Follow Up Timing</div>
+            <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+              <div>• <strong>Return:</strong> 2-3 days after dropping letters</div>
+              <div>• <strong>Best times:</strong> Same as drop times</div>
+              <div>• <strong>Multiple attempts:</strong> Try 3-4 times before marking unreachable</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Conversation Techniques */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <MessageSquare className="w-5 h-5" />
+          Conversation Techniques
+        </h3>
+        <div className="space-y-3">
+          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+            <div className="font-medium text-purple-800 dark:text-purple-200 mb-2">💡 Opening Lines</div>
+            <div className="text-sm text-purple-700 dark:text-purple-300 space-y-2">
+              <div><strong>Standard:</strong> "Hi! I'm [Name] and I'm local. I've been helping neighbours in this area save money on their household bills. I dropped a letter through earlier - have you had a chance to look at it?"</div>
+              <div><strong>Direct:</strong> "Hi! I'm helping families in [Area] save money on their bills. I left a letter earlier - would you like me to check if you could save money too?"</div>
+              <div><strong>Community:</strong> "Hi! I'm from UW and I've been working with families in this neighbourhood to reduce their bills. Have you seen the letter I dropped through?"</div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+            <div className="font-medium text-amber-800 dark:text-amber-200 mb-2">🎭 Handling Objections</div>
+            <div className="text-sm text-amber-700 dark:text-amber-300 space-y-2">
+              <div><strong>"Not interested":</strong> "Totally fine! If things change, the letter has a QR code for a quick checker. No sales calls, just the numbers. Have a great day!"</div>
+              <div><strong>"Already with UW":</strong> "That's great! You might be eligible for additional savings or better bundles. Would you like me to check your current setup?"</div>
+              <div><strong>"Too busy":</strong> "I understand! It literally takes 2 minutes to check. If you're not saving money, you're not interested. If you are, we can book a proper time."</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Success Metrics */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <BarChart3 className="w-5 h-5" />
+          Success Metrics & Goals
+        </h3>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800">
+            <div className="font-medium text-indigo-800 dark:text-indigo-200 mb-2">📊 Realistic Targets</div>
+            <div className="text-sm text-indigo-700 dark:text-indigo-300 space-y-1">
+              <div>• <strong>Drop rate:</strong> 50-100 letters per session</div>
+              <div>• <strong>Conversation rate:</strong> 15-25% of drops</div>
+              <div>• <strong>Interest rate:</strong> 5-10% of conversations</div>
+              <div>• <strong>Success rate:</strong> 2-5% of conversations</div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800">
+            <div className="font-medium text-emerald-800 dark:text-emerald-200 mb-2">🎯 Daily Goals</div>
+            <div className="text-sm text-emerald-700 dark:text-emerald-300 space-y-1">
+              <div>• <strong>Drop:</strong> 50+ letters</div>
+              <div>• <strong>Follow up:</strong> 20+ properties</div>
+              <div>• <strong>Conversations:</strong> 5+ meaningful chats</div>
+              <div>• <strong>Interested leads:</strong> 1+ per day</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Best Practices */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <Check className="w-5 h-5" />
+          Best Practices
+        </h3>
+        <div className="space-y-2">
+          <div className="p-3 bg-gray-50 dark:bg-gray-900/20 rounded-xl border border-gray-200 dark:border-gray-800">
+            <div className="text-sm space-y-1">
+              <div>• <strong>Dress appropriately:</strong> Smart casual, UW branded if possible</div>
+              <div>• <strong>Be confident:</strong> You're offering genuine value, not selling</div>
+              <div>• <strong>Listen actively:</strong> Understand their situation before suggesting solutions</div>
+              <div>• <strong>Follow up promptly:</strong> Use the app to track and schedule follow-ups</div>
+              <div>• <strong>Stay positive:</strong> Every "no" gets you closer to a "yes"</div>
+              <div>• <strong>Use the app:</strong> Track everything to improve your approach</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Common Mistakes */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5" />
+          Common Mistakes to Avoid
+        </h3>
+        <div className="space-y-2">
+          <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
+            <div className="text-sm space-y-1">
+              <div>• <strong>Rushing conversations:</strong> Take time to build rapport</div>
+              <div>• <strong>Not following up:</strong> Most success comes from follow-up visits</div>
+              <div>• <strong>Poor timing:</strong> Avoid meal times and early mornings</div>
+              <div>• <strong>Being pushy:</strong> Respect "no" and move on gracefully</div>
+              <div>• <strong>Not tracking activity:</strong> Use the app to learn what works</div>
+              <div>• <strong>Giving up too early:</strong> Try multiple times before marking unreachable</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1457,13 +2453,32 @@ function Reports({ campaigns }) {
   }))));
 
   const totals = useMemo(() => {
-    const t = { letters: 0, knocked: 0, spoke: 0, interested: 0, followups: 0 };
+    const t = { 
+      letters: 0, 
+      knocked: 0, 
+      spoke: 0, 
+      interested: 0, 
+      followups: 0,
+      outcomes: {
+        interested: 0,
+        customer_signed: 0,
+        appointment_booked: 0,
+        no_for_now: 0,
+        already_uw: 0,
+        not_interested: 0
+      }
+    };
     flat.forEach(r => {
       if (r.dropped) t.letters++;
       if (r.knocked) t.knocked++;
       if (r.spoke) t.spoke++;
-      if (r.result === 'maybe' || r.result === 'interested') t.interested++;
+      if (r.result === 'interested' || r.result === 'customer_signed' || r.result === 'appointment_booked') t.interested++;
       if (r.followUpAt) t.followups++;
+      
+      // Track all outcomes
+      if (r.result && r.result !== 'none') {
+        t.outcomes[r.result] = (t.outcomes[r.result] || 0) + 1;
+      }
     });
     return t;
   }, [campaigns]);
@@ -1477,6 +2492,40 @@ function Reports({ campaigns }) {
           <Stat icon={MessageSquare} label="Spoke" value={totals.spoke} />
           <Stat icon={CheckCircle} label="Interested" value={totals.interested} />
           <Stat icon={CalendarClock} label="Follow‑ups" value={totals.followups} />
+        </div>
+      </SectionCard>
+      
+      <SectionCard title="Conversation Outcomes" icon={MessageSquare}>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+            <div className="text-lg font-semibold text-green-700 dark:text-green-300">{totals.outcomes.interested}</div>
+            <div className="text-sm text-green-600 dark:text-green-400">Interested</div>
+          </div>
+          <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+            <div className="text-lg font-semibold text-green-700 dark:text-green-300">{totals.outcomes.customer_signed}</div>
+            <div className="text-sm text-green-600 dark:text-green-400">Customer Signed</div>
+          </div>
+          <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+            <div className="text-lg font-semibold text-green-700 dark:text-green-300">{totals.outcomes.appointment_booked}</div>
+            <div className="text-sm text-green-600 dark:text-green-400">Appointment Booked</div>
+          </div>
+          <div className="p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+            <div className="text-lg font-semibold text-yellow-700 dark:text-yellow-300">{totals.outcomes.no_for_now}</div>
+            <div className="text-sm text-yellow-600 dark:text-yellow-400">No for Now</div>
+          </div>
+                      <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <div className="text-lg font-semibold text-blue-700 dark:text-blue-300">{totals.outcomes.already_uw}</div>
+              <div className="text-sm text-blue-600 dark:text-blue-400">Already with UW</div>
+            </div>
+          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+            <div className="text-lg font-semibold text-red-700 dark:text-red-300">{totals.outcomes.not_interested}</div>
+            <div className="text-sm text-red-600 dark:text-red-400">Not Interested</div>
+          </div>
+          <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800">
+            <div className="text-lg font-semibold text-gray-700 dark:text-gray-300">{totals.outcomes.unreachable || 0}</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Unreachable</div>
+          </div>
+
         </div>
       </SectionCard>
       <SectionCard title="Activity log (sample)" icon={ListChecks}>
@@ -1874,7 +2923,23 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
       alert('Please enter a property label');
       return;
     }
-    onAddProperty(newPropertyLabel.trim());
+    
+    // Parse comma-separated property labels
+    const propertyLabels = newPropertyLabel
+      .split(',')
+      .map(label => label.trim())
+      .filter(label => label.length > 0);
+    
+    if (propertyLabels.length === 0) {
+      alert('Please enter at least one property label');
+      return;
+    }
+    
+    // Add each property
+    propertyLabels.forEach(label => {
+      onAddProperty(label);
+    });
+    
     setNewPropertyLabel("");
   };
 
@@ -1898,7 +2963,7 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
             value={newPropertyLabel} 
             onChange={e => setNewPropertyLabel(e.target.value)}
             className="flex-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-            placeholder="Property number or name (e.g., 1, 3, 5 or The Old Post Office)"
+            placeholder="Property numbers or names (e.g., 1, 3, 5 or The Old Post Office, Rose Cottage)"
           />
           <button 
             type="submit"
@@ -1908,7 +2973,7 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
           </button>
         </form>
         <div className="text-xs text-gray-500 mt-1">
-          Supports numbers (1, 3, 5) or house names (The Old Post Office, Rose Cottage)
+          Separate multiple properties with commas: "1, 3, 5" or "The Old Post Office, Rose Cottage"
         </div>
       </div>
 
