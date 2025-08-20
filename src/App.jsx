@@ -964,19 +964,20 @@ export default function App() {
       {/* Mobile Navigation Bar */}
       <div className="lg:hidden sticky top-16 z-30 bg-white/80 dark:bg-gray-950/80 backdrop-blur border-b border-gray-200/50 dark:border-gray-800/50">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
-              <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dash" active={view === "dashboard"} onClick={() => setView("dashboard")} />
-              <NavButton icon={<Target className="w-4 h-4 flex-shrink-0"/>} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
-              <NavButton icon={<MapPin className="w-4 h-4 flex-shrink-0"/>} label="Streets" active={view === "streets"} onClick={() => setView("streets")} />
-              <NavButton icon={<FileText className="w-4 h-4 flex-shrink-0"/>} label="Reports" active={view === "reports"} onClick={() => setView("reports")} />
-            </div>
-            {activeCampaign && (
-              <div className="text-xs opacity-70 truncate max-w-32">
+          <div className="grid grid-cols-4 gap-1">
+            <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
+            <NavButton icon={<Target className="w-4 h-4 flex-shrink-0"/>} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
+            <NavButton icon={<MapPin className="w-4 h-4 flex-shrink-0"/>} label="Streets" active={view === "streets"} onClick={() => setView("streets")} />
+            <NavButton icon={<FileText className="w-4 h-4 flex-shrink-0"/>} label="Reports" active={view === "reports"} onClick={() => setView("reports")} />
+          </div>
+          {activeCampaign && (
+            <div className="mt-2 text-center px-2">
+              <div className="text-xs opacity-70 mb-1">Active Campaign</div>
+              <div className="text-sm font-medium truncate bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 px-2 py-1 rounded-lg">
                 {activeCampaign.name}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1279,14 +1280,14 @@ function NavButton({ icon, label, active, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm border transition-all min-w-0 ${
+      className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-xl text-xs border transition-all min-w-0 lg:flex-row lg:gap-2 lg:px-3 lg:text-sm ${
         active 
           ? "bg-primary-600 text-white border-primary-600 shadow-md" 
           : "bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800"
       }`}
     >
       <span className="flex-shrink-0">{icon}</span>
-      <span className="truncate">{label}</span>
+      <span className="truncate text-center leading-tight">{label}</span>
     </button>
   );
 }
@@ -1358,7 +1359,7 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
 
       {hasData && stats.outcomes && (
         <SectionCard title="Conversation Outcomes" icon={MessageSquare}>
-          <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
             <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
               <div className="text-base sm:text-lg font-semibold text-green-700 dark:text-green-300">{stats.outcomes.interested}</div>
               <div className="text-xs sm:text-sm text-green-600 dark:text-green-400">Interested</div>
