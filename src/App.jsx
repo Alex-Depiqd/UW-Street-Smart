@@ -906,10 +906,10 @@ export default function App() {
   }, [dark]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 overflow-x-hidden">
       {/* Top Bar */}
       <div className="sticky top-0 z-40 backdrop-blur bg-white/60 dark:bg-gray-950/60 border-b border-gray-200/50 dark:border-gray-800/50">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-2xl bg-primary-600 flex items-center justify-center shadow text-white font-bold">UW</div>
             <div>
@@ -963,10 +963,10 @@ export default function App() {
 
       {/* Mobile Navigation Bar */}
       <div className="lg:hidden sticky top-16 z-30 bg-white/80 dark:bg-gray-950/80 backdrop-blur border-b border-gray-200/50 dark:border-gray-800/50">
-        <div className="max-w-6xl mx-auto px-4 py-2">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
+            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
+              <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dash" active={view === "dashboard"} onClick={() => setView("dashboard")} />
               <NavButton icon={<Target className="w-4 h-4 flex-shrink-0"/>} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
               <NavButton icon={<MapPin className="w-4 h-4 flex-shrink-0"/>} label="Streets" active={view === "streets"} onClick={() => setView("streets")} />
               <NavButton icon={<FileText className="w-4 h-4 flex-shrink-0"/>} label="Reports" active={view === "reports"} onClick={() => setView("reports")} />
@@ -981,7 +981,7 @@ export default function App() {
       </div>
 
       {/* Content Area */}
-      <div className="max-w-7xl mx-auto px-4 py-3 lg:py-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
         {/* Sidebar - Hidden on mobile */}
         <div className="hidden lg:block lg:col-span-1 space-y-3">
           <SectionCard title="Navigate" icon={FolderOpen}>
@@ -1293,13 +1293,13 @@ function NavButton({ icon, label, active, onClick }) {
 
 function Stat({ icon: Icon, label, value, sub }) {
   return (
-    <div className="rounded-2xl p-4 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 shadow-soft flex items-center gap-3">
-      <div className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800">
-        <Icon className="w-5 h-5 text-primary-600" />
+    <div className="rounded-2xl p-3 sm:p-4 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 shadow-soft flex items-center gap-2 sm:gap-3 min-w-0">
+      <div className="p-1.5 sm:p-2 rounded-xl bg-gray-100 dark:bg-gray-800 flex-shrink-0">
+        <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
       </div>
-      <div>
-        <div className="text-2xl font-semibold leading-none">{value}</div>
-        <div className="text-sm opacity-70">{label}</div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xl sm:text-2xl font-semibold leading-none">{value}</div>
+        <div className="text-xs sm:text-sm opacity-70 truncate">{label}</div>
         {sub && <div className="text-xs opacity-60 mt-1">{sub}</div>}
       </div>
     </div>
@@ -1333,7 +1333,7 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
         }
       >
         {hasData ? (
-          <div className="grid md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
             <Stat icon={UploadCloud} label="Letters dropped today" value={stats.letters} />
             <Stat icon={MessageSquare} label="Conversations today" value={stats.convos} />
             <Stat icon={CheckCircle} label="Interested today" value={stats.interested} />
@@ -1358,34 +1358,34 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
 
       {hasData && stats.outcomes && (
         <SectionCard title="Conversation Outcomes" icon={MessageSquare}>
-          <div className="grid md:grid-cols-2 gap-3">
-            <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-              <div className="text-lg font-semibold text-green-700 dark:text-green-300">{stats.outcomes.interested}</div>
-              <div className="text-sm text-green-600 dark:text-green-400">Interested</div>
+          <div className="grid grid-cols-2 lg:grid-cols-2 gap-2 sm:gap-3">
+            <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+              <div className="text-base sm:text-lg font-semibold text-green-700 dark:text-green-300">{stats.outcomes.interested}</div>
+              <div className="text-xs sm:text-sm text-green-600 dark:text-green-400">Interested</div>
             </div>
-            <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-              <div className="text-lg font-semibold text-green-700 dark:text-green-300">{stats.outcomes.customer_signed}</div>
-              <div className="text-sm text-green-600 dark:text-green-400">Customer Signed</div>
+            <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+              <div className="text-base sm:text-lg font-semibold text-green-700 dark:text-green-300">{stats.outcomes.customer_signed}</div>
+              <div className="text-xs sm:text-sm text-green-600 dark:text-green-400">Customer Signed</div>
             </div>
-            <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-              <div className="text-lg font-semibold text-green-700 dark:text-green-300">{stats.outcomes.appointment_booked}</div>
-              <div className="text-sm text-green-600 dark:text-green-400">Appointment Booked</div>
+            <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+              <div className="text-base sm:text-lg font-semibold text-green-700 dark:text-green-300">{stats.outcomes.appointment_booked}</div>
+              <div className="text-xs sm:text-sm text-green-600 dark:text-green-400">Appointment Booked</div>
             </div>
-            <div className="p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-              <div className="text-lg font-semibold text-yellow-700 dark:text-yellow-300">{stats.outcomes.no_for_now}</div>
-              <div className="text-sm text-yellow-600 dark:text-yellow-400">No for Now</div>
+            <div className="p-2 sm:p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+              <div className="text-base sm:text-lg font-semibold text-yellow-700 dark:text-yellow-300">{stats.outcomes.no_for_now}</div>
+              <div className="text-xs sm:text-sm text-yellow-600 dark:text-yellow-400">No for Now</div>
             </div>
-            <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-              <div className="text-lg font-semibold text-blue-700 dark:text-blue-300">{stats.outcomes.already_uw}</div>
-              <div className="text-sm text-blue-600 dark:text-blue-400">Already with UW</div>
+            <div className="p-2 sm:p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <div className="text-base sm:text-lg font-semibold text-blue-700 dark:text-blue-300">{stats.outcomes.already_uw}</div>
+              <div className="text-xs sm:text-sm text-blue-600 dark:text-blue-400">Already with UW</div>
             </div>
-            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-              <div className="text-lg font-semibold text-red-700 dark:text-red-300">{stats.outcomes.not_interested}</div>
-              <div className="text-sm text-red-600 dark:text-red-400">Not Interested</div>
+            <div className="p-2 sm:p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <div className="text-base sm:text-lg font-semibold text-red-700 dark:text-red-300">{stats.outcomes.not_interested}</div>
+              <div className="text-xs sm:text-sm text-red-600 dark:text-red-400">Not Interested</div>
             </div>
-            <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800">
-              <div className="text-lg font-semibold text-gray-700 dark:text-gray-300">{stats.outcomes.unreachable || 0}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Unreachable</div>
+            <div className="p-2 sm:p-3 rounded-xl bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800">
+              <div className="text-base sm:text-lg font-semibold text-gray-700 dark:text-gray-300">{stats.outcomes.unreachable || 0}</div>
+              <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Unreachable</div>
             </div>
 
           </div>
