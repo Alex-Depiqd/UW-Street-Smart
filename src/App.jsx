@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Check, MapPin, Home, ListChecks, CalendarClock, MessageSquare, 
@@ -6,7 +6,7 @@ import {
   Clock, Phone, FileText, FolderOpen, Share2, UploadCloud, 
   Moon, Sun, Settings, Bell, Search, Filter, MoreVertical,
   User, LogOut, HelpCircle, Info, Shield, Database, BarChart3, Target,
-  Upload, Trash2, AlertTriangle
+  Upload, Trash2, AlertTriangle, Camera
 } from "lucide-react";
 
 // --- Mock Seed Data ---
@@ -89,9 +89,9 @@ const seedCampaigns = [
         postcode: "IP30 9XX",
         status: "in_progress",
         properties: [
-          { id: "p1", label: "1", dropped: true, knocked: true, spoke: false, result: "no_answer" },
-          { id: "p2", label: "3", dropped: true, knocked: true, spoke: true, result: "maybe", followUpAt: "2025-08-16T18:00:00" },
-          { id: "p3", label: "5", dropped: true, knocked: false, spoke: false, result: "none" },
+          { id: "p1", label: "1", dropped: true, knocked: true, spoke: false, result: "no_answer", photo: null },
+          { id: "p2", label: "3", dropped: true, knocked: true, spoke: true, result: "maybe", followUpAt: "2025-08-16T18:00:00", photo: null },
+          { id: "p3", label: "5", dropped: true, knocked: false, spoke: false, result: "none", photo: null },
         ],
       },
       {
@@ -100,8 +100,8 @@ const seedCampaigns = [
         postcode: "IP30 9YY",
         status: "not_started",
         properties: [
-          { id: "p4", label: "12", dropped: false, knocked: false, spoke: false, result: "none" },
-          { id: "p5", label: "14", dropped: false, knocked: false, spoke: false, result: "none" },
+          { id: "p4", label: "12", dropped: false, knocked: false, spoke: false, result: "none", photo: null },
+          { id: "p5", label: "14", dropped: false, knocked: false, spoke: false, result: "none", photo: null },
         ],
       },
     ],
@@ -257,7 +257,7 @@ export default function App() {
         
         if (droppedToday) letters++;
         if (spokeToday) convos++;
-        if (resultToday && (p.result === "interested" || p.result === "customer_signed" || p.result === "appointment_booked")) interested++;
+        if (resultToday && (p.result === "customer_signed" || p.result === "appointment_booked")) interested++;
         if (followUpToday) followups++;
         
         // Track today's outcomes
@@ -310,14 +310,17 @@ export default function App() {
       
       let newStatus = updatedCampaign.status;
       
-      // Update to "active" if any properties have been dropped
-      if (droppedProperties > 0 && newStatus === "draft") {
+      // Update to "active" if any properties have any activity (dropped, knocked, or spoke)
+      const activeProperties = updatedCampaign.streets.reduce((total, street) => 
+        total + street.properties.filter(p => p.dropped || p.knocked || p.spoke).length, 0);
+      
+      if (activeProperties > 0 && newStatus === "planned") {
         newStatus = "active";
       }
       
-      // Update to "completed" if all properties have been handled (spoke OR not interested OR unreachable)
+      // Update to "completed" if all properties have been handled (excluding no_answer as it requires follow-up)
       const handledProperties = updatedCampaign.streets.reduce((total, street) => 
-        total + street.properties.filter(p => p.spoke || p.result === "not_interested" || p.result === "unreachable").length, 0);
+        total + street.properties.filter(p => p.result && p.result !== "none" && p.result !== "no_answer").length, 0);
       
       if (totalProperties > 0 && handledProperties === totalProperties) {
         newStatus = "completed";
@@ -327,19 +330,34 @@ export default function App() {
       const updatedStreets = updatedCampaign.streets.map(street => {
         const streetTotalProperties = street.properties.length;
         const streetDroppedProperties = street.properties.filter(p => p.dropped).length;
+        const streetKnockedProperties = street.properties.filter(p => p.knocked).length;
         const streetSpokeProperties = street.properties.filter(p => p.spoke).length;
         
         let streetStatus = street.status;
         
+        // Check if any properties have any activity (dropped, knocked, spoke, or outcomes)
+        const streetActiveProperties = street.properties.filter(p => 
+          p.dropped || p.knocked || p.spoke || (p.result && p.result !== "none")
+        ).length;
+        
+        // Revert to "not_started" if no properties have any activity
+        if (streetActiveProperties === 0) {
+          streetStatus = "not_started";
+        }
         // Update to "in_progress" if any properties have been dropped
-        if (streetDroppedProperties > 0 && streetStatus === "not_started") {
+        else if (streetDroppedProperties > 0 && streetStatus === "not_started") {
           streetStatus = "in_progress";
         }
         
-        // Update to "completed" if all properties have been handled (spoke OR not interested OR unreachable)
-        const streetHandledProperties = street.properties.filter(p => p.spoke || p.result === "not_interested" || p.result === "unreachable").length;
+        // Update to "completed" if all properties have been handled (excluding no_answer as it requires follow-up)
+        const streetHandledProperties = street.properties.filter(p => p.result && p.result !== "none" && p.result !== "no_answer").length;
         if (streetTotalProperties > 0 && streetHandledProperties === streetTotalProperties) {
           streetStatus = "completed";
+        }
+        
+        // Move back to "in_progress" if street was completed but now has properties without outcomes
+        if (streetStatus === "completed" && streetHandledProperties < streetTotalProperties) {
+          streetStatus = "in_progress";
         }
         
         return {
@@ -411,7 +429,7 @@ export default function App() {
         id: "new-campaign",
         name: "New Campaign",
         area: "",
-        status: "draft",
+        status: "planned",
         created_at: new Date().toISOString().split('T')[0],
         links: {
           connector: "",
@@ -437,7 +455,7 @@ export default function App() {
       id: `campaign-${Date.now()}`,
       name: campaignData.name,
       area: campaignData.area,
-      status: "draft",
+      status: "planned",
       created_at: new Date().toISOString().split('T')[0],
       links: {
         connector: campaignData.connector || "",
@@ -593,6 +611,7 @@ export default function App() {
       knocked: false,
       spoke: false,
       result: "none",
+      photo: null,
       droppedAt: null,
       knockedAt: null,
       spokeAt: null,
@@ -601,17 +620,95 @@ export default function App() {
     
     setCampaigns(prev => prev.map(c => {
       if (c.id === activeCampaignId) {
-        return {
+        // Update the campaign's streets and properties
+        const updatedCampaign = {
           ...c,
           streets: c.streets.map(s => {
             if (s.id === activeStreetId) {
-              return {
+              const updatedStreet = {
                 ...s,
                 properties: [...s.properties, newProperty]
               };
+              
+              // If street was completed and we're adding a new property, move back to in_progress
+              if (s.status === "completed") {
+                updatedStreet.status = "in_progress";
+              }
+              
+              return updatedStreet;
             }
             return s;
           })
+        };
+        
+        // Auto-update campaign status based on activity
+        const totalProperties = updatedCampaign.streets.reduce((total, street) => total + street.properties.length, 0);
+        const droppedProperties = updatedCampaign.streets.reduce((total, street) => 
+          total + street.properties.filter(p => p.dropped).length, 0);
+        
+        let newStatus = updatedCampaign.status;
+        
+        // Update to "active" if any properties have been dropped
+        // Update to "active" if any properties have any activity (dropped, knocked, or spoke)
+        const activeProperties = updatedCampaign.streets.reduce((total, street) => 
+          total + street.properties.filter(p => p.dropped || p.knocked || p.spoke).length, 0);
+        
+        if (activeProperties > 0 && newStatus === "planned") {
+          newStatus = "active";
+        }
+        
+        // Update to "completed" if all properties have been handled (excluding no_answer as it requires follow-up)
+        const handledProperties = updatedCampaign.streets.reduce((total, street) => 
+          total + street.properties.filter(p => p.result && p.result !== "none" && p.result !== "no_answer").length, 0);
+        
+        if (totalProperties > 0 && handledProperties === totalProperties) {
+          newStatus = "completed";
+        }
+        
+        // Also update street status
+        const updatedStreets = updatedCampaign.streets.map(street => {
+          const streetTotalProperties = street.properties.length;
+          const streetDroppedProperties = street.properties.filter(p => p.dropped).length;
+          const streetKnockedProperties = street.properties.filter(p => p.knocked).length;
+          const streetSpokeProperties = street.properties.filter(p => p.spoke).length;
+          
+          let streetStatus = street.status;
+          
+          // Check if any properties have any activity (dropped, knocked, spoke, or outcomes)
+          const streetActiveProperties = street.properties.filter(p => 
+            p.dropped || p.knocked || p.spoke || (p.result && p.result !== "none")
+          ).length;
+          
+          // Revert to "not_started" if no properties have any activity
+          if (streetActiveProperties === 0) {
+            streetStatus = "not_started";
+          }
+          // Update to "in_progress" if any properties have been dropped
+          else if (streetDroppedProperties > 0 && streetStatus === "not_started") {
+            streetStatus = "in_progress";
+          }
+          
+          // Update to "completed" if all properties have been handled (excluding no_answer as it requires follow-up)
+          const streetHandledProperties = street.properties.filter(p => p.result && p.result !== "none" && p.result !== "no_answer").length;
+          if (streetTotalProperties > 0 && streetHandledProperties === streetTotalProperties) {
+            streetStatus = "completed";
+          }
+          
+          // Move back to "in_progress" if street was completed but now has properties without outcomes
+          if (streetStatus === "completed" && streetHandledProperties < streetTotalProperties) {
+            streetStatus = "in_progress";
+          }
+          
+          return {
+            ...street,
+            status: streetStatus
+          };
+        });
+        
+        return {
+          ...updatedCampaign,
+          streets: updatedStreets,
+          status: newStatus
         };
       }
       return c;
@@ -705,13 +802,17 @@ export default function App() {
       let newStatus = updatedCampaign.status;
       
       // Update to "active" if any properties have been dropped
-      if (droppedProperties > 0 && newStatus === "draft") {
-        newStatus = "active";
-      }
+              // Update to "active" if any properties have any activity (dropped, knocked, or spoke)
+        const activeProperties = updatedCampaign.streets.reduce((total, street) => 
+          total + street.properties.filter(p => p.dropped || p.knocked || p.spoke).length, 0);
+        
+        if (activeProperties > 0 && newStatus === "planned") {
+          newStatus = "active";
+        }
       
-      // Update to "completed" if all properties have been handled (spoke OR not interested OR unreachable)
+      // Update to "completed" if all properties have been handled (excluding no_answer as it requires follow-up)
       const handledProperties = updatedCampaign.streets.reduce((total, street) => 
-        total + street.properties.filter(p => p.spoke || p.result === "not_interested" || p.result === "unreachable").length, 0);
+        total + street.properties.filter(p => p.result && p.result !== "none" && p.result !== "no_answer").length, 0);
       
       if (totalProperties > 0 && handledProperties === totalProperties) {
         newStatus = "completed";
@@ -721,19 +822,34 @@ export default function App() {
       const updatedStreets = updatedCampaign.streets.map(street => {
         const streetTotalProperties = street.properties.length;
         const streetDroppedProperties = street.properties.filter(p => p.dropped).length;
+        const streetKnockedProperties = street.properties.filter(p => p.knocked).length;
         const streetSpokeProperties = street.properties.filter(p => p.spoke).length;
         
         let streetStatus = street.status;
         
+        // Check if any properties have any activity (dropped, knocked, spoke, or outcomes)
+        const streetActiveProperties = street.properties.filter(p => 
+          p.dropped || p.knocked || p.spoke || (p.result && p.result !== "none")
+        ).length;
+        
+        // Revert to "not_started" if no properties have any activity
+        if (streetActiveProperties === 0) {
+          streetStatus = "not_started";
+        }
         // Update to "in_progress" if any properties have been dropped
-        if (streetDroppedProperties > 0 && streetStatus === "not_started") {
+        else if (streetDroppedProperties > 0 && streetStatus === "not_started") {
           streetStatus = "in_progress";
         }
         
-        // Update to "completed" if all properties have been handled (spoke OR not interested OR unreachable)
-        const streetHandledProperties = street.properties.filter(p => p.spoke || p.result === "not_interested" || p.result === "unreachable").length;
+        // Update to "completed" if all properties have been handled (excluding no_answer as it requires follow-up)
+        const streetHandledProperties = street.properties.filter(p => p.result && p.result !== "none" && p.result !== "no_answer").length;
         if (streetTotalProperties > 0 && streetHandledProperties === streetTotalProperties) {
           streetStatus = "completed";
+        }
+        
+        // Move back to "in_progress" if street was completed but now has properties without outcomes
+        if (streetStatus === "completed" && streetHandledProperties < streetTotalProperties) {
+          streetStatus = "in_progress";
         }
         
         return {
@@ -1055,21 +1171,33 @@ export default function App() {
                   if (campaign.id === campaignId) {
                     const newStatus = campaign.status === 'completed' ? 'active' : 'completed';
                     
-                    // If marking as completed, set all unhandled properties as unreachable
+                    // If marking as completed, set properties without outcomes to "No Answer"
                     if (newStatus === 'completed') {
                       const updatedStreets = campaign.streets.map(street => ({
                         ...street,
                         properties: street.properties.map(property => {
-                          if (!property.spoke && property.result === 'none') {
-                            return { ...property, result: 'unreachable' };
+                          // Only set to "No Answer" if property has no outcome
+                          if (property.result === 'none' || !property.result) {
+                            return { ...property, result: 'no_answer' };
                           }
                           return property;
                         })
                       }));
                       return { ...campaign, streets: updatedStreets, status: newStatus };
                     } else {
-                      // If unmarking as completed, just change the status back to active
-                      return { ...campaign, status: newStatus };
+                      // If unmarking as completed, clear outcomes for properties that need follow-up
+                      const updatedStreets = campaign.streets.map(street => ({
+                        ...street,
+                        properties: street.properties.map(property => {
+                          // Clear "No Answer" outcome if property doesn't have "Spoke" status
+                          // (meaning it was auto-set when marking complete, not manually set)
+                          if (property.result === 'no_answer' && !property.spoke) {
+                            return { ...property, result: 'none' };
+                          }
+                          return property;
+                        })
+                      }));
+                      return { ...campaign, streets: updatedStreets, status: newStatus };
                     }
                   }
                   return campaign;
@@ -1269,7 +1397,7 @@ export default function App() {
 
       {/* Footer Hint */}
       <div className="max-w-6xl mx-auto px-4 pb-8 text-xs opacity-70">
-        UW Street Smart - NL Activity Tracker v1.0.0 | Built for UW partners making a difference in their communities.
+        UW Street Smart - NL Activity Tracker v1.0.0 | Built for UW partners making a difference in their communities. | © 2025 Alex Cameron. All rights reserved.
       </div>
     </div>
   );
@@ -1312,6 +1440,51 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
   
   return (
     <div className="space-y-4">
+      <SectionCard title="Active Campaign" icon={MapPin}>
+        {activeCampaign ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="text-lg font-semibold truncate">{activeCampaign.name}</div>
+                <div className="text-sm opacity-70">
+                  Area: {activeCampaign.area || 'Not set'} • Streets: {activeCampaign.streets.length}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Chip variant={activeCampaign.status === 'active' ? 'success' : 'default'}>
+                  {activeCampaign.status}
+                </Chip>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button 
+                onClick={onGoStreets} 
+                className="flex-1 px-3 py-2 rounded-xl bg-primary-600 text-white text-sm flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors"
+              >
+                <MapPin className="w-4 h-4"/> Go to Streets
+              </button>
+              <button className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                <Plus className="w-4 h-4"/> Add Street
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-6">
+            <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
+              <Target className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">No active campaign</h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">Get started by creating your first neighbourhood campaign</p>
+            <button 
+              onClick={onGoStreets} 
+              className="px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+            >
+              Create First Campaign
+            </button>
+          </div>
+        )}
+      </SectionCard>
+
       <SectionCard 
         title="Today's Activity" 
         icon={Home} 
@@ -1337,22 +1510,15 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
             <Stat icon={UploadCloud} label="Letters dropped today" value={stats.letters} />
             <Stat icon={MessageSquare} label="Conversations today" value={stats.convos} />
-            <Stat icon={CheckCircle} label="Interested today" value={stats.interested} />
+            <Stat icon={CheckCircle} label="Successes today" value={stats.interested} />
             <Stat icon={CalendarClock} label="Follow‑ups scheduled today" value={stats.followups} />
           </div>
         ) : (
-          <div className="text-center py-8">
-            <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
-              <Target className="w-8 h-8 text-gray-400" />
+          <div className="text-center py-6">
+            <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
+              <Home className="w-6 h-6 text-gray-400" />
             </div>
-            <h3 className="text-lg font-medium mb-2">No campaigns yet</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">Get started by creating your first neighbourhood campaign</p>
-            <button 
-              onClick={() => setShowNewCampaignModal(true)} 
-              className="px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
-            >
-              Create First Campaign
-            </button>
+            <p className="text-gray-600 dark:text-gray-400">No activity recorded today</p>
           </div>
         )}
       </SectionCard>
@@ -1360,63 +1526,40 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
       {hasData && stats.outcomes && (
         <SectionCard title="Conversation Outcomes" icon={MessageSquare}>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-            <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-              <div className="text-base sm:text-lg font-semibold text-green-700 dark:text-green-300">{stats.outcomes.interested}</div>
-              <div className="text-xs sm:text-sm text-green-600 dark:text-green-400">Interested</div>
+            <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
+              <div className="text-base sm:text-lg font-semibold text-green-800 dark:text-green-200">{stats.outcomes.customer_signed}</div>
+              <div className="text-xs sm:text-sm text-green-700 dark:text-green-300">Customers Signed</div>
             </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-              <div className="text-base sm:text-lg font-semibold text-green-700 dark:text-green-300">{stats.outcomes.customer_signed}</div>
-              <div className="text-xs sm:text-sm text-green-600 dark:text-green-400">Customer Signed</div>
+            <div className="p-2 sm:p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500 dark:border-emerald-500">
+              <div className="text-base sm:text-lg font-semibold text-emerald-800 dark:text-emerald-200">{stats.outcomes.appointment_booked}</div>
+              <div className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300">Appointment Booked</div>
             </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-              <div className="text-base sm:text-lg font-semibold text-green-700 dark:text-green-300">{stats.outcomes.appointment_booked}</div>
-              <div className="text-xs sm:text-sm text-green-600 dark:text-green-400">Appointment Booked</div>
+            <div className="p-2 sm:p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-500 dark:border-amber-500">
+              <div className="text-base sm:text-lg font-semibold text-amber-800 dark:text-amber-200">{stats.outcomes.no_for_now}</div>
+              <div className="text-xs sm:text-sm text-amber-700 dark:text-amber-300">No for Now</div>
             </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-              <div className="text-base sm:text-lg font-semibold text-yellow-700 dark:text-yellow-300">{stats.outcomes.no_for_now}</div>
-              <div className="text-xs sm:text-sm text-yellow-600 dark:text-yellow-400">No for Now</div>
+            <div className="p-2 sm:p-3 rounded-xl bg-sky-50 dark:bg-sky-900/20 border-2 border-sky-500 dark:border-sky-500">
+              <div className="text-base sm:text-lg font-semibold text-sky-800 dark:text-sky-200">{stats.outcomes.already_uw}</div>
+              <div className="text-xs sm:text-sm text-sky-700 dark:text-sky-300">Already with UW</div>
             </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-              <div className="text-base sm:text-lg font-semibold text-blue-700 dark:text-blue-300">{stats.outcomes.already_uw}</div>
-              <div className="text-xs sm:text-sm text-blue-600 dark:text-blue-400">Already with UW</div>
+            <div className="p-2 sm:p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-500">
+              <div className="text-base sm:text-lg font-semibold text-red-800 dark:text-red-200">{stats.outcomes.not_interested}</div>
+              <div className="text-xs sm:text-sm text-red-700 dark:text-red-300">Not Interested</div>
             </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-              <div className="text-base sm:text-lg font-semibold text-red-700 dark:text-red-300">{stats.outcomes.not_interested}</div>
-              <div className="text-xs sm:text-sm text-red-600 dark:text-red-400">Not Interested</div>
+            <div className="p-2 sm:p-3 rounded-xl bg-slate-50 dark:bg-slate-900/20 border-2 border-slate-500 dark:border-slate-500">
+              <div className="text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-200">{stats.outcomes.no_answer || 0}</div>
+              <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">No Answer</div>
             </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800">
-              <div className="text-base sm:text-lg font-semibold text-gray-700 dark:text-gray-300">{stats.outcomes.unreachable || 0}</div>
-              <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Unreachable</div>
+            <div className="p-2 sm:p-3 rounded-xl bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-500 dark:border-purple-500">
+              <div className="text-base sm:text-lg font-semibold text-purple-800 dark:text-purple-200">{stats.outcomes.no_cold_callers || 0}</div>
+              <div className="text-xs sm:text-sm text-purple-700 dark:text-purple-300">No Cold Callers</div>
             </div>
 
           </div>
         </SectionCard>
       )}
 
-      <SectionCard title="Active campaign" icon={MapPin}>
-        {activeCampaign ? (
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-medium">{activeCampaign.name}</div>
-              <div className="text-xs opacity-70">
-                Area: {activeCampaign.area || 'Not set'} • Streets: {activeCampaign.streets.length}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Chip variant={activeCampaign.status === 'active' ? 'success' : 'default'}>
-                {activeCampaign.status}
-              </Chip>
-              <button className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                <Plus className="w-4 h-4"/> New street
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-4">
-            <p className="text-gray-600 dark:text-gray-400">No active campaign</p>
-          </div>
-        )}
-      </SectionCard>
+
     </div>
   );
 }
@@ -1563,11 +1706,11 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
               }`}
               onClick={() => {
                 if (c.status === 'completed') {
-                  if (confirm('Unmark this campaign as completed? This will set the status back to active.')) {
+                  if (confirm('Unmark this campaign as completed? This will clear "No Answer" outcomes for properties that need follow-up while preserving manually set outcomes.')) {
                     onToggleComplete(c.id);
                   }
                 } else {
-                  if (confirm('Mark this campaign as completed? This will set all remaining properties as "Unreachable".')) {
+                  if (confirm('Mark this campaign as completed? This will set properties without outcomes to "No Answer" while preserving existing status and outcomes.')) {
                     onToggleComplete(c.id);
                   }
                 }
@@ -1586,9 +1729,9 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
           <div className="flex items-center justify-between text-sm">
             <div>Area: <strong>{c.area || 'Not set'}</strong></div>
             <div className="flex items-center gap-2">
-              <Chip variant={c.status === 'active' ? 'success' : 'default'}>
-                {c.status}
-              </Chip>
+                              <Chip variant={c.status === 'active' ? 'success' : 'default'}>
+                  {c.status === 'planned' ? 'Planned' : c.status}
+                </Chip>
               <div className="text-xs opacity-70">
                 {c.streets.length} streets • Created {c.created_at}
               </div>
@@ -1750,33 +1893,49 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                 <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
                   {s.properties.map(p => {
                     // Determine button styling based on progression and outcome
-                    let buttonStyle = 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600';
+                    let buttonStyle = 'border border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600';
                     
-                    // Priority: Outcomes > Spoke > Knocked > Dropped
-                    if (p.result === 'interested' || p.result === 'customer_signed' || p.result === 'appointment_booked') {
-                      buttonStyle = 'border-green-400 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300';
+                    // OUTCOMES (Final Results) - Bold borders (2px) + Saturated colors
+                    if (p.result === 'customer_signed') {
+                      buttonStyle = 'border-2 border-green-500 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200';
+                    } else if (p.result === 'appointment_booked') {
+                      buttonStyle = 'border-2 border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-200';
                     } else if (p.result === 'no_for_now') {
-                      buttonStyle = 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300';
+                      buttonStyle = 'border-2 border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200';
                     } else if (p.result === 'already_uw') {
-                      buttonStyle = 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300';
+                      buttonStyle = 'border-2 border-sky-500 bg-sky-50 dark:bg-sky-900/20 text-sky-800 dark:text-sky-200';
                     } else if (p.result === 'not_interested') {
-                      buttonStyle = 'border-red-400 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300';
-                    } else if (p.result === 'unreachable') {
-                      buttonStyle = 'border-gray-400 bg-gray-50 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300';
-                    } else if (p.spoke) {
-                      buttonStyle = 'border-green-400 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300';
+                      buttonStyle = 'border-2 border-red-500 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200';
+                    } else if (p.result === 'no_answer') {
+                      buttonStyle = 'border-2 border-slate-500 bg-slate-50 dark:bg-slate-900/20 text-slate-800 dark:text-slate-200';
+                    } else if (p.result === 'no_cold_callers') {
+                      buttonStyle = 'border-2 border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200';
+                    } 
+                    // STATUS STATES (Activity Progress) - Thin borders (1px) + Muted colors
+                    else if (p.spoke) {
+                      buttonStyle = 'border border-teal-300 bg-teal-50/50 dark:bg-teal-900/10 text-teal-600 dark:text-teal-400';
                     } else if (p.knocked) {
-                      buttonStyle = 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300';
+                      buttonStyle = 'border border-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400';
                     } else if (p.dropped) {
-                      buttonStyle = 'border-orange-400 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300';
+                      buttonStyle = 'border border-orange-300 bg-orange-50/50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400';
                     }
                     
                     return (
                       <button 
                         key={p.id} 
                         onClick={()=>onOpenProperty(s.id, p.id)} 
-                        className={`px-2 py-1 rounded-lg text-xs border transition-colors flex-shrink-0 ${buttonStyle}`}
-                        title={p.result ? `Outcome: ${p.result.replace('_', ' ')}` : ''}
+                        className={`px-2 py-1 rounded-lg text-xs transition-colors flex-shrink-0 ${buttonStyle}`}
+                        title={
+                          p.result && p.result !== 'none' 
+                            ? `Outcome: ${p.result.replace('_', ' ')}` 
+                            : p.spoke 
+                              ? 'Spoke - No outcome set' 
+                              : p.knocked 
+                                ? 'Knocked - No outcome set' 
+                                : p.dropped 
+                                  ? 'Dropped - No outcome set' 
+                                  : 'No activity recorded'
+                        }
                       >
                         {p.label}
                       </button>
@@ -1860,6 +2019,7 @@ function ToggleRow({ label, value, onChange }) {
 
 function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onShowLinks, onToggleStatus }) {
   const [showFollowUp, setShowFollowUp] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [notes, setNotes] = useState("");
 
   return (
@@ -1936,34 +2096,27 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
           <div className="mt-4">
             <label className="text-xs opacity-70 mb-2 block">Conversation Outcome</label>
             <div className="grid grid-cols-2 gap-2">
-                             <OutcomeButton 
-                 label="Interested" 
-                 value="interested" 
-                 current={property.result} 
-                 onClick={() => onUpdate({ result: 'interested' })}
-                 variant="success"
-               />
-               <OutcomeButton 
-                 label="Customer Signed" 
-                 value="customer_signed" 
-                 current={property.result} 
-                 onClick={() => onUpdate({ result: 'customer_signed' })}
-                 variant="success"
-               />
-               <OutcomeButton 
-                 label="Appointment Booked" 
-                 value="appointment_booked" 
-                 current={property.result} 
-                 onClick={() => onUpdate({ result: 'appointment_booked' })}
-                 variant="success"
-               />
-               <OutcomeButton 
-                 label="No for Now" 
-                 value="no_for_now" 
-                 current={property.result} 
-                 onClick={() => onUpdate({ result: 'no_for_now' })}
-                 variant="warning"
-               />
+              <OutcomeButton 
+                label="Customers Signed" 
+                value="customer_signed" 
+                current={property.result} 
+                onClick={() => onUpdate({ result: 'customer_signed' })}
+                variant="success"
+              />
+              <OutcomeButton 
+                label="Appointment Booked" 
+                value="appointment_booked" 
+                current={property.result} 
+                onClick={() => onUpdate({ result: 'appointment_booked' })}
+                variant="success"
+              />
+              <OutcomeButton 
+                label="No for Now" 
+                value="no_for_now" 
+                current={property.result} 
+                onClick={() => onUpdate({ result: 'no_for_now' })}
+                variant="warning"
+              />
               <OutcomeButton 
                 label="Already with UW" 
                 value="already_uw" 
@@ -1979,19 +2132,29 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                 variant="error"
               />
               <OutcomeButton 
-                label="Unreachable" 
-                value="unreachable" 
+                label="No Answer" 
+                value="no_answer" 
                 current={property.result} 
-                onClick={() => onUpdate({ result: 'unreachable' })}
+                onClick={() => onUpdate({ result: 'no_answer' })}
                 variant="default"
               />
-              
+              <OutcomeButton 
+                label="No Cold Callers" 
+                value="no_cold_callers" 
+                current={property.result} 
+                onClick={() => onUpdate({ result: 'no_cold_callers' })}
+                variant="purple"
+              />
             </div>
           </div>
           
           <div className="flex items-center justify-between mt-4">
-            <button className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-              Attach photo
+            <button 
+              onClick={() => setShowPhotoModal(true)}
+              className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              {property.photo ? 'Change photo' : 'Attach photo'}
             </button>
             <button 
               onClick={() => onUpdate({ result: 'none' })}
@@ -2000,6 +2163,24 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
               Clear outcome
             </button>
           </div>
+          
+          {property.photo && (
+            <div className="mt-3">
+              <div className="relative">
+                <img 
+                  src={property.photo} 
+                  alt="Property photo" 
+                  className="w-full h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-800"
+                />
+                <button 
+                  onClick={() => onUpdate({ photo: null })}
+                  className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </SectionCard>
 
@@ -2007,6 +2188,12 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
         open={showFollowUp} 
         onClose={()=>setShowFollowUp(false)} 
         onSave={(dt)=>{ onUpdate({ followUpAt: dt }); setShowFollowUp(false); }} 
+      />
+      
+      <PhotoModal 
+        open={showPhotoModal} 
+        onClose={()=>setShowPhotoModal(false)} 
+        onSave={(photoData)=>{ onUpdate({ photo: photoData }); setShowPhotoModal(false); }} 
       />
     </div>
   );
@@ -2043,6 +2230,9 @@ function OutcomeButton({ label, value, current, onClick, variant = "default" }) 
     info: isActive 
       ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 text-blue-700 dark:text-blue-300' 
       : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700',
+    purple: isActive 
+      ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 text-purple-700 dark:text-purple-300' 
+      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-purple-300 dark:hover:border-purple-700',
     default: isActive 
       ? 'bg-gray-50 dark:bg-gray-800/60 border-gray-400 text-gray-700 dark:text-gray-300' 
       : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
@@ -2068,21 +2258,41 @@ function FollowUpModal({ open, onClose, onSave }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs opacity-70">Date</label>
-            <input 
-              type="date" 
-              value={date} 
-              onChange={e=>setDate(e.target.value)} 
-              className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-            />
+            <div className="relative">
+              <input 
+                type="date" 
+                value={date} 
+                onChange={e=>setDate(e.target.value)} 
+                className="w-full mt-1 p-2 pr-10 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                style={{
+                  colorScheme: 'light dark'
+                }}
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none dark:bg-white dark:rounded-sm dark:p-0.5">
+                <svg className="w-4 h-4 text-gray-500 dark:text-gray-900" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
           </div>
           <div>
             <label className="text-xs opacity-70">Time</label>
-            <input 
-              type="time" 
-              value={time} 
-              onChange={e=>setTime(e.target.value)} 
-              className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-            />
+            <div className="relative">
+              <input 
+                type="time" 
+                value={time} 
+                onChange={e=>setTime(e.target.value)} 
+                className="w-full mt-1 p-2 pr-10 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                style={{
+                  colorScheme: 'light dark'
+                }}
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none dark:bg-white dark:rounded-sm dark:p-0.5">
+                <svg className="w-4 h-4 text-gray-500 dark:text-gray-900" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
         <button 
@@ -2091,6 +2301,198 @@ function FollowUpModal({ open, onClose, onSave }) {
         >
           Save reminder
         </button>
+      </div>
+    </Drawer>
+  );
+}
+
+function PhotoModal({ open, onClose, onSave }) {
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setCapturedImage(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const startCamera = async () => {
+    try {
+      setIsCapturing(true);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        } 
+      });
+      
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.autoplay = true;
+      video.style.width = '100%';
+      video.style.height = '300px';
+      video.style.objectFit = 'cover';
+      
+      const container = document.getElementById('camera-container');
+      if (container) {
+        container.innerHTML = '';
+        container.appendChild(video);
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      alert('Unable to access camera. Please use the gallery option instead.');
+      setIsCapturing(false);
+    }
+  };
+
+  const capturePhoto = () => {
+    const video = document.querySelector('#camera-container video');
+    if (video) {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      
+      const photoData = canvas.toDataURL('image/jpeg', 0.8);
+      setCapturedImage(photoData);
+      
+      // Stop camera stream
+      const stream = video.srcObject;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      setIsCapturing(false);
+    }
+  };
+
+  const handleSave = () => {
+    if (capturedImage) {
+      onSave(capturedImage);
+      setCapturedImage(null);
+    }
+  };
+
+  const handleClose = () => {
+    setCapturedImage(null);
+    setIsCapturing(false);
+    // Stop any active camera stream
+    const video = document.querySelector('#camera-container video');
+    if (video && video.srcObject) {
+      video.srcObject.getTracks().forEach(track => track.stop());
+    }
+    onClose();
+  };
+
+  return (
+    <Drawer open={open} onClose={handleClose} title="Add Property Photo">
+      <div className="space-y-4">
+        {!capturedImage && !isCapturing && (
+          <div className="space-y-3">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Take a photo or select from your gallery to document this property.
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={startCamera}
+                className="px-4 py-3 rounded-xl bg-primary-600 text-white text-sm flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors"
+              >
+                <Camera className="w-4 h-4" />
+                Take Photo
+              </button>
+              
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                From Gallery
+              </button>
+            </div>
+            
+            <input 
+              ref={fileInputRef}
+              type="file" 
+              accept="image/*" 
+              capture="environment"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+          </div>
+        )}
+
+        {isCapturing && (
+          <div className="space-y-3">
+            <div id="camera-container" className="w-full h-64 bg-black rounded-xl overflow-hidden flex items-center justify-center">
+              <div className="text-white text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                <div>Starting camera...</div>
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <button 
+                onClick={capturePhoto}
+                className="flex-1 px-4 py-3 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+              >
+                📸 Capture Photo
+              </button>
+              <button 
+                onClick={() => {
+                  setIsCapturing(false);
+                  const video = document.querySelector('#camera-container video');
+                  if (video && video.srcObject) {
+                    video.srcObject.getTracks().forEach(track => track.stop());
+                  }
+                }}
+                className="px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {capturedImage && (
+          <div className="space-y-3">
+            <div className="relative">
+              <img 
+                src={capturedImage} 
+                alt="Captured photo" 
+                className="w-full h-64 object-cover rounded-xl border border-gray-200 dark:border-gray-800"
+              />
+              <button 
+                onClick={() => setCapturedImage(null)}
+                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            
+            <div className="flex gap-2">
+              <button 
+                onClick={handleSave}
+                className="flex-1 px-4 py-3 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+              >
+                Save Photo
+              </button>
+              <button 
+                onClick={() => setCapturedImage(null)}
+                className="px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                Retake
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </Drawer>
   );
@@ -2460,7 +2862,7 @@ function HelpPanel() {
                 <div className="text-green-700 dark:text-green-300">Wants to learn more about UW</div>
               </div>
               <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                <div className="font-medium text-green-800 dark:text-green-200">Customer Signed</div>
+                <div className="font-medium text-green-800 dark:text-green-200">Customers Signed</div>
                 <div className="text-green-700 dark:text-green-300">Successfully signed up with UW</div>
               </div>
               <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
@@ -2651,7 +3053,7 @@ function SuccessTipsPanel() {
             <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
               <div>• <strong>Return:</strong> 2-3 days after dropping letters</div>
               <div>• <strong>Best times:</strong> Same as drop times</div>
-              <div>• <strong>Multiple attempts:</strong> Try 3-4 times before marking unreachable</div>
+              <div>• <strong>Multiple attempts:</strong> Try 3-4 times before marking as "No Answer"</div>
             </div>
           </div>
         </div>
@@ -2747,7 +3149,7 @@ function SuccessTipsPanel() {
               <div>• <strong>Poor timing:</strong> Avoid meal times and early mornings</div>
               <div>• <strong>Being pushy:</strong> Respect "no" and move on gracefully</div>
               <div>• <strong>Not tracking activity:</strong> Use the app to learn what works</div>
-              <div>• <strong>Giving up too early:</strong> Try multiple times before marking unreachable</div>
+              <div>• <strong>Giving up too early:</strong> Try multiple times before marking as "No Answer"</div>
             </div>
           </div>
         </div>
@@ -2944,33 +3346,33 @@ function Reports({ campaigns }) {
       
       <SectionCard title="Conversation Outcomes" icon={MessageSquare}>
         <div className="grid md:grid-cols-2 gap-3">
-          <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-            <div className="text-lg font-semibold text-green-700 dark:text-green-300">{totals.outcomes.interested}</div>
-            <div className="text-sm text-green-600 dark:text-green-400">Interested</div>
+          <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
+            <div className="text-lg font-semibold text-green-800 dark:text-green-200">{totals.outcomes.customer_signed}</div>
+            <div className="text-sm text-green-700 dark:text-green-300">Customers Signed</div>
           </div>
-          <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-            <div className="text-lg font-semibold text-green-700 dark:text-green-300">{totals.outcomes.customer_signed}</div>
-            <div className="text-sm text-green-600 dark:text-green-400">Customer Signed</div>
+          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500 dark:border-emerald-500">
+            <div className="text-lg font-semibold text-emerald-800 dark:text-emerald-200">{totals.outcomes.appointment_booked}</div>
+            <div className="text-sm text-emerald-700 dark:text-emerald-300">Appointment Booked</div>
           </div>
-          <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-            <div className="text-lg font-semibold text-green-700 dark:text-green-300">{totals.outcomes.appointment_booked}</div>
-            <div className="text-sm text-green-600 dark:text-green-400">Appointment Booked</div>
+          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-500 dark:border-amber-500">
+            <div className="text-lg font-semibold text-amber-800 dark:text-amber-200">{totals.outcomes.no_for_now}</div>
+            <div className="text-sm text-amber-700 dark:text-amber-300">No for Now</div>
           </div>
-          <div className="p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-            <div className="text-lg font-semibold text-yellow-700 dark:text-yellow-300">{totals.outcomes.no_for_now}</div>
-            <div className="text-sm text-yellow-600 dark:text-yellow-400">No for Now</div>
+          <div className="p-3 rounded-xl bg-sky-50 dark:bg-sky-900/20 border-2 border-sky-500 dark:border-sky-500">
+            <div className="text-lg font-semibold text-sky-800 dark:text-sky-200">{totals.outcomes.already_uw}</div>
+            <div className="text-sm text-sky-700 dark:text-sky-300">Already with UW</div>
           </div>
-                      <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-              <div className="text-lg font-semibold text-blue-700 dark:text-blue-300">{totals.outcomes.already_uw}</div>
-              <div className="text-sm text-blue-600 dark:text-blue-400">Already with UW</div>
-            </div>
-          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-            <div className="text-lg font-semibold text-red-700 dark:text-red-300">{totals.outcomes.not_interested}</div>
-            <div className="text-sm text-red-600 dark:text-red-400">Not Interested</div>
+          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-500">
+            <div className="text-lg font-semibold text-red-800 dark:text-red-200">{totals.outcomes.not_interested}</div>
+            <div className="text-sm text-red-700 dark:text-red-300">Not Interested</div>
           </div>
-          <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800">
-            <div className="text-lg font-semibold text-gray-700 dark:text-gray-300">{totals.outcomes.unreachable || 0}</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Unreachable</div>
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/20 border-2 border-slate-500 dark:border-slate-500">
+            <div className="text-lg font-semibold text-slate-800 dark:text-slate-200">{totals.outcomes.no_answer || 0}</div>
+            <div className="text-sm text-slate-700 dark:text-slate-300">No Answer</div>
+          </div>
+          <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-500 dark:border-purple-500">
+            <div className="text-lg font-semibold text-purple-800 dark:text-purple-200">{totals.outcomes.no_cold_callers || 0}</div>
+            <div className="text-sm text-purple-700 dark:text-purple-300">No Cold Callers</div>
           </div>
 
         </div>
@@ -3196,9 +3598,9 @@ function Reports({ campaigns }) {
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
                         not interested
                       </span>
-                    ) : r.result === 'unreachable' ? (
+                    ) : r.result === 'no_answer' ? (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                        unreachable
+                        no answer
                       </span>
                     ) : (
                       <span className="text-gray-600 dark:text-gray-400">{r.result}</span>
