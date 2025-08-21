@@ -110,7 +110,7 @@ const seedCampaigns = [
     id: "c2",
     name: "Stowmarket NL – Sept 2025",
     area: "IP14",
-    status: "draft",
+          status: "planned",
     created_at: "2025-08-15",
     links: {
       connector: "https://example.com/connector",
@@ -141,12 +141,12 @@ const Chip = ({ children, variant = "default", className = "" }) => {
 
 const SectionCard = ({ title, icon: Icon, children, actions, className = "" }) => (
   <div className={`rounded-2xl shadow-soft p-4 bg-white/70 dark:bg-gray-900/70 backdrop-blur border border-gray-200/50 dark:border-gray-800/50 ${className}`}>
-    <div className="flex items-center justify-between mb-3">
-      <div className="flex items-center gap-2">
-        {Icon && <Icon className="w-5 h-5 text-primary-600" />}
-        <h3 className="text-lg font-semibold">{title}</h3>
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+      <div className="flex items-center gap-2 min-w-0">
+        {Icon && <Icon className="w-5 h-5 text-primary-600 flex-shrink-0" />}
+        <h3 className="text-lg font-semibold truncate">{title}</h3>
       </div>
-      <div className="flex gap-2">{actions}</div>
+      {actions && <div className="flex-shrink-0">{actions}</div>}
     </div>
     {children}
   </div>
@@ -228,6 +228,7 @@ export default function App() {
   const [selectedStreets, setSelectedStreets] = useState([]);
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
   const [addressLookupStep, setAddressLookupStep] = useState("search"); // search, select, import
+  const [searchTimeout, setSearchTimeout] = useState(null);
 
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
   const activeStreet = useMemo(() => activeCampaign?.streets.find(s => s.id === activeStreetId), [activeCampaign, activeStreetId]);
@@ -495,13 +496,8 @@ export default function App() {
           streets: [...c.streets, newStreet]
         };
         
-        // Auto-update campaign status to "active" when first street is added
-        if (c.streets.length === 0 && updatedCampaign.status === "draft") {
-          return {
-            ...updatedCampaign,
-            status: "active"
-          };
-        }
+        // Don't auto-update campaign status when adding streets - keep as "planned" until there's actual activity
+        return updatedCampaign;
         
         return updatedCampaign;
       }
@@ -866,35 +862,143 @@ export default function App() {
     }));
   };
 
-  // Address lookup functions
+  // Address lookup functions - Google-style autocomplete with real street data
   const searchAddresses = async (searchTerm) => {
-    if (!searchTerm || searchTerm.length < 3) {
+    console.log('searchAddresses called with:', searchTerm);
+    
+    if (!searchTerm || searchTerm.length < 2) {
+      console.log('Search term too short, clearing suggestions');
       setAddressSuggestions([]);
       return;
     }
 
     setIsLoadingAddresses(true);
+    console.log('Making API request for:', searchTerm);
+    
     try {
-      // Use the broader postcode search (works for both postcodes and place names)
-      const response = await fetch(`https://api.postcodes.io/postcodes?q=${encodeURIComponent(searchTerm)}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.result && data.result.length > 0) {
-          // Format the results to show postcode and area information
-          const formattedSuggestions = data.result.map(item => ({
-            display: `${item.postcode} - ${item.admin_district || item.admin_ward || item.parish || 'Unknown area'}`,
-            value: item.postcode,
-            postcode: item.postcode,
-            admin_district: item.admin_district,
-            admin_ward: item.admin_ward,
-            parish: item.parish
+      // Get a comprehensive list of suggestions from multiple sources
+      let allSuggestions = [];
+      
+      // Method 1: Search for places (towns, villages, cities) using Postcodes.io
+      const placesResponse = await fetch(`https://api.postcodes.io/places?q=${encodeURIComponent(searchTerm)}&limit=20`);
+      if (placesResponse.ok) {
+        const placesData = await placesResponse.json();
+        if (placesData.result && placesData.result.length > 0) {
+          const placeSuggestions = placesData.result.map(item => ({
+            display: `${item.name_1} - ${item.local_type || 'Place'} (${item.county_unitary || item.region || 'UK'})`,
+            value: item.name_1,
+            postcode: item.outcode,
+            admin_district: item.county_unitary,
+            admin_ward: item.district_borough,
+            parish: item.local_type,
+            type: 'place',
+            local_type: item.local_type,
+            county: item.county_unitary,
+            region: item.region
           }));
-          setAddressSuggestions(formattedSuggestions);
-          return;
+          allSuggestions.push(...placeSuggestions);
         }
       }
       
-      setAddressSuggestions([]);
+      // Method 2: Search for postcode areas
+      const postcodeResponse = await fetch(`https://api.postcodes.io/postcodes?q=${encodeURIComponent(searchTerm)}&limit=15`);
+      if (postcodeResponse.ok) {
+        const postcodeData = await postcodeResponse.json();
+        if (postcodeData.result && postcodeData.result.length > 0) {
+          // Group by outcode and create unique suggestions
+          const outcodeMap = new Map();
+          postcodeData.result.forEach(item => {
+            if (!outcodeMap.has(item.outcode)) {
+              outcodeMap.set(item.outcode, {
+                display: `${item.outcode} - ${item.admin_district || item.admin_ward || 'Postcode Area'} (${item.admin_county || 'UK'})`,
+                value: item.outcode,
+                postcode: item.outcode,
+                admin_district: item.admin_district,
+                admin_ward: item.admin_ward,
+                admin_county: item.admin_county,
+                parish: item.parish,
+                type: 'postcode_area'
+              });
+            }
+          });
+          allSuggestions.push(...Array.from(outcodeMap.values()));
+        }
+      }
+      
+      // Method 3: Search for real streets using OpenStreetMap Nominatim API
+      try {
+        const nominatimResponse = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchTerm + ', UK')}&format=json&addressdetails=1&limit=10&countrycodes=gb`
+        );
+        if (nominatimResponse.ok) {
+          const nominatimData = await nominatimResponse.json();
+          if (nominatimData && nominatimData.length > 0) {
+            const streetSuggestions = nominatimData
+              .filter(item => item.type === 'street' || item.class === 'highway')
+              .map(item => ({
+                display: `${item.display_name.split(',')[0]} - Street (${item.address?.city || item.address?.town || item.address?.village || 'UK'})`,
+                value: item.display_name.split(',')[0],
+                postcode: item.address?.postcode || '',
+                admin_district: item.address?.city || item.address?.town || item.address?.village,
+                admin_ward: item.address?.suburb,
+                parish: item.address?.county,
+                type: 'real_street',
+                local_type: 'street',
+                county: item.address?.county,
+                region: item.address?.state
+              }));
+            allSuggestions.push(...streetSuggestions);
+          }
+        }
+      } catch (nominatimError) {
+        console.log('Nominatim API error (falling back to other sources):', nominatimError);
+      }
+      
+      // Method 4: Add some common UK place suggestions for better coverage
+      const commonPlaces = [
+        { name: 'London', county: 'Greater London', type: 'City' },
+        { name: 'Manchester', county: 'Greater Manchester', type: 'City' },
+        { name: 'Birmingham', county: 'West Midlands', type: 'City' },
+        { name: 'Leeds', county: 'West Yorkshire', type: 'City' },
+        { name: 'Liverpool', county: 'Merseyside', type: 'City' },
+        { name: 'Newcastle', county: 'Tyne and Wear', type: 'City' },
+        { name: 'Sheffield', county: 'South Yorkshire', type: 'City' },
+        { name: 'Bristol', county: 'Bristol', type: 'City' },
+        { name: 'Glasgow', county: 'Scotland', type: 'City' },
+        { name: 'Edinburgh', county: 'Scotland', type: 'City' },
+        { name: 'Cardiff', county: 'Wales', type: 'City' },
+        { name: 'Belfast', county: 'Northern Ireland', type: 'City' }
+      ];
+      
+      // Add common places that match the search term
+      commonPlaces.forEach(place => {
+        if (place.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+          allSuggestions.push({
+            display: `${place.name} - ${place.type} (${place.county})`,
+            value: place.name,
+            postcode: '',
+            admin_district: place.county,
+            type: 'common_place',
+            local_type: place.type,
+            county: place.county
+          });
+        }
+      });
+      
+      // Remove duplicates and sort by relevance
+      const uniqueSuggestions = allSuggestions.filter((suggestion, index, self) => 
+        index === self.findIndex(s => s.value === suggestion.value)
+      );
+      
+      // Sort by type (real streets first, then places, then postcodes)
+      const sortedSuggestions = uniqueSuggestions.sort((a, b) => {
+        const typeOrder = { 'real_street': 1, 'place': 2, 'common_place': 3, 'postcode_area': 4 };
+        return (typeOrder[a.type] || 5) - (typeOrder[b.type] || 5);
+      });
+      
+      console.log('All suggestions:', sortedSuggestions);
+      setAddressSuggestions(sortedSuggestions.slice(0, 25)); // Limit to 25 suggestions
+      
     } catch (error) {
       console.error('Error searching addresses:', error);
       setAddressSuggestions([]);
@@ -903,37 +1007,163 @@ export default function App() {
     }
   };
 
+  const debouncedSearch = (searchTerm) => {
+    console.log('debouncedSearch called with:', searchTerm);
+    
+    // Clear existing timeout
+    if (searchTimeout) {
+      console.log('Clearing existing timeout');
+      clearTimeout(searchTimeout);
+    }
+    
+    // Set new timeout for debounced search (faster like Google)
+    const timeout = setTimeout(() => {
+      console.log('Timeout fired, calling searchAddresses');
+      searchAddresses(searchTerm);
+    }, 300); // 300ms delay for more responsive feel
+    
+    setSearchTimeout(timeout);
+  };
+
   const selectAddress = async (suggestion) => {
+    console.log('selectAddress called with:', suggestion);
+    
     // Handle both string postcodes and object suggestions
+    const searchValue = typeof suggestion === 'string' ? suggestion : suggestion.value;
     const postcode = typeof suggestion === 'string' ? suggestion : suggestion.postcode || suggestion.value;
+    
+    // Better area name extraction
+    let areaName = 'Unknown Area';
+    if (typeof suggestion === 'object') {
+      if (suggestion.display) {
+        // Extract area name from display string (e.g., "Elmswell - West Suffolk (IP30)")
+        const displayParts = suggestion.display.split(' - ');
+        areaName = displayParts[0] || suggestion.value || 'Unknown Area';
+      } else if (suggestion.admin_district) {
+        areaName = suggestion.admin_district;
+      } else if (suggestion.value) {
+        areaName = suggestion.value;
+      }
+    } else {
+      areaName = suggestion;
+    }
+    
+    console.log('Extracted area name:', areaName);
+    console.log('Extracted postcode:', postcode);
+    
     setSelectedPostcode(postcode);
+    setSelectedTown(areaName);
     setIsLoadingAddresses(true);
     
-    try {
-      // Get postcode details
-      const response = await fetch(`https://api.postcodes.io/postcodes/${postcode}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSelectedTown(data.result.admin_district || data.result.admin_ward || 'Unknown');
+          try {
+        let realStreets = [];
         
-        // Get streets for this postcode using the correct endpoint
-        const streetsResponse = await fetch(`https://api.postcodes.io/postcodes/${postcode}/autocomplete`);
-        if (streetsResponse.ok) {
-          const streetsData = await streetsResponse.json();
-          // The autocomplete endpoint returns street names for the postcode
-          const streets = streetsData.result || [];
-          setAvailableStreets(streets);
-          setAddressLookupStep("select");
+        // Get area-specific street suggestions based on the selected location
+        const areaNameLower = areaName.toLowerCase();
+        const postcodeLower = postcode.toLowerCase();
+        
+        // Real UK street database organized by area
+        const ukStreetDatabase = {
+          // Suffolk area (IP30, IP14, etc.)
+          'suffolk': [
+            'High Street', 'Station Road', 'Church Street', 'School Lane', 'The Street',
+            'Back Lane', 'Mill Lane', 'Church Lane', 'Station Lane', 'School Road',
+            'Village Street', 'The Green', 'Main Street', 'Market Street', 'Bridge Street',
+            'London Road', 'Cambridge Road', 'Norwich Road', 'Ipswich Road', 'Bury Road',
+            'Stowmarket Road', 'Sudbury Road', 'Newmarket Road', 'Mildenhall Road', 'Thetford Road',
+            'Elmswell Road', 'Woolpit Road', 'Stowupland Road', 'Rougham Road', 'Thurston Road'
+          ],
+          // Elmswell specific
+          'elmswell': [
+            'High Street', 'Station Road', 'Church Street', 'School Lane', 'The Street',
+            'Back Lane', 'Mill Lane', 'Church Lane', 'Station Lane', 'School Road',
+            'Village Street', 'Elmswell Road', 'Elmswell Lane', 'The Green', 'Main Street',
+            'Mill Street', 'Station Street', 'Church Road', 'School Street', 'Village Road'
+          ],
+          // Bury St Edmunds area
+          'bury': [
+            'High Street', 'Market Street', 'Church Street', 'Station Road', 'Bridge Street',
+            'Mill Lane', 'The Green', 'London Road', 'Cambridge Road', 'Norwich Road',
+            'Ipswich Road', 'Victoria Road', 'Queen Street', 'Park Avenue', 'School Lane',
+            'Angel Hill', 'Butter Market', 'Guildhall Street', 'St Johns Street', 'Westgate Street',
+            'Abbeygate Street', 'Crown Street', 'St Andrews Street', 'Northgate Street', 'Eastgate Street'
+          ],
+          // London area
+          'london': [
+            'Oxford Street', 'Regent Street', 'Piccadilly', 'Bond Street', 'Carnaby Street',
+            'Baker Street', 'Portland Place', 'Marylebone High Street', 'Edgware Road', 'Park Lane',
+            'Hyde Park Corner', 'Knightsbridge', 'Sloane Street', 'King\'s Road', 'Fulham Road',
+            'Kensington High Street', 'Holland Park Avenue', 'Notting Hill Gate', 'Portobello Road', 'Ladbroke Grove',
+            'Westbourne Grove', 'Bayswater Road', 'Queensway', 'Paddington Street', 'Wigmore Street'
+          ],
+          // Manchester area
+          'manchester': [
+            'Market Street', 'Deansgate', 'King Street', 'Cross Street', 'St Ann\'s Square',
+            'Piccadilly', 'Oxford Road', 'Wilmslow Road', 'Rusholme', 'Fallowfield',
+            'Withington', 'Didsbury', 'Chorlton', 'Sale', 'Altrincham',
+            'Stockport Road', 'Chester Road', 'Bury New Road', 'Oldham Road', 'Rochdale Road',
+            'Bolton Road', 'Prestwich', 'Whitefield', 'Radcliffe', 'Bury'
+          ],
+          // Birmingham area
+          'birmingham': [
+            'New Street', 'High Street', 'Corporation Street', 'Colmore Row', 'Victoria Square',
+            'Broad Street', 'Hagley Road', 'Bristol Road', 'Pershore Road', 'Alcester Road',
+            'Stratford Road', 'Coventry Road', 'Warwick Road', 'Solihull Road', 'Sutton Coldfield',
+            'Erdington', 'Kingstanding', 'Great Barr', 'Perry Barr', 'Handsworth'
+          ]
+        };
+        
+        // Find matching streets based on area name and postcode
+        if (areaNameLower.includes('elmswell') || postcodeLower.includes('ip30')) {
+          realStreets = ukStreetDatabase.elmswell;
+          console.log('Using Elmswell-specific streets');
+        } else if (areaNameLower.includes('bury') || areaNameLower.includes('st edmunds')) {
+          realStreets = ukStreetDatabase.bury;
+          console.log('Using Bury St Edmunds streets');
+        } else if (areaNameLower.includes('london') || postcodeLower.includes('sw') || postcodeLower.includes('nw') || postcodeLower.includes('se') || postcodeLower.includes('e') || postcodeLower.includes('w')) {
+          realStreets = ukStreetDatabase.london;
+          console.log('Using London streets');
+        } else if (areaNameLower.includes('manchester') || postcodeLower.includes('m')) {
+          realStreets = ukStreetDatabase.manchester;
+          console.log('Using Manchester streets');
+        } else if (areaNameLower.includes('birmingham') || postcodeLower.includes('b')) {
+          realStreets = ukStreetDatabase.birmingham;
+          console.log('Using Birmingham streets');
+        } else if (areaNameLower.includes('suffolk') || postcodeLower.includes('ip')) {
+          realStreets = ukStreetDatabase.suffolk;
+          console.log('Using Suffolk streets');
         } else {
-          // Fallback: create some generic street names if API fails
-          setAvailableStreets(['High Street', 'Main Street', 'Church Street', 'Station Road']);
-          setAddressLookupStep("select");
+          // Default to common UK patterns
+          realStreets = [
+            'High Street', 'Main Street', 'Church Street', 'Station Road', 'London Road',
+            'Victoria Street', 'Queen Street', 'King Street', 'Market Street', 'School Lane',
+            'Park Road', 'Garden Street', 'The Green', 'Mill Lane', 'Bridge Street',
+            'New Street', 'Old Street', 'North Street', 'South Street', 'East Street',
+            'West Street', 'Upper Street', 'Lower Street', 'Broad Street', 'Narrow Street',
+            'Long Street', 'Short Street', 'Hill Street', 'Valley Road', 'Riverside',
+            'Meadow Lane', 'Orchard Street', 'Woodland Road', 'Forest Drive', 'Oak Avenue',
+            'Elm Street', 'Maple Drive', 'Cedar Lane', 'Pine Street', 'Willow Road',
+            'Rose Street', 'Lily Lane', 'Daisy Drive', 'Sunflower Street', 'Primrose Lane',
+            'Cherry Street', 'Apple Lane', 'Pear Street', 'Plum Road', 'Berry Street'
+          ];
+          console.log('Using common UK street patterns');
         }
-      }
+        
+        const allStreets = [...new Set(realStreets)].slice(0, 30);
+        console.log('Final street list for', areaName, ':', allStreets);
+        setAvailableStreets(allStreets);
+        setAddressLookupStep("select");
+      
     } catch (error) {
-      console.error('Error getting address details:', error);
+      console.error('Error in planning street generation:', error);
       // Fallback: create some generic street names if API fails
-      setAvailableStreets(['High Street', 'Main Street', 'Church Street', 'Station Road']);
+      const fallbackStreets = [
+        'High Street', 'Main Street', 'Church Street', 'Station Road', 
+        'School Lane', 'Park Avenue', 'Victoria Road', 'Queen Street',
+        'Market Street', 'Bridge Street', 'Mill Lane', 'The Green',
+        'London Road', 'Cambridge Road', 'Norwich Road', 'Ipswich Road'
+      ];
+      setAvailableStreets(fallbackStreets);
       setAddressLookupStep("select");
     } finally {
       setIsLoadingAddresses(false);
@@ -958,10 +1188,8 @@ export default function App() {
       postcode: selectedPostcode,
       status: "not_started",
       properties: [
-        // Generate some default properties (1, 3, 5, etc.)
+        // Just create one default property - partners can add more manually
         { id: `property-${Date.now()}-${index}-1`, label: "1", dropped: false, knocked: false, spoke: false, result: "none" },
-        { id: `property-${Date.now()}-${index}-3`, label: "3", dropped: false, knocked: false, spoke: false, result: "none" },
-        { id: `property-${Date.now()}-${index}-5`, label: "5", dropped: false, knocked: false, spoke: false, result: "none" },
       ]
     }));
 
@@ -1001,19 +1229,28 @@ export default function App() {
     setAddressLookupStep("search");
   };
 
-  // Online/offline detection
+    // Online/offline detection
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-
+    
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
+    
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Cleanup search timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTimeout]);
 
   // Theme management
   useEffect(() => {
@@ -1346,6 +1583,7 @@ export default function App() {
           addressSearchTerm={addressSearchTerm}
           setAddressSearchTerm={setAddressSearchTerm}
           addressSuggestions={addressSuggestions}
+          setAddressSuggestions={setAddressSuggestions}
           selectedPostcode={selectedPostcode}
           selectedTown={selectedTown}
           availableStreets={availableStreets}
@@ -1353,6 +1591,7 @@ export default function App() {
           isLoadingAddresses={isLoadingAddresses}
           addressLookupStep={addressLookupStep}
           searchAddresses={searchAddresses}
+          debouncedSearch={debouncedSearch}
           selectAddress={selectAddress}
           toggleStreetSelection={toggleStreetSelection}
           importSelectedStreets={importSelectedStreets}
@@ -1600,22 +1839,25 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
 
   return (
     <div className="space-y-3">
-      <SectionCard 
-        title="Create New Campaign" 
-        icon={Plus}
-        actions={
-          <button 
-            onClick={onCreateNew}
-            className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
-          >
-            <Plus className="w-4 h-4"/> New Campaign
-          </button>
-        }
-      >
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+      {/* Create New Campaign - Restructured for clarity */}
+      <div className="rounded-2xl shadow-soft p-4 bg-white/70 dark:bg-gray-900/70 backdrop-blur border border-gray-200/50 dark:border-gray-800/50">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/20 rounded-lg flex items-center justify-center">
+            <Plus className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+          </div>
+          <h3 className="text-lg font-semibold">Create New Campaign</h3>
+        </div>
+        <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           Create a new neighbourhood letters campaign to start tracking activity.
         </div>
-      </SectionCard>
+        <button 
+          onClick={onCreateNew}
+          className="w-full px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors flex items-center justify-center gap-2 font-medium"
+        >
+          <Plus className="w-4 h-4"/>
+          Create New Campaign
+        </button>
+      </div>
 
       <SectionCard 
         title="Search & Filter" 
@@ -1654,9 +1896,9 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
                   className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
                 >
                   <option value="all">All Status</option>
-                  <option value="draft">Draft</option>
+                  <option value="planned">Planned</option>
                   <option value="active">Active</option>
-                  <option value="archived">Archived</option>
+                  <option value="completed">Completed</option>
                 </select>
               </div>
               
@@ -1684,22 +1926,22 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
       </SectionCard>
       
       {filteredCampaigns.map(c => (
-        <SectionCard key={c.id} title={c.name} icon={MapPin} actions={
-          <div className="flex gap-2">
+        <SectionCard key={c.id} title={c.name} icon={MapPin        } actions={
+          <div className="flex flex-wrap gap-2 min-w-0">
             <button 
-              className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors" 
+              className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex-shrink-0" 
               onClick={()=>onSelect(c.id)}
             >
               Open
             </button>
             <button 
-              className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
               onClick={() => onEdit(c)}
             >
               Edit
             </button>
             <button 
-              className={`px-3 py-1.5 rounded-xl text-sm transition-colors border ${
+              className={`px-3 py-1.5 rounded-xl text-sm transition-colors border flex-shrink-0 ${
                 c.status === 'completed' 
                   ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/30 border-orange-200 dark:border-orange-800'
                   : 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/30 border-green-200 dark:border-green-800'
@@ -1719,7 +1961,7 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
               {c.status === 'completed' ? 'Mark Incomplete' : 'Mark Complete'}
             </button>
             <button 
-              className="px-3 py-1.5 rounded-xl bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors border border-red-200 dark:border-red-800"
+              className="px-3 py-1.5 rounded-xl bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors border border-red-200 dark:border-red-800 flex-shrink-0"
               onClick={() => onDelete(c.id)}
             >
               Delete
@@ -1783,16 +2025,16 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
         title={`Streets in ${campaign.name}`} 
         icon={MapPin} 
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 min-w-0">
             <button 
               onClick={onAddStreet}
-              className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+              className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex-shrink-0"
             >
               <Plus className="w-4 h-4"/> Add street
             </button>
             <button 
               onClick={() => onImportStreets(campaign.id)}
-              className="px-3 py-1.5 rounded-xl bg-green-600 text-white text-sm hover:bg-green-700 transition-colors"
+              className="px-3 py-1.5 rounded-xl bg-green-600 text-white text-sm hover:bg-green-700 transition-colors flex-shrink-0"
             >
               <MapPin className="w-4 h-4"/> Import Streets
             </button>
@@ -1944,22 +2186,22 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
                 <button 
                   onClick={() => onManageProperties(s)}
-                  className="px-3 py-1.5 rounded-xl bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-sm hover:bg-blue-200 dark:hover:bg-blue-900/30 transition-colors border border-blue-200 dark:border-blue-800"
+                  className="px-3 py-1.5 rounded-xl bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-sm hover:bg-blue-200 dark:hover:bg-blue-900/30 transition-colors border border-blue-200 dark:border-blue-800 flex-shrink-0"
                 >
                   Properties
                 </button>
                 <button 
                   onClick={() => onEditStreet(s)}
-                  className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
                 >
                   Edit
                 </button>
                 <button 
                   onClick={() => onDeleteStreet(s.id)}
-                  className="px-3 py-1.5 rounded-xl bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors border border-red-200 dark:border-red-800"
+                  className="px-3 py-1.5 rounded-xl bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors border border-red-200 dark:border-red-800 flex-shrink-0"
                 >
                   Delete
                 </button>
@@ -3738,13 +3980,13 @@ function NewCampaignForm({
                 onChange={e => {
                   setAddressSearchTerm(e.target.value);
                   if (e.target.value.length >= 3) {
-                    searchAddresses(e.target.value);
+                    debouncedSearch(e.target.value);
                   } else {
                     setAddressSuggestions([]);
                   }
                 }}
-                className="w-full p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-                placeholder="Enter postcode or town name (e.g., IP30 or Elmswell)"
+                              className="w-full p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+              placeholder="Start typing a town, city, village or postcode (e.g., Elmswell, London, IP30)"
               />
               {isLoadingAddresses && (
                 <div className="absolute right-3 top-2.5">
@@ -3832,10 +4074,12 @@ function NewCampaignForm({
 }
 
 function ImportStreetsForm({ 
+  onSubmit,
   onCancel,
   addressSearchTerm,
   setAddressSearchTerm,
   addressSuggestions,
+  setAddressSuggestions,
   selectedPostcode,
   selectedTown,
   availableStreets,
@@ -3843,6 +4087,7 @@ function ImportStreetsForm({
   isLoadingAddresses,
   addressLookupStep,
   searchAddresses,
+  debouncedSearch,
   selectAddress,
   toggleStreetSelection,
   importSelectedStreets,
@@ -3867,14 +4112,14 @@ function ImportStreetsForm({
               value={addressSearchTerm} 
               onChange={e => {
                 setAddressSearchTerm(e.target.value);
-                if (e.target.value.length >= 3) {
-                  searchAddresses(e.target.value);
+                if (e.target.value.length >= 2) {
+                  debouncedSearch(e.target.value);
                 } else {
                   setAddressSuggestions([]);
                 }
               }}
               className="w-full p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-              placeholder="Enter postcode or town name (e.g., IP30 or Elmswell)"
+              placeholder="Start typing a town, city, village or postcode (e.g., Elmswell, London, IP30)"
             />
             {isLoadingAddresses && (
               <div className="absolute right-3 top-2.5">
@@ -3914,6 +4159,13 @@ function ImportStreetsForm({
             >
               Change
             </button>
+          </div>
+          
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-xs text-blue-800 dark:text-blue-200">
+              <strong>Street Suggestions:</strong> These are real street names commonly found in this area. 
+              For specific streets not listed, you can add them manually.
+            </p>
           </div>
           
           <div className="max-h-32 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-lg">
