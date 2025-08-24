@@ -6,8 +6,13 @@ import {
   Clock, Phone, FileText, FolderOpen, Share2, UploadCloud, 
   Moon, Sun, Settings, Bell, Search, Filter, MoreVertical,
   User, LogOut, HelpCircle, Info, Shield, Database, BarChart3, Target,
-  Upload, Trash2, AlertTriangle, Camera
+  Upload, Trash2, AlertTriangle, Camera, Globe
 } from "lucide-react";
+
+// Import new map components
+import AddressLookup from './components/AddressLookup';
+import ManualAddressEntry from './components/ManualAddressEntry';
+import OpenStreetMapView from './components/OpenStreetMapView';
 
 // --- Mock Seed Data ---
 const seedScripts = {
@@ -218,6 +223,11 @@ export default function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showSuccessTips, setShowSuccessTips] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // Map and address lookup state
+  const [showAddressLookup, setShowAddressLookup] = useState(false);
+  const [showManualAddressEntry, setShowManualAddressEntry] = useState(false);
+  const [showMapView, setShowMapView] = useState(false);
 
   // Address lookup state
   const [addressSearchTerm, setAddressSearchTerm] = useState("");
@@ -1354,6 +1364,8 @@ export default function App() {
             <div className="grid grid-cols-2 gap-2 min-w-0">
               <NavButton icon={<MessageSquare className="w-4 h-4 flex-shrink-0"/>} label="Scripts" onClick={() => setShowScripts(true)} />
               <NavButton icon={<Link2 className="w-4 h-4 flex-shrink-0"/>} label="Links" onClick={() => setShowLinks(true)} />
+              <NavButton icon={<Globe className="w-4 h-4 flex-shrink-0"/>} label="OpenStreetMap" onClick={() => setShowMapView(true)} />
+              <NavButton icon={<Search className="w-4 h-4 flex-shrink-0"/>} label="Find Address" onClick={() => setShowAddressLookup(true)} />
             </div>
             <div className="mt-3 text-xs opacity-70">
               Open while on a property to speed up calls and messages.
@@ -1614,9 +1626,55 @@ export default function App() {
         <PropertyManager street={activeStreet} onAddProperty={addProperty} onRemoveProperty={removeProperty} onEditProperty={editPropertyLabel} onClose={() => setShowPropertyManagerModal(false)} />
       </Drawer>
 
+      {/* Address Lookup Modal */}
+      {showAddressLookup && (
+        <AddressLookup
+          onAddressSelect={(address) => {
+            if (address === 'manual') {
+              setShowAddressLookup(false);
+              setShowManualAddressEntry(true);
+            } else {
+              // Handle selected address - could add to campaign or street
+              console.log('Selected address:', address);
+              setShowAddressLookup(false);
+            }
+          }}
+          onClose={() => setShowAddressLookup(false)}
+        />
+      )}
+
+      {/* Manual Address Entry Modal */}
+      {showManualAddressEntry && (
+        <ManualAddressEntry
+          onAddressSave={(address) => {
+            console.log('Manual address saved:', address);
+            setShowManualAddressEntry(false);
+          }}
+          onClose={() => setShowManualAddressEntry(false)}
+        />
+      )}
+
+      {/* OpenStreetMap View Modal */}
+      {showMapView && (
+        <OpenStreetMapView
+          onPropertySelect={(property) => {
+            console.log('Selected property:', property);
+            // Could navigate to property view here
+          }}
+          onClose={() => setShowMapView(false)}
+        />
+      )}
+
       {/* Mobile Floating Action Buttons */}
       <div className="lg:hidden fixed bottom-6 right-6 z-50">
         <div className="flex flex-col gap-2">
+          <button 
+            onClick={() => setShowMapView(true)}
+            className="w-12 h-12 rounded-full bg-purple-600 text-white shadow-lg hover:bg-purple-700 transition-colors flex items-center justify-center"
+            title="OpenStreetMap"
+          >
+            <Globe className="w-5 h-5" />
+          </button>
           <button 
             onClick={() => setShowScripts(true)}
             className="w-12 h-12 rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition-colors flex items-center justify-center"
@@ -2037,6 +2095,18 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
               className="px-3 py-1.5 rounded-xl bg-green-600 text-white text-sm hover:bg-green-700 transition-colors flex-shrink-0"
             >
               <MapPin className="w-4 h-4"/> Import Streets
+            </button>
+            <button 
+              onClick={() => setShowAddressLookup(true)}
+              className="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors flex-shrink-0"
+            >
+              <Search className="w-4 h-4"/> Find Address
+            </button>
+            <button 
+              onClick={() => setShowMapView(true)}
+              className="px-3 py-1.5 rounded-xl bg-purple-600 text-white text-sm hover:bg-purple-700 transition-colors flex-shrink-0"
+            >
+              <Globe className="w-4 h-4"/> OpenStreetMap
             </button>
           </div>
         }
