@@ -2,17 +2,14 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Check, MapPin, Home, ListChecks, CalendarClock, MessageSquare, 
-  Download, QrCode, Link2, Plus, ChevronRight, ChevronUp, ChevronDown, X, CheckCircle, 
+  Download, QrCode, Link2, Plus, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, X, CheckCircle, 
   Clock, Phone, FileText, FolderOpen, Share2, UploadCloud, 
   Moon, Sun, Settings, Bell, Search, Filter, MoreVertical,
   User, LogOut, HelpCircle, Info, Shield, Database, BarChart3, Target,
   Upload, Trash2, AlertTriangle, Camera, Globe
 } from "lucide-react";
 
-// Import new map components
-import AddressLookup from './components/AddressLookup';
-import ManualAddressEntry from './components/ManualAddressEntry';
-import OpenStreetMapView from './components/OpenStreetMapView';
+
 
 // --- Mock Seed Data ---
 const seedScripts = {
@@ -224,10 +221,7 @@ export default function App() {
   const [showSuccessTips, setShowSuccessTips] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Map and address lookup state
-  const [showAddressLookup, setShowAddressLookup] = useState(false);
-  const [showManualAddressEntry, setShowManualAddressEntry] = useState(false);
-  const [showMapView, setShowMapView] = useState(false);
+
 
   // Address lookup state
   const [addressSearchTerm, setAddressSearchTerm] = useState("");
@@ -1364,8 +1358,6 @@ export default function App() {
             <div className="grid grid-cols-2 gap-2 min-w-0">
               <NavButton icon={<MessageSquare className="w-4 h-4 flex-shrink-0"/>} label="Scripts" onClick={() => setShowScripts(true)} />
               <NavButton icon={<Link2 className="w-4 h-4 flex-shrink-0"/>} label="Links" onClick={() => setShowLinks(true)} />
-              <NavButton icon={<Globe className="w-4 h-4 flex-shrink-0"/>} label="OpenStreetMap" onClick={() => setShowMapView(true)} />
-              <NavButton icon={<Search className="w-4 h-4 flex-shrink-0"/>} label="Find Address" onClick={() => setShowAddressLookup(true)} />
             </div>
             <div className="mt-3 text-xs opacity-70">
               Open while on a property to speed up calls and messages.
@@ -1626,55 +1618,11 @@ export default function App() {
         <PropertyManager street={activeStreet} onAddProperty={addProperty} onRemoveProperty={removeProperty} onEditProperty={editPropertyLabel} onClose={() => setShowPropertyManagerModal(false)} />
       </Drawer>
 
-      {/* Address Lookup Modal */}
-      {showAddressLookup && (
-        <AddressLookup
-          onAddressSelect={(address) => {
-            if (address === 'manual') {
-              setShowAddressLookup(false);
-              setShowManualAddressEntry(true);
-            } else {
-              // Handle selected address - could add to campaign or street
-              console.log('Selected address:', address);
-              setShowAddressLookup(false);
-            }
-          }}
-          onClose={() => setShowAddressLookup(false)}
-        />
-      )}
 
-      {/* Manual Address Entry Modal */}
-      {showManualAddressEntry && (
-        <ManualAddressEntry
-          onAddressSave={(address) => {
-            console.log('Manual address saved:', address);
-            setShowManualAddressEntry(false);
-          }}
-          onClose={() => setShowManualAddressEntry(false)}
-        />
-      )}
-
-      {/* OpenStreetMap View Modal */}
-      {showMapView && (
-        <OpenStreetMapView
-          onPropertySelect={(property) => {
-            console.log('Selected property:', property);
-            // Could navigate to property view here
-          }}
-          onClose={() => setShowMapView(false)}
-        />
-      )}
 
       {/* Mobile Floating Action Buttons */}
       <div className="lg:hidden fixed bottom-6 right-6 z-50">
         <div className="flex flex-col gap-2">
-          <button 
-            onClick={() => setShowMapView(true)}
-            className="w-12 h-12 rounded-full bg-purple-600 text-white shadow-lg hover:bg-purple-700 transition-colors flex items-center justify-center"
-            title="OpenStreetMap"
-          >
-            <Globe className="w-5 h-5" />
-          </button>
           <button 
             onClick={() => setShowScripts(true)}
             className="w-12 h-12 rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition-colors flex items-center justify-center"
@@ -2089,24 +2037,6 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
               className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex-shrink-0"
             >
               <Plus className="w-4 h-4"/> Add street
-            </button>
-            <button 
-              onClick={() => onImportStreets(campaign.id)}
-              className="px-3 py-1.5 rounded-xl bg-green-600 text-white text-sm hover:bg-green-700 transition-colors flex-shrink-0"
-            >
-              <MapPin className="w-4 h-4"/> Import Streets
-            </button>
-            <button 
-              onClick={() => setShowAddressLookup(true)}
-              className="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors flex-shrink-0"
-            >
-              <Search className="w-4 h-4"/> Find Address
-            </button>
-            <button 
-              onClick={() => setShowMapView(true)}
-              className="px-3 py-1.5 rounded-xl bg-purple-600 text-white text-sm hover:bg-purple-700 transition-colors flex-shrink-0"
-            >
-              <Globe className="w-4 h-4"/> OpenStreetMap
             </button>
           </div>
         }
@@ -4277,11 +4207,66 @@ function ImportStreetsForm({
 }
 
 function NewStreetForm({ onSubmit, onCancel }) {
+  const [step, setStep] = useState('options'); // 'options', 'search', 'manual', 'map'
   const [formData, setFormData] = useState({
     name: "",
     postcode: "",
     properties: ""
   });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // OpenStreetMap Nominatim API
+  const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
+
+  const searchAddresses = async (query) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        format: 'json',
+        addressdetails: '1',
+        limit: '10',
+        countrycodes: 'gb'
+      });
+
+      const response = await fetch(`${NOMINATIM_BASE_URL}/search?${params}`, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'UW-Street-Smart-NL-Tracker/1.0'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResults(data);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleAddressSelect = (result) => {
+    const address = result.address;
+    const streetName = address.road || address.street || '';
+    const postcode = address.postcode || '';
+    
+    setFormData({
+      name: streetName,
+      postcode: postcode,
+      properties: ""
+    });
+    
+    setStep('manual'); // Go to manual entry to add properties
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -4294,7 +4279,6 @@ function NewStreetForm({ onSubmit, onCancel }) {
       return;
     }
 
-    // Parse property numbers and names (comma separated only)
     const propertyList = formData.properties
       .split(',')
       .map(p => p.trim())
@@ -4312,63 +4296,221 @@ function NewStreetForm({ onSubmit, onCancel }) {
     });
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="text-xs opacity-70">Street Name *</label>
-        <input 
-          type="text" 
-          value={formData.name} 
-          onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-          className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-          placeholder="e.g., Orchard Way"
-          required
-        />
-      </div>
-      
-      <div>
-        <label className="text-xs opacity-70">Postcode</label>
-        <input 
-          type="text" 
-          value={formData.postcode} 
-          onChange={e => setFormData(prev => ({ ...prev, postcode: e.target.value }))}
-          className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-          placeholder="e.g., IP30 9XX"
-        />
-      </div>
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm) {
+        searchAddresses(searchTerm);
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
 
-      <div>
-        <label className="text-xs opacity-70">Property Numbers *</label>
-        <textarea 
-          value={formData.properties} 
-          onChange={e => setFormData(prev => ({ ...prev, properties: e.target.value }))}
-          className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-          placeholder="Enter property numbers or names separated by commas&#10;e.g., 1, 3, 5, 7, 9&#10;or: 12, 14, 16, 18&#10;or: The Old Post Office, Rose Cottage, 1, 3"
-          rows={3}
-          required
-        />
-        <div className="text-xs text-gray-500 mt-1">
-          Separate property numbers or names with commas only. Supports house names like "The Old Post Office", "Rose Cottage"
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  if (step === 'options') {
+    return (
+      <div className="space-y-4">
+        <div className="text-center mb-6">
+          <h3 className="text-lg font-semibold mb-2">Add New Street</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Choose how you'd like to add a street to your campaign
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3">
+          <button
+            onClick={() => setStep('search')}
+            className="p-4 rounded-xl border-2 border-dashed border-primary-300 dark:border-primary-700 hover:border-primary-400 dark:hover:border-primary-600 transition-colors text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary-100 dark:bg-primary-900/20">
+                <Search className="w-5 h-5 text-primary-600" />
+              </div>
+              <div>
+                <div className="font-medium">Search for Address</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Use OpenStreetMap to find streets and addresses
+                </div>
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setStep('manual')}
+            className="p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 transition-colors text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800">
+                <MapPin className="w-5 h-5 text-gray-600" />
+              </div>
+              <div>
+                <div className="font-medium">Enter Manually</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Type in street details yourself
+                </div>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            Cancel
+          </button>
         </div>
       </div>
+    );
+  }
 
-      <div className="flex gap-3">
-        <button 
-          type="submit"
-          className="flex-1 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
-        >
-          Add Street
-        </button>
-        <button 
-          type="button"
-          onClick={onCancel}
-          className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-        >
-          Cancel
-        </button>
+  if (step === 'search') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => setStep('options')}
+            className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h3 className="font-medium">Search for Address</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Find streets using OpenStreetMap
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs opacity-70">Search for address, postcode, or street name</label>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="e.g., IP30 9DR, Cross Street, Elmswell..."
+            className="w-full mt-1 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+          />
+        </div>
+
+        {isSearching && (
+          <div className="text-center py-4 text-sm text-gray-600 dark:text-gray-400">
+            Searching addresses...
+          </div>
+        )}
+
+        {searchResults.length > 0 && (
+          <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-xl">
+            {searchResults.map((result, index) => (
+              <button
+                key={index}
+                onClick={() => handleAddressSelect(result)}
+                className="w-full p-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0"
+              >
+                <div className="font-medium">{result.display_name.split(',')[0]}</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                  {result.display_name}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!isSearching && searchTerm && searchResults.length === 0 && (
+          <div className="text-center py-4 text-sm text-gray-600 dark:text-gray-400">
+            No addresses found for "{searchTerm}"
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-4">
+          <button
+            onClick={() => setStep('manual')}
+            className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            Enter Manually Instead
+          </button>
+        </div>
       </div>
-    </form>
-  );
+    );
+  }
+
+  if (step === 'manual') {
+    return (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            type="button"
+            onClick={() => setStep('options')}
+            className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h3 className="font-medium">Enter Street Details</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Add the street and property information
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs opacity-70">Street Name *</label>
+          <input 
+            type="text" 
+            value={formData.name} 
+            onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+            className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+            placeholder="e.g., Orchard Way"
+            required
+          />
+        </div>
+        
+        <div>
+          <label className="text-xs opacity-70">Postcode</label>
+          <input 
+            type="text" 
+            value={formData.postcode} 
+            onChange={e => setFormData(prev => ({ ...prev, postcode: e.target.value }))}
+            className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+            placeholder="e.g., IP30 9XX"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs opacity-70">Property Numbers *</label>
+          <textarea 
+            value={formData.properties} 
+            onChange={e => setFormData(prev => ({ ...prev, properties: e.target.value }))}
+            className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+            placeholder="Enter property numbers or names separated by commas&#10;e.g., 1, 3, 5, 7, 9&#10;or: 12, 14, 16, 18&#10;or: The Old Post Office, Rose Cottage, 1, 3"
+            rows={3}
+            required
+          />
+          <div className="text-xs text-gray-500 mt-1">
+            Separate property numbers or names with commas only. Supports house names like "The Old Post Office", "Rose Cottage"
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button 
+            type="submit"
+            className="flex-1 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+          >
+            Add Street
+          </button>
+          <button 
+            type="button"
+            onClick={onCancel}
+            className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    );
+  }
 }
 
 // Edit Campaign Form
