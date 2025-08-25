@@ -1271,7 +1271,15 @@ export default function App() {
     console.log('Google Places API Key status:', {
       hasKey: !!GOOGLE_PLACES_API_KEY,
       keyLength: GOOGLE_PLACES_API_KEY?.length || 0,
-      keyStart: GOOGLE_PLACES_API_KEY?.substring(0, 10) + '...' || 'none'
+      keyStart: GOOGLE_PLACES_API_KEY?.substring(0, 10) + '...' || 'none',
+      fullKey: GOOGLE_PLACES_API_KEY || 'NOT_FOUND'
+    });
+    
+    // Test if environment variable is accessible
+    console.log('Environment variable test:', {
+      importMetaEnv: import.meta.env,
+      hasViteKey: !!import.meta.env.VITE_GOOGLE_PLACES_API_KEY,
+      viteKeyLength: import.meta.env.VITE_GOOGLE_PLACES_API_KEY?.length || 0
     });
   }, [GOOGLE_PLACES_API_KEY]);
   
