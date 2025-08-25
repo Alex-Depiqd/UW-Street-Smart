@@ -4223,7 +4223,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
   // OpenStreetMap Nominatim API
   const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
 
-  // Enhanced search - prioritize postcodes and streets
+  // Enhanced search - find streets and properties
   const searchAddresses = async (query) => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -4232,38 +4232,46 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
     setIsSearching(true);
     try {
-      // First, try to search for postcodes specifically
-      const postcodeParams = new URLSearchParams({
-        q: query,
-        format: 'json',
-        addressdetails: '1',
-        limit: '5',
-        countrycodes: 'gb',
-        featuretype: 'postcode'
-      });
-
-      const postcodeResponse = await fetch(`${NOMINATIM_BASE_URL}/search?${postcodeParams}`, {
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'UW-Street-Smart-NL-Tracker/1.0'
-        }
-      });
-
       let results = [];
-      if (postcodeResponse.ok) {
-        const postcodeData = await postcodeResponse.json();
-        results = postcodeData;
-      }
 
-      // If no postcode results, search for streets
-      if (results.length === 0) {
-        const streetParams = new URLSearchParams({
-          q: query,
+      // Strategy 1: If it looks like a postcode, search for streets in that postcode
+      if (query.match(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i)) {
+        // Extract the postcode area (first part)
+        const postcodeArea = query.split(' ')[0];
+        const searchQuery = `${postcodeArea} street`;
+        
+        const postcodeParams = new URLSearchParams({
+          q: searchQuery,
           format: 'json',
           addressdetails: '1',
-          limit: '10',
-          countrycodes: 'gb',
-          featuretype: 'street'
+          limit: '15',
+          countrycodes: 'gb'
+        });
+
+        const postcodeResponse = await fetch(`${NOMINATIM_BASE_URL}/search?${postcodeParams}`, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'UW-Street-Smart-NL-Tracker/1.0'
+          }
+        });
+
+        if (postcodeResponse.ok) {
+          const postcodeData = await postcodeResponse.json();
+          results = postcodeData.filter(item => {
+            const address = item.address;
+            return address.road && address.postcode; // Only streets with postcodes
+          });
+        }
+      }
+
+      // Strategy 2: Search for streets in the area
+      if (results.length === 0) {
+        const streetParams = new URLSearchParams({
+          q: `${query} street`,
+          format: 'json',
+          addressdetails: '1',
+          limit: '15',
+          countrycodes: 'gb'
         });
 
         const streetResponse = await fetch(`${NOMINATIM_BASE_URL}/search?${streetParams}`, {
@@ -4275,7 +4283,33 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
         if (streetResponse.ok) {
           const streetData = await streetResponse.json();
-          results = streetData;
+          results = streetData.filter(item => {
+            const address = item.address;
+            return address.road && address.postcode; // Only streets with postcodes
+          });
+        }
+      }
+
+      // Strategy 3: Broader area search
+      if (results.length === 0) {
+        const broadParams = new URLSearchParams({
+          q: query,
+          format: 'json',
+          addressdetails: '1',
+          limit: '10',
+          countrycodes: 'gb'
+        });
+
+        const broadResponse = await fetch(`${NOMINATIM_BASE_URL}/search?${broadParams}`, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'UW-Street-Smart-NL-Tracker/1.0'
+          }
+        });
+
+        if (broadResponse.ok) {
+          const broadData = await broadResponse.json();
+          results = broadData;
         }
       }
 
@@ -4290,6 +4324,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
   // Get properties for a specific street
   const getStreetProperties = async (streetName, postcode) => {
     try {
+      // Try to find properties on this specific street
       const params = new URLSearchParams({
         q: `${streetName}, ${postcode}`,
         format: 'json',
@@ -4327,9 +4362,15 @@ function NewStreetForm({ onSubmit, onCancel }) {
           .filter(prop => prop.number || prop.name); // Only properties with numbers or names
 
         setAvailableProperties(properties);
+        
+        // If no properties found, show a message and allow manual entry
+        if (properties.length === 0) {
+          console.log('No individual properties found for this street. OpenStreetMap data may be limited.');
+        }
       }
     } catch (error) {
       console.error('Property search error:', error);
+      setAvailableProperties([]);
     }
   };
 
