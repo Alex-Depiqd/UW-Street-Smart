@@ -198,6 +198,9 @@ const Drawer = ({ open, onClose, title, children, size = "default" }) => {
 
 // --- Main App ---
 export default function App() {
+  // Google Places API key (defined at component level)
+  const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
+  
   const [dark, setDark] = useState(true);
   const [view, setView] = useState("dashboard");
   const [campaigns, setCampaigns] = useState(seedCampaigns);
@@ -1263,9 +1266,6 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   }, [dark]);
 
-  // Google Places API with smart caching
-  const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
-  
   // Debug logging for API key
   useEffect(() => {
     console.log('Google Places API Key status:', {
