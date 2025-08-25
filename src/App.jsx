@@ -4322,21 +4322,34 @@ function NewStreetForm({ onSubmit, onCancel }) {
         }
       }
 
+      // Wait for google.maps to be fully available (guards against racing)
+      await new Promise((resolve, reject) => {
+        let attempts = 0;
+        const checkInterval = setInterval(() => {
+          if (window.google && window.google.maps && window.google.maps.importLibrary) {
+            clearInterval(checkInterval);
+            resolve();
+          }
+          if (++attempts > 200) {
+            clearInterval(checkInterval);
+            reject(new Error('Maps failed to load with importLibrary support'));
+          }
+        }, 25);
+      });
+
       // Import the new Places library
-      const { AutocompleteSessionToken, AutocompleteSuggestion } = await google.maps.importLibrary("places");
+      const { AutocompleteSessionToken, AutocompleteSuggestion } = await google.maps.importLibrary('places');
       
       // Create session token for billing efficiency
       let sessionToken = new AutocompleteSessionToken();
 
       // Get place suggestions using new Data API
-      const req = {
-        input: query + ', UK',
+      const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+        input: query,
         region: 'gb',
-        includedPrimaryTypes: ['route', 'street_address', 'postal_code', 'locality'],
+        includedPrimaryTypes: ['postal_code', 'route', 'street_address', 'locality'],
         sessionToken,
-      };
-
-      const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions(req);
+      });
 
       if (!suggestions || suggestions.length === 0) {
         console.log('No suggestions found');
