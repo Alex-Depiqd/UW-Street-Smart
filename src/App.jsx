@@ -1271,7 +1271,15 @@ export default function App() {
     console.log('Google Places API Key status:', {
       hasKey: !!GOOGLE_PLACES_API_KEY,
       keyLength: GOOGLE_PLACES_API_KEY?.length || 0,
-      keyStart: GOOGLE_PLACES_API_KEY?.substring(0, 10) + '...' || 'none'
+      keyStart: GOOGLE_PLACES_API_KEY?.substring(0, 10) + '...' || 'none',
+      fullKey: GOOGLE_PLACES_API_KEY || 'NOT_FOUND'
+    });
+    
+    // Test if environment variable is accessible
+    console.log('Environment variable test:', {
+      importMetaEnv: import.meta.env,
+      hasViteKey: !!import.meta.env.VITE_GOOGLE_PLACES_API_KEY,
+      viteKeyLength: import.meta.env.VITE_GOOGLE_PLACES_API_KEY?.length || 0
     });
   }, [GOOGLE_PLACES_API_KEY]);
   
@@ -4223,6 +4231,9 @@ function ImportStreetsForm({
 }
 
 function NewStreetForm({ onSubmit, onCancel }) {
+  // Google Places API key (defined within this component)
+  const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
+  
   const [step, setStep] = useState('options'); // 'options', 'postcode', 'streets', 'properties', 'manual'
   const [formData, setFormData] = useState({
     name: "",
@@ -4262,6 +4273,64 @@ function NewStreetForm({ onSubmit, onCancel }) {
     } else {
       console.log('No Google Places API key, using demo data');
       await searchWithDemoData(query);
+    }
+  };
+
+  // Google Places API search function
+  const searchAddressesWithGoogle = async (query) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      console.log('Making Google Places API request for:', query);
+      
+      // Google Places Text Search API
+      const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ', UK')}&key=${GOOGLE_PLACES_API_KEY}&types=street_address|route&components=country:gb`;
+      
+      console.log('API URL (without key):', searchUrl.replace(GOOGLE_PLACES_API_KEY, 'API_KEY_HIDDEN'));
+      
+      const response = await fetch(searchUrl);
+      console.log('API Response status:', response.status);
+      
+      const data = await response.json();
+      console.log('API Response data:', data);
+      
+      if (data.status === 'OK' && data.results) {
+        const results = data.results.slice(0, 10).map(place => {
+          // Parse Google Places result into our format
+          const addressComponents = place.address_components || [];
+          const street = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
+          const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name || '';
+          const village = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
+          const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.long_name || '';
+          
+          return {
+            display_name: `${street}, ${postcode}`,
+            address: {
+              road: street,
+              postcode: postcode,
+              village: village,
+              city: city
+            },
+            place_id: place.place_id,
+            type: 'google_place'
+          };
+        }).filter(result => result.address.road && result.address.postcode);
+        
+        console.log('Processed results:', results);
+        setSearchResults(results);
+      } else {
+        console.error('Google Places API error:', data.status, data.error_message);
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Google Places API error:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
     }
   };
 
