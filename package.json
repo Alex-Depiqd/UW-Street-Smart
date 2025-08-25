@@ -1,0 +1,68 @@
+{
+  "name": "uw-street-smart-nl-tracker",
+  "version": "1.0.0",
+  "description": "UW Street Smart - Track and manage Neighbourhood Letters campaigns efficiently",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext js,jsx,ts,tsx",
+    "lint:fix": "eslint . --ext js,jsx,ts,tsx --fix"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "framer-motion": "^10.16.4",
+    "lucide-react": "^0.292.0",
+    "dexie": "^3.2.4",
+    "qrcode": "^1.5.3",
+    "date-fns": "^2.30.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^8.53.0",
+    "@tailwindcss/forms": "^0.5.6",
+    "@tailwindcss/typography": "^0.5.10",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@types/qrcode": "^1.5.5",
+    "@vitejs/plugin-react": "^4.1.0",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.53.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.4",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.5",
+    "vite": "^4.5.0",
+    "vite-plugin-pwa": "^0.17.4"
+  },
+  "keywords": [
+    "pwa",
+    "react",
+    "uw",
+    "neighbourhood-letters",
+    "campaign-tracking",
+    "offline-first",
+    "progressive-web-app"
+  ],
+  "author": "UW Partners",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+} 
