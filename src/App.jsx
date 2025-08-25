@@ -4322,66 +4322,59 @@ function NewStreetForm({ onSubmit, onCancel }) {
         }
       }
 
-      // Create session token for billing efficiency
-      const sessionToken = new google.maps.places.AutocompleteSessionToken();
-      const service = new google.maps.places.AutocompleteService();
-
-      // Get place predictions
-      const predictions = await new Promise((resolve, reject) => {
-        service.getPlacePredictions(
-          {
-            input: query + ', UK',
-            sessionToken,
-            componentRestrictions: { country: 'gb' },
-            types: ['street_address', 'route']
-          },
-          (predictions, status) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
-              resolve(predictions);
-            } else {
-              reject(new Error(`Places API status: ${status}`));
-            }
-          }
-        );
+      // Use the new AutocompleteSuggestion API
+      const autocompleteSuggestion = new google.maps.places.AutocompleteSuggestion();
+      
+      // Get place suggestions
+      const suggestions = await autocompleteSuggestion.getPlacePredictions({
+        input: query + ', UK',
+        componentRestrictions: { country: 'gb' },
+        types: ['street_address', 'route']
       });
 
-      // Get detailed information for each prediction
-      const placesService = new google.maps.places.PlacesService(document.createElement('div'));
+      if (!suggestions || suggestions.length === 0) {
+        console.log('No suggestions found');
+        setSearchResults([]);
+        return;
+      }
+
+      const predictions = suggestions;
+
+      // Get detailed information for each prediction using the new API
       const detailedResults = await Promise.all(
-        predictions.slice(0, 10).map(prediction => 
-          new Promise((resolve) => {
-            placesService.getDetails(
-              {
-                placeId: prediction.place_id,
-                fields: ['address_components', 'geometry', 'name', 'formatted_address'],
-                sessionToken
-              },
-              (place, status) => {
-                if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-                  const addressComponents = place.address_components || [];
-                  const street = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
-                  const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name || '';
-                  const village = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
-                  const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.long_name || '';
-                  
-                  resolve({
-                    display_name: `${street}, ${postcode}`,
-                    address: {
-                      road: street,
-                      postcode: postcode,
-                      village: village,
-                      city: city
-                    },
-                    place_id: place.place_id,
-                    type: 'google_place'
-                  });
-                } else {
-                  resolve(null);
-                }
-              }
-            );
-          })
-        )
+        predictions.slice(0, 10).map(async (prediction) => {
+          try {
+            // Use the new Places API for details
+            const placeDetails = await google.maps.places.PlacesService.getDetails({
+              placeId: prediction.place_id,
+              fields: ['address_components', 'geometry', 'name', 'formatted_address']
+            });
+
+            if (placeDetails) {
+              const addressComponents = placeDetails.address_components || [];
+              const street = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
+              const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name || '';
+              const village = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
+              const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.long_name || '';
+              
+              return {
+                display_name: `${street}, ${postcode}`,
+                address: {
+                  road: street,
+                  postcode: postcode,
+                  village: village,
+                  city: city
+                },
+                place_id: prediction.place_id,
+                type: 'google_place'
+              };
+            }
+            return null;
+          } catch (error) {
+            console.error('Error getting place details:', error);
+            return null;
+          }
+        })
       );
 
       const results = detailedResults.filter(result => result && result.address.road && result.address.postcode);
