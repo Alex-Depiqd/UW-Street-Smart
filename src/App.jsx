@@ -199,7 +199,7 @@ const Drawer = ({ open, onClose, title, children, size = "default" }) => {
 // --- Main App ---
 export default function App() {
   // Google Places API key (defined at component level)
-  const GOOGLE_PLACES_API_KEY = process.env.VITE_GOOGLE_PLACES_API_KEY;
+  const GOOGLE_PLACES_API_KEY = process.env.VITE_GOOGLE_PLACES_API_KEY || window.VITE_GOOGLE_PLACES_API_KEY;
   
   const [dark, setDark] = useState(true);
   const [view, setView] = useState("dashboard");
