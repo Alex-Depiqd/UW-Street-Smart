@@ -4309,13 +4309,25 @@ function NewStreetForm({ onSubmit, onCancel }) {
     try {
       console.log('Making Google Places API request for:', query);
       
-      // Google Places Text Search API
-      const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ', UK')}&key=${GOOGLE_PLACES_API_KEY}&types=street_address|route&components=country:gb`;
+      // Google Places Text Search API (with CORS proxy fallback)
+      const baseUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ', UK')}&key=${GOOGLE_PLACES_API_KEY}&types=street_address|route&components=country:gb`;
+      
+      // Try direct request first, then proxy if CORS fails
+      let searchUrl = baseUrl;
       
       console.log('API URL (without key):', searchUrl.replace(GOOGLE_PLACES_API_KEY, 'API_KEY_HIDDEN'));
       
-      const response = await fetch(searchUrl);
-      console.log('API Response status:', response.status);
+      let response;
+      try {
+        response = await fetch(searchUrl);
+        console.log('API Response status:', response.status);
+      } catch (corsError) {
+        console.log('CORS error, trying proxy:', corsError);
+        // Use CORS proxy as fallback
+        searchUrl = `https://cors-anywhere.herokuapp.com/${baseUrl}`;
+        response = await fetch(searchUrl);
+        console.log('Proxy API Response status:', response.status);
+      }
       
       const data = await response.json();
       console.log('API Response data:', data);
