@@ -199,13 +199,18 @@ const Drawer = ({ open, onClose, title, children, size = "default" }) => {
 // --- Main App ---
 export default function App() {
   // Google Places API key (defined at component level)
-  const [apiKey, setApiKey] = useState(localStorage.getItem('google_places_api_key') || '');
+  const [apiKey, setApiKey] = useState(() => {
+    const stored = localStorage.getItem('google_places_api_key');
+    console.log('Loading API key from localStorage:', stored ? 'found' : 'not found');
+    return stored || '';
+  });
   const GOOGLE_PLACES_API_KEY = apiKey;
   
   // Update API key when localStorage changes
   useEffect(() => {
     const handleStorageChange = () => {
       const newApiKey = localStorage.getItem('google_places_api_key') || '';
+      console.log('API key changed in localStorage:', newApiKey ? 'found' : 'not found');
       setApiKey(newApiKey);
     };
     
