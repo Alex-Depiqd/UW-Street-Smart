@@ -8,6 +8,7 @@ import {
   User, LogOut, HelpCircle, Info, Shield, Database, BarChart3, Target,
   Upload, Trash2, AlertTriangle, Camera, Globe
 } from "lucide-react";
+import { config } from './config';
 
 
 
@@ -4225,7 +4226,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
   // OpenStreetMap Nominatim API
   const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
 
-  // Flexible search - find postcodes, streets, villages, towns
+  // Improved OpenStreetMap search for UK addresses
   const searchPostcodes = async (query) => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -4242,8 +4243,9 @@ function NewStreetForm({ onSubmit, onCancel }) {
           q: query,
           format: 'json',
           addressdetails: '1',
-          limit: '5',
-          countrycodes: 'gb'
+          limit: '10',
+          countrycodes: 'gb',
+          featuretype: 'postcode'
         });
 
         const postcodeResponse = await fetch(`${NOMINATIM_BASE_URL}/search?${postcodeParams}`, {
@@ -4255,18 +4257,24 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
         if (postcodeResponse.ok) {
           const postcodeData = await postcodeResponse.json();
-          results = postcodeData;
+          // Filter for actual postcodes, not internal IDs
+          results = postcodeData.filter(item => {
+            const address = item.address;
+            // Only include if it has a real postcode format
+            return address.postcode && address.postcode.match(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i);
+          });
         }
       }
 
       // Strategy 2: Search for streets in the area
       if (results.length === 0) {
         const streetParams = new URLSearchParams({
-          q: `${query} street`,
+          q: `${query}, UK`,
           format: 'json',
           addressdetails: '1',
-          limit: '10',
-          countrycodes: 'gb'
+          limit: '15',
+          countrycodes: 'gb',
+          featuretype: 'street'
         });
 
         const streetResponse = await fetch(`${NOMINATIM_BASE_URL}/search?${streetParams}`, {
@@ -4278,9 +4286,12 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
         if (streetResponse.ok) {
           const streetData = await streetResponse.json();
+          // Filter for actual streets with real postcodes
           results = streetData.filter(item => {
             const address = item.address;
-            return address.road && address.postcode; // Only streets with postcodes
+            return address.road && 
+                   address.postcode && 
+                   address.postcode.match(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i);
           });
         }
       }
@@ -4288,7 +4299,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
       // Strategy 3: Search for villages, towns, areas
       if (results.length === 0) {
         const areaParams = new URLSearchParams({
-          q: query,
+          q: `${query}, UK`,
           format: 'json',
           addressdetails: '1',
           limit: '10',
@@ -4304,7 +4315,12 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
         if (areaResponse.ok) {
           const areaData = await areaResponse.json();
-          results = areaData;
+          // Filter for areas that have postcodes
+          results = areaData.filter(item => {
+            const address = item.address;
+            return address.postcode && 
+                   address.postcode.match(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i);
+          });
         }
       }
 
@@ -4355,7 +4371,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
   const handlePostcodeSelect = (result) => {
     const address = result.address;
     
-    // If it's a street, use it directly
+    // If it's a street with a postcode, use it directly
     if (address.road && address.postcode) {
       const streetName = address.road;
       const postcode = address.postcode;
@@ -4367,20 +4383,26 @@ function NewStreetForm({ onSubmit, onCancel }) {
         postcode: postcode
       }));
       
-      // Get properties for this street
-      getStreetProperties(streetName, postcode);
-      setStep('properties');
+      // Since OpenStreetMap doesn't provide individual properties,
+      // we'll go directly to manual property entry
+      setStep('manual');
       return;
     }
     
     // If it's a postcode or area, search for streets in that area
     const postcode = address.postcode || result.name;
-    setCurrentPostcode(postcode);
-    setFormData(prev => ({ ...prev, postcode: postcode }));
+    if (postcode && postcode.match(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i)) {
+      setCurrentPostcode(postcode);
+      setFormData(prev => ({ ...prev, postcode: postcode }));
+      
+      // Search for streets in this postcode
+      searchStreetsInPostcode(postcode);
+      setStep('streets');
+      return;
+    }
     
-    // Search for streets in this postcode/area
-    searchStreetsInPostcode(postcode);
-    setStep('streets');
+    // Fallback to manual entry
+    setStep('manual');
   };
 
   // Handle street selection
@@ -4948,7 +4970,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="e.g., IP30 9DR, Cross Street, Elmswell, Bury St Edmunds..."
+            placeholder="e.g., IP30 9DR, Cross Street, Elmswell..."
             className="w-full mt-1 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
           />
         </div>
@@ -4967,7 +4989,12 @@ function NewStreetForm({ onSubmit, onCancel }) {
                 onClick={() => handlePostcodeSelect(result)}
                 className="w-full p-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0"
               >
-                <div className="font-medium">{result.display_name.split(',')[0]}</div>
+                <div className="font-medium">
+                  {result.address.road ? 
+                    `${result.address.road}, ${result.address.postcode}` : 
+                    result.display_name.split(',')[0]
+                  }
+                </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
                   {result.display_name}
                 </div>
@@ -5285,3 +5312,44 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
     </div>
   );
 }
+
+// Get detailed place information including properties
+const getPlaceDetails = async (placeId) => {
+  try {
+    const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY';
+    
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=address_components,formatted_address,geometry,name&key=${GOOGLE_API_KEY}`
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      
+      if (data.status === 'OK') {
+        const place = data.result;
+        const addressComponents = place.address_components || [];
+        
+        // Extract detailed address information
+        const streetNumber = addressComponents.find(comp => comp.types.includes('street_number'))?.long_name || '';
+        const route = addressComponents.find(comp => comp.types.includes('route'))?.long_name || '';
+        const postcode = addressComponents.find(comp => comp.types.includes('postal_code'))?.long_name || '';
+        const locality = addressComponents.find(comp => comp.types.includes('locality'))?.long_name || '';
+        
+        return {
+          display_name: place.formatted_address,
+          address: {
+            road: route,
+            postcode: postcode,
+            village: locality,
+            house_number: streetNumber
+          },
+          lat: place.geometry?.location?.lat,
+          lon: place.geometry?.location?.lng
+        };
+      }
+    }
+  } catch (error) {
+    console.error('Place details error:', error);
+  }
+  return null;
+};
