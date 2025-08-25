@@ -1,5 +1,5 @@
 // Service Worker for UW Street Smart PWA
-const CACHE_NAME = 'uw-street-smart-v1';
+const CACHE_NAME = 'uw-street-smart-v2';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -22,6 +22,14 @@ self.addEventListener('install', (event) => {
 
 // Fetch event - serve from cache when offline
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  
+  // Bypass service worker cache for Google Maps files
+  if (url.origin === 'https://maps.googleapis.com' || url.origin === 'https://maps.gstatic.com') {
+    // Let the network handle it directly - don't cache Google Maps files
+    return;
+  }
+  
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
