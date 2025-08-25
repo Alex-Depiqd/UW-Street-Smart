@@ -950,34 +950,8 @@ export default function App() {
         }
       }
       
-      // Method 3: Search for real streets using OpenStreetMap Nominatim API
-      try {
-        const nominatimResponse = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchTerm + ', UK')}&format=json&addressdetails=1&limit=10&countrycodes=gb`
-        );
-        if (nominatimResponse.ok) {
-          const nominatimData = await nominatimResponse.json();
-          if (nominatimData && nominatimData.length > 0) {
-            const streetSuggestions = nominatimData
-              .filter(item => item.type === 'street' || item.class === 'highway')
-              .map(item => ({
-                display: `${item.display_name.split(',')[0]} - Street (${item.address?.city || item.address?.town || item.address?.village || 'UK'})`,
-                value: item.display_name.split(',')[0],
-                postcode: item.address?.postcode || '',
-                admin_district: item.address?.city || item.address?.town || item.address?.village,
-                admin_ward: item.address?.suburb,
-                parish: item.address?.county,
-                type: 'real_street',
-                local_type: 'street',
-                county: item.address?.county,
-                region: item.address?.state
-              }));
-            allSuggestions.push(...streetSuggestions);
-          }
-        }
-      } catch (nominatimError) {
-        console.log('Nominatim API error (falling back to other sources):', nominatimError);
-      }
+      // Method 3: Disabled - Using Google Places API instead
+      // OpenStreetMap Nominatim API disabled in favor of Google Places API
       
       // Method 4: Add some common UK place suggestions for better coverage
       const commonPlaces = [
