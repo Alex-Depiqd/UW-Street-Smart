@@ -4255,20 +4255,9 @@ function NewStreetForm({ onSubmit, onCancel }) {
       return;
     }
 
-    // Use Google Places API if available, otherwise fallback to mock data
-    if (GOOGLE_PLACES_API_KEY) {
-      try {
-        console.log('Using Google Places API for search');
-        await searchAddressesWithGoogle(query);
-      } catch (error) {
-        console.error('Google Places API failed, falling back to demo data:', error);
-        // Fallback to demo data if Google API fails
-        await searchWithDemoData(query);
-      }
-    } else {
-      console.log('No Google Places API key, using demo data');
-      await searchWithDemoData(query);
-    }
+    // Temporarily use demo data only for testing
+    console.log('Using demo data for testing');
+    await searchWithDemoData(query);
   };
 
   // Google Places API search function
