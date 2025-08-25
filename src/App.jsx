@@ -4207,7 +4207,7 @@ function ImportStreetsForm({
 }
 
 function NewStreetForm({ onSubmit, onCancel }) {
-  const [step, setStep] = useState('options'); // 'options', 'search', 'manual', 'properties'
+  const [step, setStep] = useState('options'); // 'options', 'postcode', 'streets', 'properties', 'manual'
   const [formData, setFormData] = useState({
     name: "",
     postcode: "",
@@ -4219,12 +4219,14 @@ function NewStreetForm({ onSubmit, onCancel }) {
   const [selectedStreet, setSelectedStreet] = useState(null);
   const [availableProperties, setAvailableProperties] = useState([]);
   const [selectedProperties, setSelectedProperties] = useState([]);
+  const [currentPostcode, setCurrentPostcode] = useState('');
+  const [availableStreets, setAvailableStreets] = useState([]);
 
   // OpenStreetMap Nominatim API
   const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
 
-  // Enhanced search - find streets and properties
-  const searchAddresses = async (query) => {
+  // Flexible search - find postcodes, streets, villages, towns
+  const searchPostcodes = async (query) => {
     if (!query.trim()) {
       setSearchResults([]);
       return;
@@ -4234,17 +4236,13 @@ function NewStreetForm({ onSubmit, onCancel }) {
     try {
       let results = [];
 
-      // Strategy 1: If it looks like a postcode, search for streets in that postcode
+      // Strategy 1: Search for postcodes (if it looks like a postcode)
       if (query.match(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i)) {
-        // Extract the postcode area (first part)
-        const postcodeArea = query.split(' ')[0];
-        const searchQuery = `${postcodeArea} street`;
-        
         const postcodeParams = new URLSearchParams({
-          q: searchQuery,
+          q: query,
           format: 'json',
           addressdetails: '1',
-          limit: '15',
+          limit: '5',
           countrycodes: 'gb'
         });
 
@@ -4257,10 +4255,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
         if (postcodeResponse.ok) {
           const postcodeData = await postcodeResponse.json();
-          results = postcodeData.filter(item => {
-            const address = item.address;
-            return address.road && address.postcode; // Only streets with postcodes
-          });
+          results = postcodeData;
         }
       }
 
@@ -4270,7 +4265,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
           q: `${query} street`,
           format: 'json',
           addressdetails: '1',
-          limit: '15',
+          limit: '10',
           countrycodes: 'gb'
         });
 
@@ -4290,9 +4285,9 @@ function NewStreetForm({ onSubmit, onCancel }) {
         }
       }
 
-      // Strategy 3: Broader area search
+      // Strategy 3: Search for villages, towns, areas
       if (results.length === 0) {
-        const broadParams = new URLSearchParams({
+        const areaParams = new URLSearchParams({
           q: query,
           format: 'json',
           addressdetails: '1',
@@ -4300,16 +4295,16 @@ function NewStreetForm({ onSubmit, onCancel }) {
           countrycodes: 'gb'
         });
 
-        const broadResponse = await fetch(`${NOMINATIM_BASE_URL}/search?${broadParams}`, {
+        const areaResponse = await fetch(`${NOMINATIM_BASE_URL}/search?${areaParams}`, {
           headers: {
             'Accept': 'application/json',
             'User-Agent': 'UW-Street-Smart-NL-Tracker/1.0'
           }
         });
 
-        if (broadResponse.ok) {
-          const broadData = await broadResponse.json();
-          results = broadData;
+        if (areaResponse.ok) {
+          const areaData = await areaResponse.json();
+          results = areaData;
         }
       }
 
@@ -4319,6 +4314,91 @@ function NewStreetForm({ onSubmit, onCancel }) {
     } finally {
       setIsSearching(false);
     }
+  };
+
+  // Search for streets in a specific postcode or area
+  const searchStreetsInPostcode = async (postcodeOrArea) => {
+    setIsSearching(true);
+    try {
+      const params = new URLSearchParams({
+        q: `${postcodeOrArea} street`,
+        format: 'json',
+        addressdetails: '1',
+        limit: '20',
+        countrycodes: 'gb'
+      });
+
+      const response = await fetch(`${NOMINATIM_BASE_URL}/search?${params}`, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'UW-Street-Smart-NL-Tracker/1.0'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Filter for actual streets
+        const streets = data.filter(item => {
+          const address = item.address;
+          return address.road && address.postcode;
+        });
+        setAvailableStreets(streets);
+      }
+    } catch (error) {
+      console.error('Street search error:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Handle postcode selection
+  const handlePostcodeSelect = (result) => {
+    const address = result.address;
+    
+    // If it's a street, use it directly
+    if (address.road && address.postcode) {
+      const streetName = address.road;
+      const postcode = address.postcode;
+      
+      setSelectedStreet({ name: streetName, postcode: postcode });
+      setFormData(prev => ({
+        ...prev,
+        name: streetName,
+        postcode: postcode
+      }));
+      
+      // Get properties for this street
+      getStreetProperties(streetName, postcode);
+      setStep('properties');
+      return;
+    }
+    
+    // If it's a postcode or area, search for streets in that area
+    const postcode = address.postcode || result.name;
+    setCurrentPostcode(postcode);
+    setFormData(prev => ({ ...prev, postcode: postcode }));
+    
+    // Search for streets in this postcode/area
+    searchStreetsInPostcode(postcode);
+    setStep('streets');
+  };
+
+  // Handle street selection
+  const handleStreetSelect = (street) => {
+    const address = street.address;
+    const streetName = address.road;
+    const postcode = address.postcode;
+    
+    setSelectedStreet({ name: streetName, postcode: postcode });
+    setFormData(prev => ({
+      ...prev,
+      name: streetName,
+      postcode: postcode
+    }));
+    
+    // Get properties for this street
+    getStreetProperties(streetName, postcode);
+    setStep('properties');
   };
 
   // Get properties for a specific street
@@ -4371,33 +4451,6 @@ function NewStreetForm({ onSubmit, onCancel }) {
     } catch (error) {
       console.error('Property search error:', error);
       setAvailableProperties([]);
-    }
-  };
-
-  const handleAddressSelect = (result) => {
-    const address = result.address;
-    const streetName = address.road || address.street || '';
-    const postcode = address.postcode || '';
-    
-    if (streetName && postcode) {
-      setSelectedStreet({ name: streetName, postcode: postcode });
-      setFormData({
-        name: streetName,
-        postcode: postcode,
-        properties: ""
-      });
-      
-      // Get properties for this street
-      getStreetProperties(streetName, postcode);
-      setStep('properties');
-    } else {
-      // Fallback to manual entry if we don't have complete street info
-      setFormData({
-        name: streetName,
-        postcode: postcode,
-        properties: ""
-      });
-      setStep('manual');
     }
   };
 
@@ -4460,7 +4513,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (searchTerm) {
-        searchAddresses(searchTerm);
+        searchPostcodes(searchTerm);
       } else {
         setSearchResults([]);
       }
@@ -4491,7 +4544,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
               <div>
                 <div className="font-medium">Search for Address</div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Use OpenStreetMap to find streets and select properties
+                  Search by postcode, street, village, or town
                 </div>
               </div>
             </div>
@@ -4527,7 +4580,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
     );
   }
 
-  if (step === 'search') {
+  if (step === 'postcode') {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3 mb-4">
@@ -4538,7 +4591,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div>
-            <h3 className="font-medium">Search for Address</h3>
+            <h3 className="font-medium">Postcode Search</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Start with a postcode to find streets
             </p>
@@ -4546,19 +4599,19 @@ function NewStreetForm({ onSubmit, onCancel }) {
         </div>
 
         <div>
-          <label className="text-xs opacity-70">Search for postcode or street name</label>
+          <label className="text-xs opacity-70">Enter postcode</label>
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="e.g., IP30 9DR, Cross Street, Elmswell..."
+            placeholder="e.g., IP30 9DR"
             className="w-full mt-1 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
           />
         </div>
 
         {isSearching && (
           <div className="text-center py-4 text-sm text-gray-600 dark:text-gray-400">
-            Searching addresses...
+            Searching postcodes...
           </div>
         )}
 
@@ -4567,7 +4620,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
             {searchResults.map((result, index) => (
               <button
                 key={index}
-                onClick={() => handleAddressSelect(result)}
+                onClick={() => handlePostcodeSelect(result)}
                 className="w-full p-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0"
               >
                 <div className="font-medium">{result.display_name.split(',')[0]}</div>
@@ -4581,7 +4634,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
         {!isSearching && searchTerm && searchResults.length === 0 && (
           <div className="text-center py-4 text-sm text-gray-600 dark:text-gray-400">
-            No addresses found for "{searchTerm}"
+            No postcodes found for "{searchTerm}"
           </div>
         )}
 
@@ -4597,12 +4650,118 @@ function NewStreetForm({ onSubmit, onCancel }) {
     );
   }
 
+  if (step === 'streets') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => setStep('postcode')}
+            className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h3 className="font-medium">Select Street</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {currentPostcode}
+            </p>
+          </div>
+        </div>
+
+        {availableStreets.length > 0 ? (
+          <>
+            <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+              Select the street you want to add to your campaign:
+            </div>
+            
+            <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-xl">
+              {availableStreets.map((street, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleStreetSelect({
+                    display: `${street} - ${currentPostcode}`,
+                    value: street,
+                    postcode: currentPostcode,
+                    admin_district: '',
+                    admin_ward: '',
+                    parish: '',
+                    type: 'real_street',
+                    local_type: 'street',
+                    county: '',
+                    region: ''
+                  })}
+                  className={`w-full p-3 text-left text-sm transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${
+                    selectedStreet && selectedStreet.name === street
+                      ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800' 
+                      : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                      selectedStreet && selectedStreet.name === street
+                        ? 'bg-primary-600 border-primary-600' 
+                        : 'border-gray-300 dark:border-gray-600'
+                    }`}>
+                      {selectedStreet && selectedStreet.name === street && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <div>
+                      <div className="font-medium">
+                        {street}
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                        {currentPostcode}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={() => setStep('postcode')}
+                className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                Change Postcode
+              </button>
+              <button
+                onClick={() => setStep('manual')}
+                className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                Enter Manually
+              </button>
+              <button
+                onClick={handlePropertiesConfirm}
+                disabled={selectedProperties.length === 0}
+                className="flex-1 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Add {selectedProperties.length} Properties
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              No streets found for this postcode. You can enter them manually.
+            </div>
+            <button
+              onClick={() => setStep('manual')}
+              className="px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+            >
+              Enter Manually
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (step === 'properties') {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3 mb-4">
           <button
-            onClick={() => setStep('search')}
+            onClick={() => setStep('streets')}
             className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -4762,6 +4921,76 @@ function NewStreetForm({ onSubmit, onCancel }) {
           </button>
         </div>
       </form>
+    );
+  }
+
+  if (step === 'search') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => setStep('options')}
+            className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h3 className="font-medium">Search for Address</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Search by postcode, street name, village, or town
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs opacity-70">Search for address</label>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="e.g., IP30 9DR, Cross Street, Elmswell, Bury St Edmunds..."
+            className="w-full mt-1 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+          />
+        </div>
+
+        {isSearching && (
+          <div className="text-center py-4 text-sm text-gray-600 dark:text-gray-400">
+            Searching addresses...
+          </div>
+        )}
+
+        {searchResults.length > 0 && (
+          <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-xl">
+            {searchResults.map((result, index) => (
+              <button
+                key={index}
+                onClick={() => handlePostcodeSelect(result)}
+                className="w-full p-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0"
+              >
+                <div className="font-medium">{result.display_name.split(',')[0]}</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                  {result.display_name}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!isSearching && searchTerm && searchResults.length === 0 && (
+          <div className="text-center py-4 text-sm text-gray-600 dark:text-gray-400">
+            No addresses found for "{searchTerm}"
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-4">
+          <button
+            onClick={() => setStep('manual')}
+            className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            Enter Manually Instead
+          </button>
+        </div>
+      </div>
     );
   }
 }
