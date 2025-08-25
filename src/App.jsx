@@ -1263,6 +1263,21 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   }, [dark]);
 
+  // Google Places API with smart caching
+  const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
+  
+  // Debug logging for API key
+  useEffect(() => {
+    console.log('Google Places API Key status:', {
+      hasKey: !!GOOGLE_PLACES_API_KEY,
+      keyLength: GOOGLE_PLACES_API_KEY?.length || 0,
+      keyStart: GOOGLE_PLACES_API_KEY?.substring(0, 10) + '...' || 'none'
+    });
+  }, [GOOGLE_PLACES_API_KEY]);
+  
+  // Cache for API results (reduces API calls by 80%+)
+  const [addressCache, setAddressCache] = useState({});
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 overflow-x-hidden">
       {/* Top Bar */}
@@ -4236,72 +4251,84 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
     // Use Google Places API if available, otherwise fallback to mock data
     if (GOOGLE_PLACES_API_KEY) {
-      await searchAddressesWithGoogle(query);
-    } else {
-      // Fallback to mock data for testing
-      setIsSearching(true);
       try {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        let results = [];
-        const searchTerm = query.toLowerCase();
-
-        // Comprehensive UK address data (simulated)
-        const ukAddresses = [
-          // IP30 postcodes (Elmswell area)
-          {
-            display_name: "Cross Street, Elmswell, IP30 9DR",
-            address: { road: "Cross Street", postcode: "IP30 9DR", village: "Elmswell", city: "Bury St Edmunds" }
-          },
-          {
-            display_name: "Station Road, Elmswell, IP30 9YY",
-            address: { road: "Station Road", postcode: "IP30 9YY", village: "Elmswell", city: "Bury St Edmunds" }
-          },
-          {
-            display_name: "Orchard Way, Elmswell, IP30 9XX",
-            address: { road: "Orchard Way", postcode: "IP30 9XX", village: "Elmswell", city: "Bury St Edmunds" }
-          },
-          {
-            display_name: "High Street, Elmswell, IP30 9AA",
-            address: { road: "High Street", postcode: "IP30 9AA", village: "Elmswell", city: "Bury St Edmunds" }
-          },
-          {
-            display_name: "Church Street, Elmswell, IP30 9BB",
-            address: { road: "Church Street", postcode: "IP30 9BB", village: "Elmswell", city: "Bury St Edmunds" }
-          },
-          {
-            display_name: "School Lane, Elmswell, IP30 9CC",
-            address: { road: "School Lane", postcode: "IP30 9CC", village: "Elmswell", city: "Bury St Edmunds" }
-          },
-          {
-            display_name: "Mill Road, Elmswell, IP30 9DD",
-            address: { road: "Mill Road", postcode: "IP30 9DD", village: "Elmswell", city: "Bury St Edmunds" }
-          },
-          {
-            display_name: "The Street, Elmswell, IP30 9EE",
-            address: { road: "The Street", postcode: "IP30 9EE", village: "Elmswell", city: "Bury St Edmunds" }
-          }
-        ];
-
-        // Filter results based on search term
-        results = ukAddresses.filter(address => {
-          const displayName = address.display_name.toLowerCase();
-          const road = address.address.road.toLowerCase();
-          const postcode = address.address.postcode.toLowerCase();
-          const village = address.address.village.toLowerCase();
-          
-          return displayName.includes(searchTerm) ||
-                 road.includes(searchTerm) ||
-                 postcode.includes(searchTerm) ||
-                 village.includes(searchTerm);
-        });
-
-        setSearchResults(results);
+        console.log('Using Google Places API for search');
+        await searchAddressesWithGoogle(query);
       } catch (error) {
-        console.error('Search error:', error);
-      } finally {
-        setIsSearching(false);
+        console.error('Google Places API failed, falling back to demo data:', error);
+        // Fallback to demo data if Google API fails
+        await searchWithDemoData(query);
       }
+    } else {
+      console.log('No Google Places API key, using demo data');
+      await searchWithDemoData(query);
+    }
+  };
+
+  // Demo data search function
+  const searchWithDemoData = async (query) => {
+    setIsSearching(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      let results = [];
+      const searchTerm = query.toLowerCase();
+
+      // Comprehensive UK address data (simulated)
+      const ukAddresses = [
+        // IP30 postcodes (Elmswell area)
+        {
+          display_name: "Cross Street, Elmswell, IP30 9DR",
+          address: { road: "Cross Street", postcode: "IP30 9DR", village: "Elmswell", city: "Bury St Edmunds" }
+        },
+        {
+          display_name: "Station Road, Elmswell, IP30 9YY",
+          address: { road: "Station Road", postcode: "IP30 9YY", village: "Elmswell", city: "Bury St Edmunds" }
+        },
+        {
+          display_name: "Orchard Way, Elmswell, IP30 9XX",
+          address: { road: "Orchard Way", postcode: "IP30 9XX", village: "Elmswell", city: "Bury St Edmunds" }
+        },
+        {
+          display_name: "High Street, Elmswell, IP30 9AA",
+          address: { road: "High Street", postcode: "IP30 9AA", village: "Elmswell", city: "Bury St Edmunds" }
+        },
+        {
+          display_name: "Church Street, Elmswell, IP30 9BB",
+          address: { road: "Church Street", postcode: "IP30 9BB", village: "Elmswell", city: "Bury St Edmunds" }
+        },
+        {
+          display_name: "School Lane, Elmswell, IP30 9CC",
+          address: { road: "School Lane", postcode: "IP30 9CC", village: "Elmswell", city: "Bury St Edmunds" }
+        },
+        {
+          display_name: "Mill Road, Elmswell, IP30 9DD",
+          address: { road: "Mill Road", postcode: "IP30 9DD", village: "Elmswell", city: "Bury St Edmunds" }
+        },
+        {
+          display_name: "The Street, Elmswell, IP30 9EE",
+          address: { road: "The Street", postcode: "IP30 9EE", village: "Elmswell", city: "Bury St Edmunds" }
+        }
+      ];
+
+      // Filter results based on search term
+      results = ukAddresses.filter(address => {
+        const displayName = address.display_name.toLowerCase();
+        const road = address.address.road.toLowerCase();
+        const postcode = address.address.postcode.toLowerCase();
+        const village = address.address.village.toLowerCase();
+        
+        return displayName.includes(searchTerm) ||
+               road.includes(searchTerm) ||
+               postcode.includes(searchTerm) ||
+               village.includes(searchTerm);
+      });
+
+      setSearchResults(results);
+    } catch (error) {
+      console.error('Demo search error:', error);
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -5335,67 +5362,76 @@ const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
 // Cache for API results (reduces API calls by 80%+)
 const [addressCache, setAddressCache] = useState({});
 
-const searchAddressesWithGoogle = async (query) => {
-  if (!query.trim()) {
-    setSearchResults([]);
-    return;
-  }
-
-  // Check cache first (major cost savings!)
-  const cacheKey = query.toLowerCase().trim();
-  if (addressCache[cacheKey]) {
-    setSearchResults(addressCache[cacheKey]);
-    return;
-  }
-
-  setIsSearching(true);
-  try {
-    // Google Places Text Search API
-    const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ', UK')}&key=${GOOGLE_PLACES_API_KEY}&types=street_address|route&components=country:gb`;
-    
-    const response = await fetch(searchUrl);
-    const data = await response.json();
-    
-    if (data.status === 'OK' && data.results) {
-      const results = data.results.slice(0, 10).map(place => {
-        // Parse Google Places result into our format
-        const addressComponents = place.address_components || [];
-        const street = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
-        const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name || '';
-        const village = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
-        const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.long_name || '';
-        
-        return {
-          display_name: `${street}, ${postcode}`,
-          address: {
-            road: street,
-            postcode: postcode,
-            village: village,
-            city: city
-          },
-          place_id: place.place_id,
-          type: 'google_place'
-        };
-      }).filter(result => result.address.road && result.address.postcode);
-      
-      // Cache the results (major cost savings!)
-      setAddressCache(prev => ({
-        ...prev,
-        [cacheKey]: results
-      }));
-      
-      setSearchResults(results);
-    } else {
-      console.log('Google Places API error:', data.status);
+  const searchAddressesWithGoogle = async (query) => {
+    if (!query.trim()) {
       setSearchResults([]);
+      return;
     }
-  } catch (error) {
-    console.error('Google Places API error:', error);
-    setSearchResults([]);
-  } finally {
-    setIsSearching(false);
-  }
-};
+
+    // Check cache first (major cost savings!)
+    const cacheKey = query.toLowerCase().trim();
+    if (addressCache[cacheKey]) {
+      setSearchResults(addressCache[cacheKey]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      console.log('Making Google Places API request for:', query);
+      
+      // Google Places Text Search API
+      const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ', UK')}&key=${GOOGLE_PLACES_API_KEY}&types=street_address|route&components=country:gb`;
+      
+      console.log('API URL (without key):', searchUrl.replace(GOOGLE_PLACES_API_KEY, 'API_KEY_HIDDEN'));
+      
+      const response = await fetch(searchUrl);
+      console.log('API Response status:', response.status);
+      
+      const data = await response.json();
+      console.log('API Response data:', data);
+      
+      if (data.status === 'OK' && data.results) {
+        const results = data.results.slice(0, 10).map(place => {
+          // Parse Google Places result into our format
+          const addressComponents = place.address_components || [];
+          const street = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
+          const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name || '';
+          const village = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
+          const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.long_name || '';
+          
+          return {
+            display_name: `${street}, ${postcode}`,
+            address: {
+              road: street,
+              postcode: postcode,
+              village: village,
+              city: city
+            },
+            place_id: place.place_id,
+            type: 'google_place'
+          };
+        }).filter(result => result.address.road && result.address.postcode);
+        
+        console.log('Processed results:', results);
+        
+        // Cache the results (major cost savings!)
+        setAddressCache(prev => ({
+          ...prev,
+          [cacheKey]: results
+        }));
+        
+        setSearchResults(results);
+      } else {
+        console.error('Google Places API error:', data.status, data.error_message);
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Google Places API error:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
 // Get detailed property information (cached)
 const getStreetPropertiesWithGoogle = async (placeId) => {
