@@ -4343,17 +4343,26 @@ function NewStreetForm({ onSubmit, onCancel }) {
       // Create session token for billing efficiency
       let sessionToken = new AutocompleteSessionToken();
 
-      // Get place suggestions using new Data API
+      // Get place suggestions using new Data API with broader types
       const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
         input: query,
         region: 'gb',
-        includedPrimaryTypes: ['postal_code', 'route', 'street_address', 'locality'],
+        includedPrimaryTypes: [
+          'postal_code',
+          'route',                    // streets
+          'street_address',
+          'locality',                 // towns/villages
+          'administrative_area_level_1' // counties
+        ],
         sessionToken,
       });
 
+      console.log('Raw suggestions from API:', suggestions);
+      
       if (!suggestions || suggestions.length === 0) {
-        console.log('No suggestions found');
-        setSearchResults([]);
+        console.log('No suggestions found for query:', query);
+        console.log('Falling back to demo data...');
+        await searchWithDemoData(query);
         return;
       }
 
