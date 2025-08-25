@@ -4298,7 +4298,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
     }
   };
 
-  // Google Maps JavaScript SDK search function
+  // Google Maps JavaScript SDK search function using new Data API
   const searchAddressesWithGoogle = async (query) => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -4310,7 +4310,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
       console.log('Using Google Maps JavaScript SDK for search:', query);
       
       // Load Google Maps SDK if not already loaded
-      if (!window.google || !window.google.maps || !window.google.maps.places) {
+      if (!window.google || !window.google.maps) {
         console.log('Loading Google Maps SDK...');
         try {
           await window.loadGoogleMapsSDK(GOOGLE_PLACES_API_KEY);
@@ -4322,15 +4322,21 @@ function NewStreetForm({ onSubmit, onCancel }) {
         }
       }
 
-      // Use the new AutocompleteSuggestion API
-      const autocompleteSuggestion = new google.maps.places.AutocompleteSuggestion();
+      // Import the new Places library
+      const { AutocompleteSessionToken, AutocompleteSuggestion } = await google.maps.importLibrary("places");
       
-      // Get place suggestions
-      const suggestions = await autocompleteSuggestion.getPlacePredictions({
+      // Create session token for billing efficiency
+      let sessionToken = new AutocompleteSessionToken();
+
+      // Get place suggestions using new Data API
+      const req = {
         input: query + ', UK',
-        componentRestrictions: { country: 'gb' },
-        types: ['street_address', 'route']
-      });
+        region: 'gb',
+        includedPrimaryTypes: ['route', 'street_address', 'postal_code', 'locality'],
+        sessionToken,
+      };
+
+      const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions(req);
 
       if (!suggestions || suggestions.length === 0) {
         console.log('No suggestions found');
@@ -4338,44 +4344,42 @@ function NewStreetForm({ onSubmit, onCancel }) {
         return;
       }
 
-      const predictions = suggestions;
-
-      // Get detailed information for each prediction using the new API
+      // Get detailed information for each suggestion
       const detailedResults = await Promise.all(
-        predictions.slice(0, 10).map(async (prediction) => {
+        suggestions.slice(0, 10).map(async (suggestion) => {
           try {
-            // Use the new Places API for details
-            const placeDetails = await google.maps.places.PlacesService.getDetails({
-              placeId: prediction.place_id,
-              fields: ['address_components', 'geometry', 'name', 'formatted_address']
+            const place = suggestion.placePrediction.toPlace();
+            await place.fetchFields({
+              fields: ['id', 'displayName', 'formattedAddress', 'addressComponents', 'location'],
             });
 
-            if (placeDetails) {
-              const addressComponents = placeDetails.address_components || [];
-              const street = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
-              const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name || '';
-              const village = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
-              const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.long_name || '';
-              
-              return {
-                display_name: `${street}, ${postcode}`,
-                address: {
-                  road: street,
-                  postcode: postcode,
-                  village: village,
-                  city: city
-                },
-                place_id: prediction.place_id,
-                type: 'google_place'
-              };
-            }
-            return null;
+            // Parse address components
+            const addressComponents = place.addressComponents || [];
+            const street = addressComponents.find(c => c.types.includes('route'))?.longName || '';
+            const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.longName || '';
+            const village = addressComponents.find(c => c.types.includes('locality'))?.longName || '';
+            const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.longName || '';
+            
+            return {
+              display_name: `${street}, ${postcode}`,
+              address: {
+                road: street,
+                postcode: postcode,
+                village: village,
+                city: city
+              },
+              place_id: place.id,
+              type: 'google_place'
+            };
           } catch (error) {
             console.error('Error getting place details:', error);
             return null;
           }
         })
       );
+
+      // Create new session token after selection
+      sessionToken = new AutocompleteSessionToken();
 
       const results = detailedResults.filter(result => result && result.address.road && result.address.postcode);
       console.log('Processed results:', results);
