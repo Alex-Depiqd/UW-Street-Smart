@@ -4239,8 +4239,22 @@ function ImportStreetsForm({
 }
 
 function NewStreetForm({ onSubmit, onCancel }) {
-  // Google Places API key (defined within this component)
-  const GOOGLE_PLACES_API_KEY = localStorage.getItem('google_places_api_key') || '';
+  // Google Places API key (reactive to localStorage changes)
+  const [apiKey, setApiKey] = useState(localStorage.getItem('google_places_api_key') || '');
+  
+  // Listen for localStorage changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const newApiKey = localStorage.getItem('google_places_api_key') || '';
+      console.log('NewStreetForm: API key changed in localStorage:', newApiKey ? 'found' : 'not found');
+      setApiKey(newApiKey);
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+  
+  const GOOGLE_PLACES_API_KEY = apiKey;
   
   const [step, setStep] = useState('options'); // 'options', 'postcode', 'streets', 'properties', 'manual'
   const [formData, setFormData] = useState({
