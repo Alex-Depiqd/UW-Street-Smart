@@ -5071,16 +5071,20 @@ function NewStreetForm({ onSubmit, onCancel }) {
             placeholder="e.g., IP30 9DR, Cross Street, Elmswell..."
             className="w-full mt-1 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
           />
-          {!GOOGLE_PLACES_API_KEY && (
+          {!GOOGLE_PLACES_API_KEY ? (
             <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">
               💡 Using demo data. Add Google Places API key for real UK addresses.
+            </div>
+          ) : (
+            <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+              ✅ Using Google Places API for real UK addresses.
             </div>
           )}
         </div>
 
         {isSearching && (
           <div className="text-center py-4 text-sm text-gray-600 dark:text-gray-400">
-            {GOOGLE_PLACES_API_KEY ? 'Searching Google Places API...' : 'Searching UK addresses...'}
+            {GOOGLE_PLACES_API_KEY ? 'Searching Google Places API...' : 'Searching demo addresses...'}
           </div>
         )}
 
