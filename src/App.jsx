@@ -4298,7 +4298,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
     }
   };
 
-  // Google Places API search function
+  // Google Maps JavaScript SDK search function
   const searchAddressesWithGoogle = async (query) => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -4307,61 +4307,89 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
     setIsSearching(true);
     try {
-      console.log('Making Google Places API request for:', query);
+      console.log('Using Google Maps JavaScript SDK for search:', query);
       
-      // Google Places Text Search API (with CORS proxy fallback)
-      const baseUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query + ', UK')}&key=${GOOGLE_PLACES_API_KEY}&types=street_address|route&components=country:gb`;
-      
-      // Try direct request first, then proxy if CORS fails
-      let searchUrl = baseUrl;
-      
-      console.log('API URL (without key):', searchUrl.replace(GOOGLE_PLACES_API_KEY, 'API_KEY_HIDDEN'));
-      
-      let response;
-      try {
-        response = await fetch(searchUrl);
-        console.log('API Response status:', response.status);
-      } catch (corsError) {
-        console.log('CORS error, trying proxy:', corsError);
-        // Use CORS proxy as fallback
-        searchUrl = `https://cors-anywhere.herokuapp.com/${baseUrl}`;
-        response = await fetch(searchUrl);
-        console.log('Proxy API Response status:', response.status);
+      // Load Google Maps SDK if not already loaded
+      if (!window.google || !window.google.maps || !window.google.maps.places) {
+        console.log('Loading Google Maps SDK...');
+        try {
+          await window.loadGoogleMapsSDK(GOOGLE_PLACES_API_KEY);
+          console.log('Google Maps SDK loaded successfully');
+        } catch (error) {
+          console.error('Failed to load Google Maps SDK:', error);
+          setSearchResults([]);
+          return;
+        }
       }
+
+      // Create session token for billing efficiency
+      const sessionToken = new google.maps.places.AutocompleteSessionToken();
+      const service = new google.maps.places.AutocompleteService();
+
+      // Get place predictions
+      const predictions = await new Promise((resolve, reject) => {
+        service.getPlacePredictions(
+          {
+            input: query + ', UK',
+            sessionToken,
+            componentRestrictions: { country: 'gb' },
+            types: ['street_address', 'route']
+          },
+          (predictions, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+              resolve(predictions);
+            } else {
+              reject(new Error(`Places API status: ${status}`));
+            }
+          }
+        );
+      });
+
+      // Get detailed information for each prediction
+      const placesService = new google.maps.places.PlacesService(document.createElement('div'));
+      const detailedResults = await Promise.all(
+        predictions.slice(0, 10).map(prediction => 
+          new Promise((resolve) => {
+            placesService.getDetails(
+              {
+                placeId: prediction.place_id,
+                fields: ['address_components', 'geometry', 'name', 'formatted_address'],
+                sessionToken
+              },
+              (place, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+                  const addressComponents = place.address_components || [];
+                  const street = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
+                  const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name || '';
+                  const village = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
+                  const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.long_name || '';
+                  
+                  resolve({
+                    display_name: `${street}, ${postcode}`,
+                    address: {
+                      road: street,
+                      postcode: postcode,
+                      village: village,
+                      city: city
+                    },
+                    place_id: place.place_id,
+                    type: 'google_place'
+                  });
+                } else {
+                  resolve(null);
+                }
+              }
+            );
+          })
+        )
+      );
+
+      const results = detailedResults.filter(result => result && result.address.road && result.address.postcode);
+      console.log('Processed results:', results);
+      setSearchResults(results);
       
-      const data = await response.json();
-      console.log('API Response data:', data);
-      
-      if (data.status === 'OK' && data.results) {
-        const results = data.results.slice(0, 10).map(place => {
-          // Parse Google Places result into our format
-          const addressComponents = place.address_components || [];
-          const street = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
-          const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name || '';
-          const village = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
-          const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.long_name || '';
-          
-          return {
-            display_name: `${street}, ${postcode}`,
-            address: {
-              road: street,
-              postcode: postcode,
-              village: village,
-              city: city
-            },
-            place_id: place.place_id,
-            type: 'google_place'
-          };
-        }).filter(result => result.address.road && result.address.postcode);
-        
-        console.log('Processed results:', results);
-        setSearchResults(results);
-      } else {
-        console.error('Google Places API error:', data.status, data.error_message);
-        setSearchResults([]);
-      }
     } catch (error) {
-      console.error('Google Places API error:', error);
+      console.error('Google Maps SDK error:', error);
       setSearchResults([]);
     } finally {
       setIsSearching(false);

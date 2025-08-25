@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CORS Test</title>
+</head>
+<body>
+    <h1>Google Places API CORS Test</h1>
+    <button onclick="testDirect()">Test Direct API</button>
+    <button onclick="testProxy()">Test Proxy API</button>
+    <div id="result"></div>
+
+    <script>
+        const API_KEY = 'AIzaSyAzMhiEVq8M1KTb-70Y0aFQYzJE2JUcc8Y';
+        
+        async function testDirect() {
+            const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=IP30%209DR%2C%20UK&key=${API_KEY}&types=street_address|route&components=country:gb`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                document.getElementById('result').innerHTML = '<h3>Direct API Result:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('result').innerHTML = '<h3>Direct API Error:</h3><pre>' + error.message + '</pre>';
+            }
+        }
+        
+        async function testProxy() {
+            const baseUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=IP30%209DR%2C%20UK&key=${API_KEY}&types=street_address|route&components=country:gb`;
+            const proxyUrl = `https://cors-anywhere.herokuapp.com/${baseUrl}`;
+            
+            try {
+                const response = await fetch(proxyUrl);
+                const data = await response.json();
+                document.getElementById('result').innerHTML = '<h3>Proxy API Result:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('result').innerHTML = '<h3>Proxy API Error:</h3><pre>' + error.message + '</pre>';
+            }
+        }
+    </script>
+</body>
+</html>
