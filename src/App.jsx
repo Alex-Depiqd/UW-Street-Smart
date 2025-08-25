@@ -199,7 +199,8 @@ const Drawer = ({ open, onClose, title, children, size = "default" }) => {
 // --- Main App ---
 export default function App() {
   // Google Places API key (defined at component level)
-  const GOOGLE_PLACES_API_KEY = process.env.VITE_GOOGLE_PLACES_API_KEY || window.VITE_GOOGLE_PLACES_API_KEY;
+  const [apiKey, setApiKey] = useState(localStorage.getItem('google_places_api_key') || '');
+  const GOOGLE_PLACES_API_KEY = apiKey;
   
   const [dark, setDark] = useState(true);
   const [view, setView] = useState("dashboard");
@@ -2839,6 +2840,7 @@ function LinksPanel({ links }) {
 
 function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
   const [selectedFile, setSelectedFile] = useState(null);
+  const [apiKey, setApiKey] = useState(localStorage.getItem('google_places_api_key') || '');
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -2851,6 +2853,29 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
 
   return (
     <div className="space-y-4">
+      <div className="space-y-2">
+        <h4 className="font-medium">API Configuration</h4>
+        <div>
+          <label className="text-xs opacity-70 mb-1 block">Google Places API Key</label>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => {
+              const newKey = e.target.value;
+              setApiKey(newKey);
+              localStorage.setItem('google_places_api_key', newKey);
+              // Force app to reload API key
+              window.location.reload();
+            }}
+            placeholder="Enter your Google Places API key"
+            className="w-full p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+          />
+          <div className="text-xs text-gray-500 mt-1">
+            {apiKey ? 'API key saved. App will reload to use real addresses.' : 'Leave empty to use demo data.'}
+          </div>
+        </div>
+      </div>
+      
       <div className="space-y-2">
         <h4 className="font-medium">Appearance</h4>
         <ToggleRow 
