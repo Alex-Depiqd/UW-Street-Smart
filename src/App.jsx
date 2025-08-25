@@ -199,7 +199,7 @@ const Drawer = ({ open, onClose, title, children, size = "default" }) => {
 // --- Main App ---
 export default function App() {
   // Google Places API key (defined at component level)
-  const GOOGLE_PLACES_API_KEY = process.env.VITE_GOOGLE_PLACES_API_KEY || import.meta.env?.VITE_GOOGLE_PLACES_API_KEY;
+  const GOOGLE_PLACES_API_KEY = process.env.VITE_GOOGLE_PLACES_API_KEY;
   
   const [dark, setDark] = useState(true);
   const [view, setView] = useState("dashboard");
@@ -1268,14 +1268,11 @@ export default function App() {
 
   // Debug logging for API key
   useEffect(() => {
-    console.log('=== API KEY DEBUG ===');
-    console.log('GOOGLE_PLACES_API_KEY:', GOOGLE_PLACES_API_KEY);
-    console.log('process.env.VITE_GOOGLE_PLACES_API_KEY:', process.env.VITE_GOOGLE_PLACES_API_KEY);
-    console.log('import.meta.env?.VITE_GOOGLE_PLACES_API_KEY:', import.meta.env?.VITE_GOOGLE_PLACES_API_KEY);
-    console.log('Has key:', !!GOOGLE_PLACES_API_KEY);
-    console.log('Key length:', GOOGLE_PLACES_API_KEY?.length || 0);
-    console.log('Key starts with:', GOOGLE_PLACES_API_KEY?.substring(0, 10) || 'none');
-    console.log('=== END DEBUG ===');
+    console.log('API Key Debug:', {
+      hasKey: !!GOOGLE_PLACES_API_KEY,
+      keyLength: GOOGLE_PLACES_API_KEY?.length || 0,
+      keyStart: GOOGLE_PLACES_API_KEY?.substring(0, 10) || 'none'
+    });
   }, [GOOGLE_PLACES_API_KEY]);
   
   // Cache for API results (reduces API calls by 80%+)
@@ -4227,7 +4224,7 @@ function ImportStreetsForm({
 
 function NewStreetForm({ onSubmit, onCancel }) {
   // Google Places API key (defined within this component)
-  const GOOGLE_PLACES_API_KEY = process.env.VITE_GOOGLE_PLACES_API_KEY || import.meta.env?.VITE_GOOGLE_PLACES_API_KEY;
+  const GOOGLE_PLACES_API_KEY = process.env.VITE_GOOGLE_PLACES_API_KEY;
   
   const [step, setStep] = useState('options'); // 'options', 'postcode', 'streets', 'properties', 'manual'
   const [formData, setFormData] = useState({
