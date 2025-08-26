@@ -4667,9 +4667,41 @@ function NewStreetForm({ onSubmit, onCancel }) {
       return;
     }
     
-    // If we have just a street name (no postcode), treat it as a street search
+    // If we have just a street name (no postcode), try to get postcode from Google Places result
     if (streetName && !postcode) {
-      console.log('Searching for streets in area:', streetName);
+      console.log('Attempting to get postcode from Google Places result for:', streetName);
+      
+      // If we have the raw Google Places result, try to get the postcode
+      if (result.raw && result.raw.placePrediction) {
+        try {
+          console.log('Fetching details from Google Places...');
+          const place = result.raw.placePrediction.toPlace();
+          await place.fetchFields({
+            fields: ['addressComponents', 'formattedAddress'],
+          });
+          
+          // Extract postcode from address components
+          const addressComponents = place.addressComponents || [];
+          const postcodeComponent = addressComponents.find(c => c.types.includes('postal_code'));
+          const extractedPostcode = postcodeComponent?.longName || '';
+          
+          console.log('Extracted postcode from Google Places:', extractedPostcode);
+          
+          if (extractedPostcode) {
+            // Use the extracted postcode for street search
+            setCurrentPostcode(extractedPostcode);
+            setFormData(prev => ({ ...prev, postcode: extractedPostcode }));
+            await searchStreetsInPostcode(extractedPostcode);
+            setStep('streets');
+            return;
+          }
+        } catch (error) {
+          console.error('Error fetching Google Places details:', error);
+        }
+      }
+      
+      // Fallback to searching by street name
+      console.log('Falling back to street name search for:', streetName);
       try {
         setCurrentPostcode(streetName);
         setFormData(prev => ({ ...prev, postcode: streetName }));
