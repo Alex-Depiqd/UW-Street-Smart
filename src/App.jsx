@@ -4554,14 +4554,22 @@ function NewStreetForm({ onSubmit, onCancel }) {
   // Search for streets in a specific postcode or area
   const searchStreetsInPostcode = async (postcodeOrArea) => {
     console.log('searchStreetsInPostcode called with:', postcodeOrArea);
+    console.log('Setting isSearching to true');
     setIsSearching(true);
     
     // Add timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
-      console.log('Street search timeout');
+      console.log('Street search timeout - forcing manual entry');
       setAvailableStreets([]);
       setIsSearching(false);
-    }, 10000); // 10 second timeout
+      // Force manual entry if timeout occurs
+      setFormData(prev => ({
+        ...prev,
+        name: postcodeOrArea,
+        postcode: ''
+      }));
+      setStep('manual');
+    }, 5000); // 5 second timeout (reduced from 10)
     try {
       const params = new URLSearchParams({
         q: `${postcodeOrArea} street`,
@@ -4605,7 +4613,15 @@ function NewStreetForm({ onSubmit, onCancel }) {
     } catch (error) {
       console.error('Street search error:', error);
       setAvailableStreets([]);
+      // Force manual entry on error
+      setFormData(prev => ({
+        ...prev,
+        name: postcodeOrArea,
+        postcode: ''
+      }));
+      setStep('manual');
     } finally {
+      console.log('searchStreetsInPostcode finally block - clearing timeout and setting isSearching to false');
       clearTimeout(timeoutId);
       setIsSearching(false);
     }
