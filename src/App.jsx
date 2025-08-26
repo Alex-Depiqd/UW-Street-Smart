@@ -4863,10 +4863,10 @@ function NewStreetForm({ onSubmit, onCancel }) {
                 className="w-full p-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0"
               >
                 <div className="font-medium">
-                  {result.main || result.display_name || 'Unknown'}
+                  {result.display_name || 'Unknown'}
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                  {result.secondary || result.display_name || 'No description'}
+                  {result.address?.road ? `${result.address.road}, ${result.address.village}` : 'No description'}
                 </div>
               </button>
             ))}
