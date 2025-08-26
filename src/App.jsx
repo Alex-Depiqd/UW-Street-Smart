@@ -4554,13 +4554,8 @@ function NewStreetForm({ onSubmit, onCancel }) {
     
     // Add timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
-      console.log('Street search timeout, providing demo streets');
-      const demoStreets = [
-        'High Street', 'Station Road', 'Church Street', 'School Lane', 'The Street',
-        'Back Lane', 'Mill Lane', 'Church Lane', 'Station Lane', 'School Road',
-        'Village Street', 'The Green', 'Main Street', 'Market Street', 'Bridge Street'
-      ];
-      setAvailableStreets(demoStreets);
+      console.log('Street search timeout');
+      setAvailableStreets([]);
       setIsSearching(false);
     }, 10000); // 10 second timeout
     try {
@@ -4594,35 +4589,18 @@ function NewStreetForm({ onSubmit, onCancel }) {
         console.log('Filtered streets:', streets);
         setAvailableStreets(streets);
         
-        // If no streets found, provide some demo streets
+        // If no streets found, show a message
         if (streets.length === 0) {
-          console.log('No streets found, providing demo streets');
-          const demoStreets = [
-            'High Street', 'Station Road', 'Church Street', 'School Lane', 'The Street',
-            'Back Lane', 'Mill Lane', 'Church Lane', 'Station Lane', 'School Road',
-            'Village Street', 'The Green', 'Main Street', 'Market Street', 'Bridge Street'
-          ];
-          setAvailableStreets(demoStreets);
+          console.log('No streets found for this area');
+          setAvailableStreets([]);
         }
       } else {
         console.error('OpenStreetMap response not ok:', response.status);
-        // Provide demo streets as fallback
-        const demoStreets = [
-          'High Street', 'Station Road', 'Church Street', 'School Lane', 'The Street',
-          'Back Lane', 'Mill Lane', 'Church Lane', 'Station Lane', 'School Road',
-          'Village Street', 'The Green', 'Main Street', 'Market Street', 'Bridge Street'
-        ];
-        setAvailableStreets(demoStreets);
+        setAvailableStreets([]);
       }
     } catch (error) {
       console.error('Street search error:', error);
-      // Provide demo streets as fallback
-      const demoStreets = [
-        'High Street', 'Station Road', 'Church Street', 'School Lane', 'The Street',
-        'Back Lane', 'Mill Lane', 'Church Lane', 'Station Lane', 'School Road',
-        'Village Street', 'The Green', 'Main Street', 'Market Street', 'Bridge Street'
-      ];
-      setAvailableStreets(demoStreets);
+      setAvailableStreets([]);
     } finally {
       clearTimeout(timeoutId);
       setIsSearching(false);
@@ -5091,7 +5069,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
         ) : (
           <div className="text-center py-8">
             <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              No streets found for this postcode. You can enter them manually.
+              No streets found. Sorry. Try adding the address manually.
             </div>
             <button
               onClick={() => setStep('manual')}
