@@ -4366,29 +4366,53 @@ function NewStreetForm({ onSubmit, onCancel }) {
         return;
       }
 
-      // Get detailed information for each suggestion
+      // Map both place + query predictions into a uniform UI model
+      const mappedSuggestions = suggestions.map((s) => {
+        if (s.placePrediction) {
+          const p = s.placePrediction;
+          const label = p.text?.text || p.displayName?.text || p.formattedAddress || "Place";
+          return { kind: "place", label, raw: s };
+        } else if (s.queryPrediction) {
+          const q = s.queryPrediction;
+          const label = q.text?.text || q.text || "Search";
+          return { kind: "query", label, raw: s };
+        }
+        return { kind: "unknown", label: "Suggestion", raw: s };
+      });
+
+      console.log('Mapped suggestions:', mappedSuggestions);
+
+      // Process place predictions only (for now)
+      const placeSuggestions = mappedSuggestions.filter(s => s.kind === "place");
+      
+      if (placeSuggestions.length === 0) {
+        console.log('No place predictions found, falling back to demo data...');
+        await searchWithDemoData(query);
+        return;
+      }
+
+      // Get detailed information for place predictions
       const detailedResults = await Promise.all(
-        suggestions.slice(0, 10).map(async (suggestion) => {
+        placeSuggestions.slice(0, 10).map(async (suggestion) => {
           try {
-            const place = suggestion.placePrediction.toPlace();
+            const place = suggestion.raw.placePrediction.toPlace();
+            console.log('Fetching details for place:', suggestion.label);
+            
             await place.fetchFields({
               fields: ['id', 'displayName', 'formattedAddress', 'addressComponents', 'location'],
             });
+            
+            console.log('Details fetched for place:', place.displayName, 'ID:', place.id);
 
             // Parse address components
             const addressComponents = place.addressComponents || [];
-            console.log('Address components:', addressComponents);
-            
             const street = addressComponents.find(c => c.types.includes('route'))?.longName || '';
             const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.longName || '';
             const village = addressComponents.find(c => c.types.includes('locality'))?.longName || '';
             const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.longName || '';
             
-            console.log('Parsed data:', { street, postcode, village, city });
-            
-            // Return result even if some fields are empty
             return {
-              display_name: place.displayName || `${street}, ${postcode}`,
+              display_name: place.displayName || suggestion.label,
               address: {
                 road: street,
                 postcode: postcode,
