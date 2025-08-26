@@ -4377,13 +4377,18 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
             // Parse address components
             const addressComponents = place.addressComponents || [];
+            console.log('Address components:', addressComponents);
+            
             const street = addressComponents.find(c => c.types.includes('route'))?.longName || '';
             const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.longName || '';
             const village = addressComponents.find(c => c.types.includes('locality'))?.longName || '';
             const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.longName || '';
             
+            console.log('Parsed data:', { street, postcode, village, city });
+            
+            // Return result even if some fields are empty
             return {
-              display_name: `${street}, ${postcode}`,
+              display_name: place.displayName || `${street}, ${postcode}`,
               address: {
                 road: street,
                 postcode: postcode,
@@ -4403,7 +4408,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
       // Create new session token after selection
       sessionToken = new AutocompleteSessionToken();
 
-      const results = detailedResults.filter(result => result && result.address.road && result.address.postcode);
+      const results = detailedResults.filter(result => result !== null);
       console.log('Processed results:', results);
       setSearchResults(results);
       
