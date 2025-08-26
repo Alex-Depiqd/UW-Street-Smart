@@ -4707,7 +4707,8 @@ function NewStreetForm({ onSubmit, onCancel }) {
             console.log('Using final postcode for search:', finalPostcode);
             setCurrentPostcode(finalPostcode);
             setFormData(prev => ({ ...prev, postcode: finalPostcode }));
-            await searchStreetsInPostcode(finalPostcode);
+            // Search for the specific street in this postcode area
+            await searchStreetsInPostcode(`${streetName}, ${finalPostcode}`);
             setStep('streets');
             return;
           }
@@ -4719,7 +4720,8 @@ function NewStreetForm({ onSubmit, onCancel }) {
             console.log('Using postcode from display name:', displayNamePostcode);
             setCurrentPostcode(displayNamePostcode);
             setFormData(prev => ({ ...prev, postcode: displayNamePostcode }));
-            await searchStreetsInPostcode(displayNamePostcode);
+            // Search for the specific street in this postcode area
+            await searchStreetsInPostcode(`${streetName}, ${displayNamePostcode}`);
             setStep('streets');
             return;
           }
@@ -4848,9 +4850,15 @@ function NewStreetForm({ onSubmit, onCancel }) {
       // OpenStreetMap format
       streetName = street.address.road || street.display_name?.split(',')[0] || 'Unknown Street';
       postcode = street.address.postcode || currentPostcode;
+    } else if (street.display_name) {
+      // OpenStreetMap format without address object
+      streetName = street.display_name.split(',')[0] || 'Unknown Street';
+      postcode = street.display_name.match(/[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i)?.[0] || 
+                 street.display_name.match(/[A-Z]{1,2}[0-9][0-9A-Z]?/i)?.[0] || 
+                 currentPostcode;
     } else {
       // Fallback
-      streetName = street.display_name?.split(',')[0] || 'Unknown Street';
+      streetName = 'Unknown Street';
       postcode = currentPostcode;
     }
     
@@ -5135,7 +5143,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
           <div>
             <h3 className="font-medium">Select Street</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {currentPostcode}
+              {formData.name ? `${formData.name}, ${currentPostcode}` : currentPostcode}
             </p>
           </div>
         </div>
