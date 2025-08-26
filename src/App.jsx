@@ -4449,7 +4449,11 @@ function NewStreetForm({ onSubmit, onCancel }) {
         },
         place_id: suggestion.id,
         type: suggestion.kind === 'place' ? 'google_place' : 'google_query',
-        raw: suggestion.raw
+        raw: suggestion.raw,
+        // Add parsed components for easier access
+        street_name: suggestion.main?.split(',')[0]?.trim() || '',
+        postcode: suggestion.main?.match(/[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i)?.[0] || '',
+        village: suggestion.main?.split(',').slice(1, -1).join(',').trim() || ''
       }));
       console.log('Processed results:', results);
       console.log('First result display_name:', results[0]?.display_name);
@@ -4582,65 +4586,55 @@ function NewStreetForm({ onSubmit, onCancel }) {
   const handlePostcodeSelect = async (result) => {
     console.log('Selected result:', result);
     
-    // If it's a Google Places result, fetch details
-    if (result.type === 'google_place' && result.raw) {
-      try {
-        console.log('Fetching details for Google Places result...');
-        const place = result.raw.placePrediction.toPlace();
-        await place.fetchFields({
-          fields: ['id', 'displayName', 'formattedAddress', 'addressComponents', 'location'],
-        });
-        
-        console.log('Fetched place details:', place);
-        
-        // Parse address components
-        const addressComponents = place.addressComponents || [];
-        const street = addressComponents.find(c => c.types.includes('route'))?.longName || '';
-        const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.longName || '';
-        const village = addressComponents.find(c => c.types.includes('locality'))?.longName || '';
-        const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.longName || '';
-        
-        console.log('Parsed address components:', { street, postcode, village, city });
-        
-        // If it's a street with a postcode, use it directly
-        if (street && postcode) {
-          setSelectedStreet({ name: street, postcode: postcode });
-          setFormData(prev => ({
-            ...prev,
-            name: street,
-            postcode: postcode
-          }));
-          setStep('manual');
-          return;
-        }
-        
-        // If it's a postcode, search for streets in that area
-        if (postcode && postcode.match(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i)) {
-          setCurrentPostcode(postcode);
-          setFormData(prev => ({ ...prev, postcode: postcode }));
-          searchStreetsInPostcode(postcode);
-          setStep('streets');
-          return;
-        }
-        
-        // If it's a town/village, search for streets in that area
-        if (village) {
-          setCurrentPostcode(village);
-          setFormData(prev => ({ ...prev, postcode: village }));
-          searchStreetsInPostcode(village);
-          setStep('streets');
-          return;
-        }
-        
-        // Fallback to manual entry
-        setStep('manual');
-        
-      } catch (error) {
-        console.error('Error fetching place details:', error);
-        setStep('manual');
-      }
+    // Extract street name and postcode from the display name
+    const displayName = result.display_name || '';
+    const streetName = result.street_name || displayName.split(',')[0]?.trim() || '';
+    const postcode = result.postcode || displayName.match(/[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i)?.[0] || '';
+    const village = result.village || displayName.split(',').slice(1, -1).join(',').trim() || '';
+    
+    console.log('Parsed selection:', { streetName, postcode, village });
+    
+    // If we have a street name and postcode, use it directly
+    if (streetName && postcode) {
+      console.log('Setting street with postcode:', { name: streetName, postcode: postcode });
+      setSelectedStreet({ name: streetName, postcode: postcode });
+      setFormData(prev => ({
+        ...prev,
+        name: streetName,
+        postcode: postcode
+      }));
+      setStep('manual');
       return;
     }
+    
+    // If we have a postcode, search for streets in that area
+    if (postcode && postcode.match(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i)) {
+      console.log('Searching for streets in postcode:', postcode);
+      setCurrentPostcode(postcode);
+      setFormData(prev => ({ ...prev, postcode: postcode }));
+      searchStreetsInPostcode(postcode);
+      setStep('streets');
+      return;
+    }
+    
+    // If we have a village/town, search for streets in that area
+    if (village) {
+      console.log('Searching for streets in village:', village);
+      setCurrentPostcode(village);
+      setFormData(prev => ({ ...prev, postcode: village }));
+      searchStreetsInPostcode(village);
+      setStep('streets');
+      return;
+    }
+    
+    // Fallback to manual entry with what we have
+    console.log('Falling back to manual entry');
+    setFormData(prev => ({
+      ...prev,
+      name: streetName || displayName,
+      postcode: postcode
+    }));
+    setStep('manual');
     
     // Handle legacy results (demo data, etc.)
     const address = result.address;
@@ -4662,12 +4656,12 @@ function NewStreetForm({ onSubmit, onCancel }) {
     }
     
     // If it's a postcode or area, search for streets in that area
-    const postcode = address.postcode || result.name;
-    if (postcode && postcode.match(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i)) {
-      setCurrentPostcode(postcode);
-      setFormData(prev => ({ ...prev, postcode: postcode }));
+    const legacyPostcode = address.postcode || result.name;
+    if (legacyPostcode && legacyPostcode.match(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i)) {
+      setCurrentPostcode(legacyPostcode);
+      setFormData(prev => ({ ...prev, postcode: legacyPostcode }));
       
-      searchStreetsInPostcode(postcode);
+      searchStreetsInPostcode(legacyPostcode);
       setStep('streets');
       return;
     }
@@ -5281,7 +5275,10 @@ function NewStreetForm({ onSubmit, onCancel }) {
                   {result.display_name || 'Unknown'}
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                  {result.address?.road ? `${result.address.road}, ${result.address.village}` : 'No description'}
+                  {result.display_name && result.display_name.includes(',') ? 
+                    result.display_name.split(',').slice(1).join(',').trim() : 
+                    'UK Address'
+                  }
                 </div>
               </button>
             ))}
