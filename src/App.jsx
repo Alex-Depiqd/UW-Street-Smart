@@ -4462,6 +4462,8 @@ function NewStreetForm({ onSubmit, onCancel }) {
         return;
       }
       
+      console.log('Setting search results from Google:', results);
+      console.log('Results length:', results.length);
       setSearchResults(results);
       
     } catch (error) {
@@ -4531,6 +4533,8 @@ function NewStreetForm({ onSubmit, onCancel }) {
                village.includes(searchTerm);
       });
 
+      console.log('Setting search results from demo data:', results);
+      console.log('Demo results length:', results.length);
       setSearchResults(results);
     } catch (error) {
       console.error('Demo search error:', error);
@@ -5241,7 +5245,10 @@ function NewStreetForm({ onSubmit, onCancel }) {
           <input
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              console.log('Input changed to:', e.target.value);
+              setSearchTerm(e.target.value);
+            }}
             placeholder="e.g., IP30 9DR, Cross Street, Elmswell..."
             className="w-full mt-1 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
           />
@@ -5271,10 +5278,10 @@ function NewStreetForm({ onSubmit, onCancel }) {
                 className="w-full p-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0"
               >
                 <div className="font-medium">
-                  {result.address.road}, {result.address.postcode}
+                  {result.display_name || 'Unknown'}
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                  {result.address.village}, {result.address.city}
+                  {result.address?.road ? `${result.address.road}, ${result.address.village}` : 'No description'}
                 </div>
               </button>
             ))}
@@ -5290,6 +5297,16 @@ function NewStreetForm({ onSubmit, onCancel }) {
               className="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
             >
               Try Demo Data
+            </button>
+            <br />
+            <button 
+              onClick={() => {
+                console.log('Forcing demo data for testing');
+                searchWithDemoData('Elmswell');
+              }}
+              className="mt-2 px-3 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+            >
+              Force Demo Data (Test)
             </button>
           </div>
         )}
