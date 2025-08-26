@@ -4411,6 +4411,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
         raw: suggestion.raw
       }));
       console.log('Processed results:', results);
+      console.log('First result structure:', results[0]);
       setSearchResults(results);
       
     } catch (error) {
@@ -4861,9 +4862,9 @@ function NewStreetForm({ onSubmit, onCancel }) {
                 onClick={() => handlePostcodeSelect(result)}
                 className="w-full p-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0"
               >
-                <div className="font-medium">{result.display_name.split(',')[0]}</div>
+                <div className="font-medium">{result.display_name ? result.display_name.split(',')[0] : 'Unknown'}</div>
                 <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                  {result.display_name}
+                  {result.display_name || 'No description'}
                 </div>
               </button>
             ))}
