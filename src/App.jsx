@@ -4686,17 +4686,27 @@ function NewStreetForm({ onSubmit, onCancel }) {
           // Extract postcode from address components
           const addressComponents = place.addressComponents || [];
           console.log('Address components:', addressComponents);
+          console.log('Full place object:', place);
+          console.log('Formatted address:', place.formattedAddress);
+          
           const postcodeComponent = addressComponents.find(c => c.types.includes('postal_code'));
           const extractedPostcode = postcodeComponent?.longName || '';
           
           console.log('Extracted postcode from Google Places:', extractedPostcode);
           
-          if (extractedPostcode) {
+          // Also try to extract from formatted address
+          const formattedAddressPostcode = place.formattedAddress?.match(/[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i)?.[0];
+          console.log('Postcode from formatted address:', formattedAddressPostcode);
+          
+          const finalPostcode = extractedPostcode || formattedAddressPostcode;
+          console.log('Final postcode to use:', finalPostcode);
+          
+          if (finalPostcode) {
             // Use the extracted postcode for street search
-            console.log('Using extracted postcode for search:', extractedPostcode);
-            setCurrentPostcode(extractedPostcode);
-            setFormData(prev => ({ ...prev, postcode: extractedPostcode }));
-            await searchStreetsInPostcode(extractedPostcode);
+            console.log('Using final postcode for search:', finalPostcode);
+            setCurrentPostcode(finalPostcode);
+            setFormData(prev => ({ ...prev, postcode: finalPostcode }));
+            await searchStreetsInPostcode(finalPostcode);
             setStep('streets');
             return;
           }
