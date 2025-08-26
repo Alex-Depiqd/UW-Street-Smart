@@ -4403,15 +4403,20 @@ function NewStreetForm({ onSubmit, onCancel }) {
             });
             
             console.log('Details fetched for place:', place.displayName, 'ID:', place.id);
+            console.log('Full place object:', place);
 
             // Parse address components
             const addressComponents = place.addressComponents || [];
+            console.log('Address components for:', place.displayName, addressComponents);
+            
             const street = addressComponents.find(c => c.types.includes('route'))?.longName || '';
             const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.longName || '';
             const village = addressComponents.find(c => c.types.includes('locality'))?.longName || '';
             const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.longName || '';
             
-            return {
+            console.log('Parsed data for:', place.displayName, { street, postcode, village, city });
+            
+            const result = {
               display_name: place.displayName || suggestion.label,
               address: {
                 road: street,
@@ -4422,6 +4427,9 @@ function NewStreetForm({ onSubmit, onCancel }) {
               place_id: place.id,
               type: 'google_place'
             };
+            
+            console.log('Returning result for:', place.displayName, result);
+            return result;
           } catch (error) {
             console.error('Error getting place details:', error);
             return null;
