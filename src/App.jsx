@@ -4380,37 +4380,63 @@ function NewStreetForm({ onSubmit, onCancel }) {
       }
 
       // Map suggestions to UI display model (no details fetch yet)
-      const toUiSuggestion = (s) => {
+      // ChatGPT's robust solution for handling new Places API field shapes
+      function labelFromPlacePrediction(p) {
+        const main =
+          p.structuredFormat?.mainText?.text ??
+          p.structured_formatting?.main_text?.text ??   // some builds
+          p.structured_formatting?.main_text ??         // old shape
+          p.text?.text ??
+          p.displayName?.text ??
+          p.displayName ??                              // sometimes a string
+          p.formattedAddress ??
+          "";
+
+        const secondary =
+          p.structuredFormat?.secondaryText?.text ??
+          p.structured_formatting?.secondary_text?.text ??
+          p.structured_formatting?.secondary_text ??
+          p.subtitle?.text ??
+          "";
+
+        return [main, secondary].filter(Boolean).join(" • ");
+      }
+
+      function normalizeSuggestion(s) {
         if (s.placePrediction) {
-          const p = s.placePrediction;
-          const main = p.structuredFormat?.mainText?.text || 
-                      p.text?.text || 
-                      p.displayName?.text || 
-                      p.formattedAddress || 
-                      "Place";
-
-          const secondary = p.structuredFormat?.secondaryText?.text || 
-                           p.subtitle?.text || 
-                           "";
-
-          const id = p.id || p.placeId || crypto.randomUUID();
-
-          return { id, kind: "place", main, secondary, raw: s };
+          return {
+            kind: "place",
+            label: labelFromPlacePrediction(s.placePrediction),
+            raw: s,
+          };
         }
-
         if (s.queryPrediction) {
           const q = s.queryPrediction;
-          const main = q.text?.text || q.text || "Search";
-          return { id: crypto.randomUUID(), kind: "query", main, raw: s };
+          return {
+            kind: "query",
+            label: q.text?.text ?? q.text ?? "",
+            raw: s,
+          };
         }
+        return { kind: "unknown", label: "", raw: s };
+      }
 
-        return { id: crypto.randomUUID(), kind: "place", main: "Suggestion", raw: s };
+      const toUiSuggestion = (s) => {
+        const normalized = normalizeSuggestion(s);
+        return {
+          id: crypto.randomUUID(),
+          kind: normalized.kind,
+          main: normalized.label,
+          secondary: "",
+          raw: normalized.raw
+        };
       };
 
       const uiSuggestions = suggestions.map(toUiSuggestion);
       console.log('UI Suggestions:', uiSuggestions);
       console.log('First UI suggestion main:', uiSuggestions[0]?.main);
       console.log('First UI suggestion secondary:', uiSuggestions[0]?.secondary);
+      console.log('First UI suggestion label:', uiSuggestions[0]?.main);
 
       // Convert to the format expected by the UI
       const results = uiSuggestions.map(suggestion => ({
@@ -4888,12 +4914,12 @@ function NewStreetForm({ onSubmit, onCancel }) {
                   onClick={() => handlePostcodeSelect(result)}
                   className="w-full p-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0"
                 >
-                  <div className="font-medium">
-                    {result.display_name || 'Unknown'}
-                  </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                    {result.address?.road ? `${result.address.road}, ${result.address.village}` : 'No description'}
-                  </div>
+                                  <div className="font-medium">
+                  {result.display_name || 'Unknown'}
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                  {result.address?.road ? `${result.address.road}, ${result.address.village}` : (result.display_name ? '' : 'No description')}
+                </div>
                 </button>
               );
             })}
