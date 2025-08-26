@@ -4835,9 +4835,26 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
   // Handle street selection
   const handleStreetSelect = (street) => {
-    const address = street.address;
-    const streetName = address.road;
-    const postcode = address.postcode;
+    console.log('handleStreetSelect called with:', street);
+    
+    // Handle both string streets and object streets from OpenStreetMap
+    let streetName, postcode;
+    
+    if (typeof street === 'string') {
+      // Demo data format
+      streetName = street;
+      postcode = currentPostcode;
+    } else if (street.address) {
+      // OpenStreetMap format
+      streetName = street.address.road || street.display_name?.split(',')[0] || 'Unknown Street';
+      postcode = street.address.postcode || currentPostcode;
+    } else {
+      // Fallback
+      streetName = street.display_name?.split(',')[0] || 'Unknown Street';
+      postcode = currentPostcode;
+    }
+    
+    console.log('Extracted street name:', streetName, 'postcode:', postcode);
     
     setSelectedStreet({ name: streetName, postcode: postcode });
     setFormData(prev => ({
