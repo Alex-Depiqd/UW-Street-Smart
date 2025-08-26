@@ -4351,24 +4351,39 @@ function NewStreetForm({ onSubmit, onCancel }) {
       });
 
       // Import the new Places library
-      const { AutocompleteSessionToken, AutocompleteSuggestion } = await google.maps.importLibrary('places');
+      const placesLibrary = await google.maps.importLibrary('places');
+      if (!placesLibrary || !placesLibrary.AutocompleteSessionToken || !placesLibrary.AutocompleteSuggestion) {
+        console.error('Google Maps Places library not available, falling back to demo data');
+        await searchWithDemoData(query, true);
+        return;
+      }
+      
+      const { AutocompleteSessionToken, AutocompleteSuggestion } = placesLibrary;
       
       // Create session token for billing efficiency
       let sessionToken = new AutocompleteSessionToken();
 
       // Get place suggestions using new Data API with broader types
-      const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
-        input: query,
-        region: 'gb',
-        includedPrimaryTypes: [
-          'postal_code',
-          'route',                    // streets
-          'street_address',
-          'locality',                 // towns/villages
-          'administrative_area_level_1' // counties
-        ],
-        sessionToken,
-      });
+      let suggestions = [];
+      try {
+        const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: query,
+          region: 'gb',
+          includedPrimaryTypes: [
+            'postal_code',
+            'route',                    // streets
+            'street_address',
+            'locality',                 // towns/villages
+            'administrative_area_level_1' // counties
+          ],
+          sessionToken,
+        });
+        suggestions = response.suggestions || [];
+      } catch (error) {
+        console.error('Error fetching autocomplete suggestions:', error);
+        await searchWithDemoData(query, true);
+        return;
+      }
 
       console.log('Raw suggestions from API:', suggestions);
       
