@@ -4274,9 +4274,22 @@ function NewStreetForm({ onSubmit, onCancel }) {
   // OpenStreetMap Nominatim API
   const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
 
+  // Trigger search when searchTerm changes
+  useEffect(() => {
+    console.log('NewStreetForm: searchTerm changed to:', searchTerm);
+    if (searchTerm.length >= 2) {
+      console.log('NewStreetForm: Triggering search for:', searchTerm);
+      searchPostcodes(searchTerm);
+    } else {
+      console.log('NewStreetForm: Clearing results (searchTerm too short)');
+      setSearchResults([]);
+    }
+  }, [searchTerm]);
+
   // Realistic UK address search with comprehensive data
   // Smart address search with Google Places API and caching
   const searchPostcodes = async (query) => {
+    console.log('searchPostcodes called with:', query);
     if (!query.trim()) {
       setSearchResults([]);
       return;
@@ -4367,37 +4380,63 @@ function NewStreetForm({ onSubmit, onCancel }) {
       }
 
       // Map suggestions to UI display model (no details fetch yet)
-      const toUiSuggestion = (s) => {
+      // ChatGPT's robust solution for handling new Places API field shapes
+      function labelFromPlacePrediction(p) {
+        const main =
+          p.structuredFormat?.mainText?.text ??
+          p.structured_formatting?.main_text?.text ??   // some builds
+          p.structured_formatting?.main_text ??         // old shape
+          p.text?.text ??
+          p.displayName?.text ??
+          p.displayName ??                              // sometimes a string
+          p.formattedAddress ??
+          "";
+
+        const secondary =
+          p.structuredFormat?.secondaryText?.text ??
+          p.structured_formatting?.secondary_text?.text ??
+          p.structured_formatting?.secondary_text ??
+          p.subtitle?.text ??
+          "";
+
+        return [main, secondary].filter(Boolean).join(" • ");
+      }
+
+      function normalizeSuggestion(s) {
         if (s.placePrediction) {
-          const p = s.placePrediction;
-          const main = p.structuredFormat?.mainText?.text || 
-                      p.text?.text || 
-                      p.displayName?.text || 
-                      p.formattedAddress || 
-                      "Place";
-
-          const secondary = p.structuredFormat?.secondaryText?.text || 
-                           p.subtitle?.text || 
-                           "";
-
-          const id = p.id || p.placeId || crypto.randomUUID();
-
-          return { id, kind: "place", main, secondary, raw: s };
+          return {
+            kind: "place",
+            label: labelFromPlacePrediction(s.placePrediction),
+            raw: s,
+          };
         }
-
         if (s.queryPrediction) {
           const q = s.queryPrediction;
-          const main = q.text?.text || q.text || "Search";
-          return { id: crypto.randomUUID(), kind: "query", main, raw: s };
+          return {
+            kind: "query",
+            label: q.text?.text ?? q.text ?? "",
+            raw: s,
+          };
         }
+        return { kind: "unknown", label: "", raw: s };
+      }
 
-        return { id: crypto.randomUUID(), kind: "place", main: "Suggestion", raw: s };
+      const toUiSuggestion = (s) => {
+        const normalized = normalizeSuggestion(s);
+        return {
+          id: crypto.randomUUID(),
+          kind: normalized.kind,
+          main: normalized.label,
+          secondary: "",
+          raw: normalized.raw
+        };
       };
 
       const uiSuggestions = suggestions.map(toUiSuggestion);
       console.log('UI Suggestions:', uiSuggestions);
       console.log('First UI suggestion main:', uiSuggestions[0]?.main);
       console.log('First UI suggestion secondary:', uiSuggestions[0]?.secondary);
+      console.log('First UI suggestion label:', uiSuggestions[0]?.main);
 
       // Convert to the format expected by the UI
       const results = uiSuggestions.map(suggestion => ({
@@ -4867,20 +4906,23 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
         {searchResults.length > 0 && (
           <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-xl">
-            {searchResults.map((result, index) => (
-              <button
-                key={index}
-                onClick={() => handlePostcodeSelect(result)}
-                className="w-full p-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0"
-              >
-                <div className="font-medium">
+            {searchResults.map((result, index) => {
+              console.log(`Rendering result ${index}:`, result);
+              return (
+                <button
+                  key={index}
+                  onClick={() => handlePostcodeSelect(result)}
+                  className="w-full p-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0"
+                >
+                                  <div className="font-medium">
                   {result.display_name || 'Unknown'}
                 </div>
                 <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                  {result.address?.road ? `${result.address.road}, ${result.address.village}` : 'No description'}
+                  {result.address?.road ? `${result.address.road}, ${result.address.village}` : (result.display_name ? '' : 'No description')}
                 </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -5242,6 +5284,13 @@ function NewStreetForm({ onSubmit, onCancel }) {
         {!isSearching && searchTerm && searchResults.length === 0 && (
           <div className="text-center py-4 text-sm text-gray-600 dark:text-gray-400">
             No addresses found for "{searchTerm}"
+            <br />
+            <button 
+              onClick={() => searchWithDemoData(searchTerm)}
+              className="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+            >
+              Try Demo Data
+            </button>
           </div>
         )}
 
