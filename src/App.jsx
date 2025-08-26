@@ -4276,9 +4276,12 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
   // Trigger search when searchTerm changes
   useEffect(() => {
+    console.log('NewStreetForm: searchTerm changed to:', searchTerm);
     if (searchTerm.length >= 2) {
+      console.log('NewStreetForm: Triggering search for:', searchTerm);
       searchPostcodes(searchTerm);
     } else {
+      console.log('NewStreetForm: Clearing results (searchTerm too short)');
       setSearchResults([]);
     }
   }, [searchTerm]);
@@ -4286,6 +4289,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
   // Realistic UK address search with comprehensive data
   // Smart address search with Google Places API and caching
   const searchPostcodes = async (query) => {
+    console.log('searchPostcodes called with:', query);
     if (!query.trim()) {
       setSearchResults([]);
       return;
@@ -4876,20 +4880,23 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
         {searchResults.length > 0 && (
           <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-xl">
-            {searchResults.map((result, index) => (
-              <button
-                key={index}
-                onClick={() => handlePostcodeSelect(result)}
-                className="w-full p-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0"
-              >
-                <div className="font-medium">
-                  {result.display_name || 'Unknown'}
-                </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                  {result.address?.road ? `${result.address.road}, ${result.address.village}` : 'No description'}
-                </div>
-              </button>
-            ))}
+            {searchResults.map((result, index) => {
+              console.log(`Rendering result ${index}:`, result);
+              return (
+                <button
+                  key={index}
+                  onClick={() => handlePostcodeSelect(result)}
+                  className="w-full p-3 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0"
+                >
+                  <div className="font-medium">
+                    {result.display_name || 'Unknown'}
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                    {result.address?.road ? `${result.address.road}, ${result.address.village}` : 'No description'}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -5251,6 +5258,13 @@ function NewStreetForm({ onSubmit, onCancel }) {
         {!isSearching && searchTerm && searchResults.length === 0 && (
           <div className="text-center py-4 text-sm text-gray-600 dark:text-gray-400">
             No addresses found for "{searchTerm}"
+            <br />
+            <button 
+              onClick={() => searchWithDemoData(searchTerm)}
+              className="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+            >
+              Try Demo Data
+            </button>
           </div>
         )}
 
