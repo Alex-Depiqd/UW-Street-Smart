@@ -4695,7 +4695,8 @@ function NewStreetForm({ onSubmit, onCancel }) {
           console.log('Extracted postcode from Google Places:', extractedPostcode);
           
           // Also try to extract from formatted address
-          const formattedAddressPostcode = place.formattedAddress?.match(/[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i)?.[0];
+          const formattedAddressPostcode = place.formattedAddress?.match(/[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i)?.[0] || 
+                                          place.formattedAddress?.match(/[A-Z]{1,2}[0-9][0-9A-Z]?/i)?.[0];
           console.log('Postcode from formatted address:', formattedAddressPostcode);
           
           const finalPostcode = extractedPostcode || formattedAddressPostcode;
