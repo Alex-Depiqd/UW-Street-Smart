@@ -4611,6 +4611,9 @@ function NewStreetForm({ onSubmit, onCancel }) {
   const handlePostcodeSelect = async (result) => {
     console.log('Selected result:', result);
     
+    // Ensure we're not in a loading state
+    setIsSearching(false);
+    
     // Extract street name and postcode from the display name
     const displayName = result.display_name || '';
     const streetName = result.street_name || displayName.split(',')[0]?.trim() || '';
@@ -4635,30 +4638,63 @@ function NewStreetForm({ onSubmit, onCancel }) {
     // If we have just a street name (no postcode), treat it as a street search
     if (streetName && !postcode) {
       console.log('Searching for streets in area:', streetName);
-      setCurrentPostcode(streetName);
-      setFormData(prev => ({ ...prev, postcode: streetName }));
-      searchStreetsInPostcode(streetName);
-      setStep('streets');
+      try {
+        setCurrentPostcode(streetName);
+        setFormData(prev => ({ ...prev, postcode: streetName }));
+        await searchStreetsInPostcode(streetName);
+        setStep('streets');
+      } catch (error) {
+        console.error('Error in street search:', error);
+        // Fallback to manual entry
+        setFormData(prev => ({
+          ...prev,
+          name: streetName,
+          postcode: ''
+        }));
+        setStep('manual');
+      }
       return;
     }
     
     // If we have a postcode, search for streets in that area
     if (postcode && postcode.match(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i)) {
       console.log('Searching for streets in postcode:', postcode);
-      setCurrentPostcode(postcode);
-      setFormData(prev => ({ ...prev, postcode: postcode }));
-      searchStreetsInPostcode(postcode);
-      setStep('streets');
+      try {
+        setCurrentPostcode(postcode);
+        setFormData(prev => ({ ...prev, postcode: postcode }));
+        await searchStreetsInPostcode(postcode);
+        setStep('streets');
+      } catch (error) {
+        console.error('Error in postcode search:', error);
+        // Fallback to manual entry
+        setFormData(prev => ({
+          ...prev,
+          name: '',
+          postcode: postcode
+        }));
+        setStep('manual');
+      }
       return;
     }
     
     // If we have a village/town, search for streets in that area
     if (village) {
       console.log('Searching for streets in village:', village);
-      setCurrentPostcode(village);
-      setFormData(prev => ({ ...prev, postcode: village }));
-      searchStreetsInPostcode(village);
-      setStep('streets');
+      try {
+        setCurrentPostcode(village);
+        setFormData(prev => ({ ...prev, postcode: village }));
+        await searchStreetsInPostcode(village);
+        setStep('streets');
+      } catch (error) {
+        console.error('Error in village search:', error);
+        // Fallback to manual entry
+        setFormData(prev => ({
+          ...prev,
+          name: '',
+          postcode: village
+        }));
+        setStep('manual');
+      }
       return;
     }
     
