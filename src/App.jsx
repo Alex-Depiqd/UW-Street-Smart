@@ -4366,73 +4366,50 @@ function NewStreetForm({ onSubmit, onCancel }) {
         return;
       }
 
-      // Map both place + query predictions into a uniform UI model
-      const mappedSuggestions = suggestions.map((s) => {
+      // Map suggestions to UI display model (no details fetch yet)
+      const toUiSuggestion = (s) => {
         if (s.placePrediction) {
           const p = s.placePrediction;
-          const label = p.text?.text || p.displayName?.text || p.formattedAddress || "Place";
-          return { kind: "place", label, raw: s };
-        } else if (s.queryPrediction) {
-          const q = s.queryPrediction;
-          const label = q.text?.text || q.text || "Search";
-          return { kind: "query", label, raw: s };
+          const main = p.structuredFormat?.mainText?.text || 
+                      p.text?.text || 
+                      p.displayName?.text || 
+                      p.formattedAddress || 
+                      "Place";
+
+          const secondary = p.structuredFormat?.secondaryText?.text || 
+                           p.subtitle?.text || 
+                           "";
+
+          const id = p.id || p.placeId || crypto.randomUUID();
+
+          return { id, kind: "place", main, secondary, raw: s };
         }
-        return { kind: "unknown", label: "Suggestion", raw: s };
-      });
 
-      console.log('Mapped suggestions:', mappedSuggestions);
+        if (s.queryPrediction) {
+          const q = s.queryPrediction;
+          const main = q.text?.text || q.text || "Search";
+          return { id: crypto.randomUUID(), kind: "query", main, raw: s };
+        }
 
-      // Process place predictions only (for now)
-      const placeSuggestions = mappedSuggestions.filter(s => s.kind === "place");
-      
-      if (placeSuggestions.length === 0) {
-        console.log('No place predictions found, falling back to demo data...');
-        await searchWithDemoData(query);
-        return;
-      }
+        return { id: crypto.randomUUID(), kind: "place", main: "Suggestion", raw: s };
+      };
 
-      // Get detailed information for place predictions
-      const detailedResults = await Promise.all(
-        placeSuggestions.slice(0, 10).map(async (suggestion) => {
-          try {
-            const place = suggestion.raw.placePrediction.toPlace();
-            console.log('Fetching details for place:', suggestion.label);
-            
-            await place.fetchFields({
-              fields: ['id', 'displayName', 'formattedAddress', 'addressComponents', 'location'],
-            });
-            
-            console.log('Details fetched for place:', place.displayName, 'ID:', place.id);
+      const uiSuggestions = suggestions.map(toUiSuggestion);
+      console.log('UI Suggestions:', uiSuggestions);
 
-            // Parse address components
-            const addressComponents = place.addressComponents || [];
-            const street = addressComponents.find(c => c.types.includes('route'))?.longName || '';
-            const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.longName || '';
-            const village = addressComponents.find(c => c.types.includes('locality'))?.longName || '';
-            const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.longName || '';
-            
-            return {
-              display_name: place.displayName || suggestion.label,
-              address: {
-                road: street,
-                postcode: postcode,
-                village: village,
-                city: city
-              },
-              place_id: place.id,
-              type: 'google_place'
-            };
-          } catch (error) {
-            console.error('Error getting place details:', error);
-            return null;
-          }
-        })
-      );
-
-      // Create new session token after selection
-      sessionToken = new AutocompleteSessionToken();
-
-      const results = detailedResults.filter(result => result !== null);
+      // Convert to the format expected by the UI
+      const results = uiSuggestions.map(suggestion => ({
+        display_name: suggestion.main,
+        address: {
+          road: '',
+          postcode: '',
+          village: '',
+          city: ''
+        },
+        place_id: suggestion.id,
+        type: suggestion.kind === 'place' ? 'google_place' : 'google_query',
+        raw: suggestion.raw
+      }));
       console.log('Processed results:', results);
       setSearchResults(results);
       
@@ -4547,7 +4524,70 @@ function NewStreetForm({ onSubmit, onCancel }) {
   };
 
   // Handle postcode selection
-  const handlePostcodeSelect = (result) => {
+  const handlePostcodeSelect = async (result) => {
+    console.log('Selected result:', result);
+    
+    // If it's a Google Places result, fetch details
+    if (result.type === 'google_place' && result.raw) {
+      try {
+        console.log('Fetching details for Google Places result...');
+        const place = result.raw.placePrediction.toPlace();
+        await place.fetchFields({
+          fields: ['id', 'displayName', 'formattedAddress', 'addressComponents', 'location'],
+        });
+        
+        console.log('Fetched place details:', place);
+        
+        // Parse address components
+        const addressComponents = place.addressComponents || [];
+        const street = addressComponents.find(c => c.types.includes('route'))?.longName || '';
+        const postcode = addressComponents.find(c => c.types.includes('postal_code'))?.longName || '';
+        const village = addressComponents.find(c => c.types.includes('locality'))?.longName || '';
+        const city = addressComponents.find(c => c.types.includes('administrative_area_level_2'))?.longName || '';
+        
+        console.log('Parsed address components:', { street, postcode, village, city });
+        
+        // If it's a street with a postcode, use it directly
+        if (street && postcode) {
+          setSelectedStreet({ name: street, postcode: postcode });
+          setFormData(prev => ({
+            ...prev,
+            name: street,
+            postcode: postcode
+          }));
+          setStep('manual');
+          return;
+        }
+        
+        // If it's a postcode, search for streets in that area
+        if (postcode && postcode.match(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i)) {
+          setCurrentPostcode(postcode);
+          setFormData(prev => ({ ...prev, postcode: postcode }));
+          searchStreetsInPostcode(postcode);
+          setStep('streets');
+          return;
+        }
+        
+        // If it's a town/village, search for streets in that area
+        if (village) {
+          setCurrentPostcode(village);
+          setFormData(prev => ({ ...prev, postcode: village }));
+          searchStreetsInPostcode(village);
+          setStep('streets');
+          return;
+        }
+        
+        // Fallback to manual entry
+        setStep('manual');
+        
+      } catch (error) {
+        console.error('Error fetching place details:', error);
+        setStep('manual');
+      }
+      return;
+    }
+    
+    // Handle legacy results (demo data, etc.)
     const address = result.address;
     
     // If it's a street with a postcode, use it directly
@@ -4562,8 +4602,6 @@ function NewStreetForm({ onSubmit, onCancel }) {
         postcode: postcode
       }));
       
-      // Since OpenStreetMap doesn't provide individual properties,
-      // we'll go directly to manual property entry
       setStep('manual');
       return;
     }
@@ -4574,7 +4612,6 @@ function NewStreetForm({ onSubmit, onCancel }) {
       setCurrentPostcode(postcode);
       setFormData(prev => ({ ...prev, postcode: postcode }));
       
-      // Search for streets in this postcode
       searchStreetsInPostcode(postcode);
       setStep('streets');
       return;
