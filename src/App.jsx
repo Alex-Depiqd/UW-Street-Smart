@@ -4274,6 +4274,15 @@ function NewStreetForm({ onSubmit, onCancel }) {
   // OpenStreetMap Nominatim API
   const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
 
+  // Trigger search when searchTerm changes
+  useEffect(() => {
+    if (searchTerm.length >= 2) {
+      searchPostcodes(searchTerm);
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchTerm]);
+
   // Realistic UK address search with comprehensive data
   // Smart address search with Google Places API and caching
   const searchPostcodes = async (query) => {
