@@ -4672,6 +4672,9 @@ function NewStreetForm({ onSubmit, onCancel }) {
       console.log('Attempting to get postcode from Google Places result for:', streetName);
       
       // If we have the raw Google Places result, try to get the postcode
+      console.log('Checking for raw Google Places result:', result.raw);
+      console.log('Result type:', result.type);
+      
       if (result.raw && result.raw.placePrediction) {
         try {
           console.log('Fetching details from Google Places...');
@@ -4682,6 +4685,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
           
           // Extract postcode from address components
           const addressComponents = place.addressComponents || [];
+          console.log('Address components:', addressComponents);
           const postcodeComponent = addressComponents.find(c => c.types.includes('postal_code'));
           const extractedPostcode = postcodeComponent?.longName || '';
           
@@ -4689,9 +4693,22 @@ function NewStreetForm({ onSubmit, onCancel }) {
           
           if (extractedPostcode) {
             // Use the extracted postcode for street search
+            console.log('Using extracted postcode for search:', extractedPostcode);
             setCurrentPostcode(extractedPostcode);
             setFormData(prev => ({ ...prev, postcode: extractedPostcode }));
             await searchStreetsInPostcode(extractedPostcode);
+            setStep('streets');
+            return;
+          }
+          
+          // If no postcode from Google Places, try to extract from display name
+          console.log('No postcode from Google Places, trying to extract from display name');
+          const displayNamePostcode = displayName.match(/[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i)?.[0];
+          if (displayNamePostcode) {
+            console.log('Using postcode from display name:', displayNamePostcode);
+            setCurrentPostcode(displayNamePostcode);
+            setFormData(prev => ({ ...prev, postcode: displayNamePostcode }));
+            await searchStreetsInPostcode(displayNamePostcode);
             setStep('streets');
             return;
           }
