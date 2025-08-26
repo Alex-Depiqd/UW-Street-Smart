@@ -5323,30 +5323,13 @@ function NewStreetForm({ onSubmit, onCancel }) {
         {!isSearching && searchTerm && searchResults.length === 0 && (
           <div className="text-center py-4 text-sm text-gray-600 dark:text-gray-400">
             No addresses found for "{searchTerm}"
-            <br />
-            <button 
-              onClick={() => searchWithDemoData(searchTerm)}
-              className="mt-2 px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
-            >
-              Try Demo Data
-            </button>
-            <br />
-            <button 
-              onClick={() => {
-                console.log('Forcing demo data for testing');
-                searchWithDemoData('Elmswell');
-              }}
-              className="mt-2 px-3 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
-            >
-              Force Demo Data (Test)
-            </button>
           </div>
         )}
 
         <div className="flex gap-3 pt-4">
           <button
             onClick={() => setStep('manual')}
-            className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            className="flex-1 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
           >
             Enter Manually Instead
           </button>
