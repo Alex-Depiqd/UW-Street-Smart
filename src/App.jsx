@@ -5055,46 +5055,52 @@ function NewStreetForm({ onSubmit, onCancel }) {
             </div>
             
             <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-xl">
-              {availableStreets.map((street, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleStreetSelect({
-                    display: `${street} - ${currentPostcode}`,
-                    value: street,
-                    postcode: currentPostcode,
-                    admin_district: '',
-                    admin_ward: '',
-                    parish: '',
-                    type: 'real_street',
-                    local_type: 'street',
-                    county: '',
-                    region: ''
-                  })}
-                  className={`w-full p-3 text-left text-sm transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${
-                    selectedStreet && selectedStreet.name === street
-                      ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800' 
-                      : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                      selectedStreet && selectedStreet.name === street
-                        ? 'bg-primary-600 border-primary-600' 
-                        : 'border-gray-300 dark:border-gray-600'
-                    }`}>
-                      {selectedStreet && selectedStreet.name === street && <Check className="w-3 h-3 text-white" />}
-                    </div>
-                    <div>
-                      <div className="font-medium">
-                        {street}
+              {availableStreets.map((street, index) => {
+                // Handle both string streets and object streets from OpenStreetMap
+                const streetName = typeof street === 'string' ? street : (street.address?.road || street.display_name || 'Unknown Street');
+                const streetPostcode = typeof street === 'string' ? currentPostcode : (street.address?.postcode || currentPostcode);
+                
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleStreetSelect({
+                      display: `${streetName} - ${streetPostcode}`,
+                      value: streetName,
+                      postcode: streetPostcode,
+                      admin_district: '',
+                      admin_ward: '',
+                      parish: '',
+                      type: 'real_street',
+                      local_type: 'street',
+                      county: '',
+                      region: ''
+                    })}
+                    className={`w-full p-3 text-left text-sm transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${
+                      selectedStreet && selectedStreet.name === streetName
+                        ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800' 
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                        selectedStreet && selectedStreet.name === streetName
+                          ? 'bg-primary-600 border-primary-600' 
+                          : 'border-gray-300 dark:border-gray-600'
+                      }`}>
+                        {selectedStreet && selectedStreet.name === streetName && <Check className="w-3 h-3 text-white" />}
                       </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                        {currentPostcode}
+                      <div>
+                        <div className="font-medium">
+                          {streetName}
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                          {streetPostcode}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="flex gap-3 pt-4">
