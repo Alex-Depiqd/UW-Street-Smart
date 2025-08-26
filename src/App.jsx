@@ -4396,12 +4396,14 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
       const uiSuggestions = suggestions.map(toUiSuggestion);
       console.log('UI Suggestions:', uiSuggestions);
+      console.log('First UI suggestion main:', uiSuggestions[0]?.main);
+      console.log('First UI suggestion secondary:', uiSuggestions[0]?.secondary);
 
       // Convert to the format expected by the UI
       const results = uiSuggestions.map(suggestion => ({
-        display_name: suggestion.main,
+        display_name: suggestion.main || 'Unknown Location',
         address: {
-          road: '',
+          road: suggestion.secondary || '',
           postcode: '',
           village: '',
           city: ''
@@ -4411,7 +4413,16 @@ function NewStreetForm({ onSubmit, onCancel }) {
         raw: suggestion.raw
       }));
       console.log('Processed results:', results);
-      console.log('First result structure:', results[0]);
+      console.log('First result display_name:', results[0]?.display_name);
+      console.log('First result address:', results[0]?.address);
+      
+      // If no valid results, fall back to demo data
+      if (!results.length || !results[0]?.display_name || results[0]?.display_name === 'Unknown Location') {
+        console.log('Falling back to demo data');
+        await searchWithDemoData(query);
+        return;
+      }
+      
       setSearchResults(results);
       
     } catch (error) {
