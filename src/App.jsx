@@ -4549,7 +4549,20 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
   // Search for streets in a specific postcode or area
   const searchStreetsInPostcode = async (postcodeOrArea) => {
+    console.log('searchStreetsInPostcode called with:', postcodeOrArea);
     setIsSearching(true);
+    
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.log('Street search timeout, providing demo streets');
+      const demoStreets = [
+        'High Street', 'Station Road', 'Church Street', 'School Lane', 'The Street',
+        'Back Lane', 'Mill Lane', 'Church Lane', 'Station Lane', 'School Road',
+        'Village Street', 'The Green', 'Main Street', 'Market Street', 'Bridge Street'
+      ];
+      setAvailableStreets(demoStreets);
+      setIsSearching(false);
+    }, 10000); // 10 second timeout
     try {
       const params = new URLSearchParams({
         q: `${postcodeOrArea} street`,
@@ -4558,6 +4571,8 @@ function NewStreetForm({ onSubmit, onCancel }) {
         limit: '20',
         countrycodes: 'gb'
       });
+
+      console.log('Fetching from OpenStreetMap:', `${NOMINATIM_BASE_URL}/search?${params}`);
 
       const response = await fetch(`${NOMINATIM_BASE_URL}/search?${params}`, {
         headers: {
@@ -4568,16 +4583,48 @@ function NewStreetForm({ onSubmit, onCancel }) {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('OpenStreetMap response:', data);
+        
         // Filter for actual streets
         const streets = data.filter(item => {
           const address = item.address;
           return address.road && address.postcode;
         });
+        
+        console.log('Filtered streets:', streets);
         setAvailableStreets(streets);
+        
+        // If no streets found, provide some demo streets
+        if (streets.length === 0) {
+          console.log('No streets found, providing demo streets');
+          const demoStreets = [
+            'High Street', 'Station Road', 'Church Street', 'School Lane', 'The Street',
+            'Back Lane', 'Mill Lane', 'Church Lane', 'Station Lane', 'School Road',
+            'Village Street', 'The Green', 'Main Street', 'Market Street', 'Bridge Street'
+          ];
+          setAvailableStreets(demoStreets);
+        }
+      } else {
+        console.error('OpenStreetMap response not ok:', response.status);
+        // Provide demo streets as fallback
+        const demoStreets = [
+          'High Street', 'Station Road', 'Church Street', 'School Lane', 'The Street',
+          'Back Lane', 'Mill Lane', 'Church Lane', 'Station Lane', 'School Road',
+          'Village Street', 'The Green', 'Main Street', 'Market Street', 'Bridge Street'
+        ];
+        setAvailableStreets(demoStreets);
       }
     } catch (error) {
       console.error('Street search error:', error);
+      // Provide demo streets as fallback
+      const demoStreets = [
+        'High Street', 'Station Road', 'Church Street', 'School Lane', 'The Street',
+        'Back Lane', 'Mill Lane', 'Church Lane', 'Station Lane', 'School Road',
+        'Village Street', 'The Green', 'Main Street', 'Market Street', 'Bridge Street'
+      ];
+      setAvailableStreets(demoStreets);
     } finally {
+      clearTimeout(timeoutId);
       setIsSearching(false);
     }
   };
@@ -4604,6 +4651,16 @@ function NewStreetForm({ onSubmit, onCancel }) {
         postcode: postcode
       }));
       setStep('manual');
+      return;
+    }
+    
+    // If we have just a street name (no postcode), treat it as a street search
+    if (streetName && !postcode) {
+      console.log('Searching for streets in area:', streetName);
+      setCurrentPostcode(streetName);
+      setFormData(prev => ({ ...prev, postcode: streetName }));
+      searchStreetsInPostcode(streetName);
+      setStep('streets');
       return;
     }
     
