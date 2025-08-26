@@ -4303,7 +4303,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
       } catch (error) {
         console.error('Google Places API failed, falling back to demo data:', error);
         // Fallback to demo data if Google API fails
-        await searchWithDemoData(query);
+        await searchWithDemoData(query, true);
       }
     } else {
       console.log('No Google Places API key, using demo data');
@@ -4462,7 +4462,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
       // If no valid results, fall back to demo data
       if (!results.length || !results[0]?.display_name || results[0]?.display_name === 'Unknown Location') {
         console.log('Falling back to demo data');
-        await searchWithDemoData(query);
+        await searchWithDemoData(query, true);
         return;
       }
       
@@ -4479,8 +4479,10 @@ function NewStreetForm({ onSubmit, onCancel }) {
   };
 
   // Demo data search function
-  const searchWithDemoData = async (query) => {
-    setIsSearching(true);
+  const searchWithDemoData = async (query, skipLoadingState = false) => {
+    if (!skipLoadingState) {
+      setIsSearching(true);
+    }
     try {
       await new Promise(resolve => setTimeout(resolve, 500));
       
@@ -4543,7 +4545,9 @@ function NewStreetForm({ onSubmit, onCancel }) {
     } catch (error) {
       console.error('Demo search error:', error);
     } finally {
-      setIsSearching(false);
+      if (!skipLoadingState) {
+        setIsSearching(false);
+      }
     }
   };
 
@@ -4610,9 +4614,6 @@ function NewStreetForm({ onSubmit, onCancel }) {
   // Handle postcode selection
   const handlePostcodeSelect = async (result) => {
     console.log('Selected result:', result);
-    
-    // Ensure we're not in a loading state
-    setIsSearching(false);
     
     // Extract street name and postcode from the display name
     const displayName = result.display_name || '';
