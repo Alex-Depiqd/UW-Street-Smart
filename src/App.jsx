@@ -4924,6 +4924,7 @@ function Reports({ campaigns }) {
       spoke: 0, 
       interested: 0, 
       followups: 0,
+      successes: 0,
       outcomes: {
         interested: 0,
         customer_signed: 0,
@@ -4940,6 +4941,11 @@ function Reports({ campaigns }) {
       if (r.result === 'interested' || r.result === 'customer_signed' || r.result === 'appointment_booked') t.interested++;
       if (r.followUpAt) t.followups++;
       
+      // Track successes (customers signed + appointments booked + interested)
+      if (r.result === 'customer_signed' || r.result === 'appointment_booked' || r.result === 'interested') {
+        t.successes++;
+      }
+      
       // Track all outcomes
       if (r.result && r.result !== 'none') {
         t.outcomes[r.result] = (t.outcomes[r.result] || 0) + 1;
@@ -4951,11 +4957,11 @@ function Reports({ campaigns }) {
   return (
     <div className="space-y-4">
       <SectionCard title="Overview" icon={FileText}>
-        <div className="grid md:grid-cols-5 gap-3">
+        <div className="grid md:grid-cols-6 gap-3">
           <Stat icon={UploadCloud} label="Letters" value={totals.letters} />
           <Stat icon={Check} label="Knocked" value={totals.knocked} />
           <Stat icon={MessageSquare} label="Spoke" value={totals.spoke} />
-          <Stat icon={CheckCircle} label="Interested" value={totals.interested} />
+          <Stat icon={CheckCircle} label="Successes" value={totals.successes} />
           <Stat icon={CalendarClock} label="Follow‑ups" value={totals.followups} />
         </div>
       </SectionCard>
