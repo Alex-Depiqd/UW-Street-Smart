@@ -1389,7 +1389,7 @@ export default function App() {
       </div>
 
       {/* Content Area */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 pb-28 lg:pb-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 pb-32 lg:pb-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
         {/* Sidebar - Hidden on mobile */}
         <div className="hidden lg:block lg:col-span-1 space-y-3">
           <SectionCard title="Navigate" icon={FolderOpen}>
@@ -1748,7 +1748,7 @@ export default function App() {
 
 
       {/* Footer Hint */}
-      <div className="max-w-6xl mx-auto px-4 pb-16 lg:pb-8 text-xs opacity-70">
+      <div className="max-w-6xl mx-auto px-4 pb-20 lg:pb-8 text-xs opacity-70">
         UW Street Smart - NL Activity Tracker v1.0.0 | Built for UW partners making a difference in their communities. | © 2025 Alex Cameron. All rights reserved.
       </div>
     </div>
@@ -3033,11 +3033,14 @@ function ScriptsPanel() {
     { key: "closer", label: "Closers" },
   ];
   
+  // Get partner name from localStorage
+  const partnerName = localStorage.getItem('partner_name') || 'Your Name';
+  
   const danCrooksSystem = [
     {
       id: "intro",
       title: "1. INTRODUCTION",
-      content: "Hi, I'm Dan I live locally. I posted this through a couple of days ago. If you're anything like me, you probably didn't get a chance to look at it and you put it in the recycling bin. Am I right?"
+      content: `Hi, I'm ${partnerName} I live locally. I posted this through a couple of days ago. If you're anything like me, you probably didn't get a chance to look at it and you put it in the recycling bin. Am I right?`
     },
     {
       id: "story",
@@ -3135,6 +3138,17 @@ function ScriptsPanel() {
     setNewScriptData({ title: '', content: '' });
     setShowNewScriptModal(false);
   };
+
+  // Handle delete custom script
+  const handleDeleteScript = (scriptId) => {
+    if (confirm('Are you sure you want to delete this script? This action cannot be undone.')) {
+      const updatedScripts = { ...customScripts };
+      delete updatedScripts[scriptId];
+      saveCustomScripts(updatedScripts);
+    }
+  };
+
+
 
   // Get all scripts including custom ones
   const getAllScripts = () => {
@@ -3326,6 +3340,15 @@ function ScriptsPanel() {
                         <Copy className="w-4 h-4" />
                         Save as New
                       </button>
+                      {s.isCustom && (
+                        <button 
+                          onClick={() => handleDeleteScript(s.id)}
+                          className="px-3 py-2 rounded-xl bg-red-600 text-white text-sm hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </button>
+                      )}
                     </>
                   )}
                   {isReordering && tab !== "system" && (
@@ -3403,6 +3426,8 @@ function ScriptsPanel() {
           </div>
         </div>
       )}
+
+
     </div>
   );
 }
@@ -4054,6 +4079,11 @@ function PdfViewer({ url, title }) {
 function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [apiKey, setApiKey] = useState(localStorage.getItem('google_places_api_key') || '');
+  const [partnerName, setPartnerName] = useState(() => {
+    const saved = localStorage.getItem('partner_name');
+    return saved || 'Your Name';
+  });
+  const [showNameModal, setShowNameModal] = useState(false);
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -4067,6 +4097,16 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
   return (
     <div className="space-y-4">
 
+      <div className="space-y-2">
+        <h4 className="font-medium">Personalization</h4>
+        <button 
+          onClick={() => setShowNameModal(true)}
+          className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+        >
+          <User className="w-4 h-4" />
+          Set Your Name ({partnerName})
+        </button>
+      </div>
       
       <div className="space-y-2">
         <h4 className="font-medium">Appearance</h4>
@@ -4155,6 +4195,60 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
           Sign out
         </button>
       </div>
+
+      {/* Set Name Modal */}
+      {showNameModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Set Your Name</h3>
+              <button
+                onClick={() => setShowNameModal(false)}
+                className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Your Name</label>
+                <input
+                  type="text"
+                  value={partnerName}
+                  onChange={(e) => setPartnerName(e.target.value)}
+                  placeholder="e.g., John Smith"
+                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  This will be used throughout the app, including in scripts
+                </div>
+              </div>
+              
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    if (partnerName.trim()) {
+                      localStorage.setItem('partner_name', partnerName.trim());
+                      setShowNameModal(false);
+                    }
+                  }}
+                  disabled={!partnerName.trim()}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save Name
+                </button>
+                <button
+                  onClick={() => setShowNameModal(false)}
+                  className="px-4 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
