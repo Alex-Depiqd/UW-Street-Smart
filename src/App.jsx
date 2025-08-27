@@ -198,25 +198,8 @@ const Drawer = ({ open, onClose, title, children, size = "default" }) => {
 
 // --- Main App ---
 export default function App() {
-  // Google Places API key (defined at component level)
-  const [apiKey, setApiKey] = useState(() => {
-    const stored = localStorage.getItem('google_places_api_key');
-    console.log('Loading API key from localStorage:', stored ? 'found' : 'not found');
-    return stored || '';
-  });
-  const GOOGLE_PLACES_API_KEY = apiKey;
-  
-  // Update API key when localStorage changes
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const newApiKey = localStorage.getItem('google_places_api_key') || '';
-      console.log('API key changed in localStorage:', newApiKey ? 'found' : 'not found');
-      setApiKey(newApiKey);
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+  // API functionality disabled - manual entry only
+  const GOOGLE_PLACES_API_KEY = '';
   
   const [dark, setDark] = useState(true);
   const [view, setView] = useState("dashboard");
@@ -1587,7 +1570,6 @@ export default function App() {
         <NewStreetForm 
           onSubmit={createNewStreet} 
           onCancel={() => setShowNewStreetModal(false)}
-          apiKey={GOOGLE_PLACES_API_KEY}
         />
       </Drawer>
 
@@ -2850,23 +2832,9 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
     <div className="space-y-4">
       <div className="space-y-2">
         <h4 className="font-medium">API Configuration</h4>
-        <div>
-          <label className="text-xs opacity-70 mb-1 block">Google Places API Key</label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => {
-              const newKey = e.target.value;
-              setApiKey(newKey);
-              localStorage.setItem('google_places_api_key', newKey);
-              // Force app to reload API key
-              window.location.reload();
-            }}
-            placeholder="Enter your Google Places API key"
-            className="w-full p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-          />
-          <div className="text-xs text-gray-500 mt-1">
-            {apiKey ? 'API key saved. App will reload to use real addresses.' : 'Leave empty to use demo data.'}
+        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Address search functionality has been disabled. Manual entry only.
           </div>
         </div>
       </div>
@@ -4242,8 +4210,8 @@ function ImportStreetsForm({
   );
 }
 
-function NewStreetForm({ onSubmit, onCancel, apiKey }) {
-  const GOOGLE_PLACES_API_KEY = apiKey;
+function NewStreetForm({ onSubmit, onCancel }) {
+  const GOOGLE_PLACES_API_KEY = '';
   
   const [step, setStep] = useState('options'); // 'options', 'postcode', 'streets', 'properties', 'manual'
   const [formData, setFormData] = useState({
@@ -4263,47 +4231,16 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
   // OpenStreetMap Nominatim API
   const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
 
-  // Trigger search when searchTerm changes
+  // Manual entry only - no search functionality
   useEffect(() => {
-    console.log('NewStreetForm: searchTerm changed to:', searchTerm);
-    if (searchTerm.length >= 2) {
-      console.log('NewStreetForm: Triggering search for:', searchTerm);
-      searchPostcodes(searchTerm);
-    } else {
-      console.log('NewStreetForm: Clearing results (searchTerm too short)');
-      setSearchResults([]);
-    }
+    // Disabled - manual entry only
   }, [searchTerm]);
 
   // Realistic UK address search with comprehensive data
-  // Smart address search with Google Places API and caching
+  // Manual entry only - no search functionality
   const searchPostcodes = async (query) => {
-    console.log('searchPostcodes called with:', query);
-    console.log('API key available:', !!GOOGLE_PLACES_API_KEY);
-    console.log('API key length:', GOOGLE_PLACES_API_KEY?.length || 0);
-    console.log('API key start:', GOOGLE_PLACES_API_KEY?.substring(0, 10) || 'none');
-    
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    // Use Google Places API if available, otherwise fallback to demo data
-    if (GOOGLE_PLACES_API_KEY) {
-      try {
-        console.log('Using Google Places API for search');
-        console.log('API key being used:', GOOGLE_PLACES_API_KEY.substring(0, 20) + '...');
-        await searchAddressesWithGoogle(query);
-      } catch (error) {
-        console.error('Google Places API failed, falling back to demo data:', error);
-        console.error('This usually means API key restrictions are blocking the request');
-        // Fallback to demo data if Google API fails
-        await searchWithDemoData(query, true);
-      }
-    } else {
-      console.log('No Google Places API key, using demo data');
-      await searchWithDemoData(query);
-    }
+    // Disabled - manual entry only
+    setSearchResults([]);
   };
 
   // Simple Google Places API search - no OpenStreetMap needed
@@ -4436,6 +4373,18 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
         {
           display_name: "The Street, Elmswell, IP30 9EE",
           address: { road: "The Street", postcode: "IP30 9EE", village: "Elmswell", city: "Bury St Edmunds" }
+        },
+        {
+          display_name: "Whitehall Road, Stowmarket, IP14 9DR",
+          address: { road: "Whitehall Road", postcode: "IP14 9DR", village: "Stowmarket", city: "Bury St Edmunds" }
+        },
+        {
+          display_name: "IP30 9DR, Elmswell, Suffolk",
+          address: { road: "IP30 9DR", postcode: "IP30 9DR", village: "Elmswell", city: "Suffolk" }
+        },
+        {
+          display_name: "IP14 9DR, Stowmarket, Suffolk", 
+          address: { road: "IP14 9DR", postcode: "IP14 9DR", village: "Stowmarket", city: "Suffolk" }
         }
       ];
 
@@ -4733,29 +4682,12 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
 
         <div className="grid grid-cols-1 gap-3">
           <button
-            onClick={() => setStep('search')}
+            onClick={() => setStep('manual')}
             className="p-4 rounded-xl border-2 border-dashed border-primary-300 dark:border-primary-700 hover:border-primary-400 dark:hover:border-primary-600 transition-colors text-left"
           >
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary-100 dark:bg-primary-900/20">
-                <Search className="w-5 h-5 text-primary-600" />
-              </div>
-              <div>
-                <div className="font-medium">Search for Address</div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Search by postcode, street, village, or town
-                </div>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setStep('manual')}
-            className="p-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 transition-colors text-left"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800">
-                <MapPin className="w-5 h-5 text-gray-600" />
+                <MapPin className="w-5 h-5 text-primary-600" />
               </div>
               <div>
                 <div className="font-medium">Enter Manually</div>
