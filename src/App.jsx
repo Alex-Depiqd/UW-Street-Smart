@@ -2807,12 +2807,18 @@ function PhotoModal({ open, onClose, onSave }) {
 
 function ScriptsPanel() {
   const [tab, setTab] = useState("system");
+  const [editingScript, setEditingScript] = useState(null);
+  const [customScripts, setCustomScripts] = useState({});
+  const [showCustomScripts, setShowCustomScripts] = useState(false);
+  const [scriptOrder, setScriptOrder] = useState({});
+  const [isReordering, setIsReordering] = useState(false);
+  const [draggedItem, setDraggedItem] = useState(null);
+  
   const tabs = [
     { key: "system", label: "Dan's System" },
     { key: "opener", label: "Openers" },
     { key: "objection", label: "Objections" },
     { key: "closer", label: "Closers" },
-    { key: "sms", label: "SMS/WhatsApp" },
   ];
   
   const danCrooksSystem = [
@@ -2845,39 +2851,249 @@ function ScriptsPanel() {
   
   const items = tab === "system" ? danCrooksSystem : seedScripts[tab];
 
+  // Copy script to clipboard
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // You could add a toast notification here
+      console.log('Script copied to clipboard');
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+    }
+  };
+
+  // Handle edit script
+  const handleEditScript = (script) => {
+    setEditingScript(script);
+  };
+
+  // Handle save edited script
+  const handleSaveScript = (scriptId, newContent) => {
+    setCustomScripts(prev => ({
+      ...prev,
+      [scriptId]: {
+        ...editingScript,
+        content: newContent,
+        isCustom: true
+      }
+    }));
+    setEditingScript(null);
+  };
+
+  // Handle save as new script
+  const handleSaveAsNew = (originalScript) => {
+    const newId = `custom_${Date.now()}`;
+    const newScript = {
+      ...originalScript,
+      id: newId,
+      title: `${originalScript.title} (Custom)`,
+      isCustom: true
+    };
+    
+    setCustomScripts(prev => ({
+      ...prev,
+      [newId]: newScript
+    }));
+  };
+
+  // Get all scripts including custom ones
+  const getAllScripts = () => {
+    const baseScripts = tab === "system" ? danCrooksSystem : seedScripts[tab];
+    const customScriptsForTab = Object.values(customScripts).filter(
+      script => script.category === tab || (tab === "system" && script.category === "system")
+    );
+    return [...baseScripts, ...customScriptsForTab];
+  };
+
+  const displayItems = getAllScripts();
+
+  // Drag and drop functionality
+  const handleDragStart = (e, script) => {
+    // Protect Dan's System - no dragging allowed
+    if (tab === "system") {
+      e.preventDefault();
+      return;
+    }
+    
+    setDraggedItem(script);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e, targetScript) => {
+    e.preventDefault();
+    if (!draggedItem || draggedItem.id === targetScript.id) return;
+
+    // Protect Dan's System - no reordering allowed
+    if (tab === "system") {
+      setDraggedItem(null);
+      return;
+    }
+
+    const items = [...displayItems];
+    const draggedIndex = items.findIndex(item => item.id === draggedItem.id);
+    const targetIndex = items.findIndex(item => item.id === targetScript.id);
+
+    // Remove dragged item and insert at target position
+    items.splice(draggedIndex, 1);
+    items.splice(targetIndex, 0, draggedItem);
+
+    // Save the new order
+    const newOrder = items.map((item, index) => ({ id: item.id, order: index }));
+    setScriptOrder(prev => ({
+      ...prev,
+      [tab]: newOrder
+    }));
+
+    setDraggedItem(null);
+  };
+
+  // Get ordered scripts
+  const getOrderedScripts = () => {
+    const items = getAllScripts();
+    const tabOrder = scriptOrder[tab];
+    
+    if (!tabOrder || tabOrder.length === 0) {
+      return items;
+    }
+
+    // Sort based on saved order
+    return items.sort((a, b) => {
+      const aOrder = tabOrder.find(order => order.id === a.id)?.order ?? 999;
+      const bOrder = tabOrder.find(order => order.id === b.id)?.order ?? 999;
+      return aOrder - bOrder;
+    });
+  };
+
+  const finalDisplayItems = getOrderedScripts();
+
   return (
     <div>
-      <div className="grid grid-cols-5 gap-2 mb-3">
-        {tabs.map(t => (
-          <button 
-            key={t.key} 
-            onClick={()=>setTab(t.key)} 
+      <div className="flex items-center justify-between mb-3">
+        <div className="grid grid-cols-4 gap-2">
+          {tabs.map(t => (
+            <button 
+              key={t.key} 
+              onClick={()=>setTab(t.key)} 
+              className={`px-3 py-2 rounded-xl text-sm transition-colors ${
+                tab===t.key 
+                  ? 'bg-primary-600 text-white' 
+                  : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        
+        {tab !== "system" && (
+          <button
+            onClick={() => setIsReordering(!isReordering)}
             className={`px-3 py-2 rounded-xl text-sm transition-colors ${
-              tab===t.key 
-                ? 'bg-primary-600 text-white' 
+              isReordering 
+                ? 'bg-green-600 text-white' 
                 : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
             }`}
           >
-            {t.label}
+            {isReordering ? 'Done' : 'Reorder'}
           </button>
-        ))}
+        )}
       </div>
       <div className="space-y-3">
-        {items.map(s => (
-          <div key={s.id} className="p-3 rounded-2xl border bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800">
-            <div className="text-sm font-medium mb-1">{s.title}</div>
-            <div className="text-sm opacity-90">{s.content}</div>
-            <div className="mt-2 flex gap-2">
-              <button className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                Copy
-              </button>
-              <button className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                Edit
-              </button>
-              <button className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                Save as new
-              </button>
+        {finalDisplayItems.map(s => (
+          <div 
+            key={s.id} 
+            className={`p-3 rounded-2xl border transition-all duration-200 ${
+              s.isCustom 
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
+                : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800'
+            } ${
+              isReordering && tab !== "system" ? 'cursor-move hover:shadow-lg' : ''
+            } ${
+              draggedItem?.id === s.id ? 'opacity-50 scale-95' : ''
+            }`}
+            draggable={isReordering && tab !== "system"}
+            onDragStart={(e) => isReordering && handleDragStart(e, s)}
+            onDragOver={isReordering ? handleDragOver : undefined}
+            onDrop={isReordering ? (e) => handleDrop(e, s) : undefined}
+          >
+            <div className="text-sm font-medium mb-1 flex items-center gap-2">
+              {s.title}
+              {s.isCustom && (
+                <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                  Custom
+                </span>
+              )}
             </div>
+            
+            {editingScript?.id === s.id ? (
+              <div className="space-y-2">
+                <textarea
+                  value={editingScript.content}
+                  onChange={(e) => setEditingScript({...editingScript, content: e.target.value})}
+                  className="w-full p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm resize-none"
+                  rows={4}
+                />
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleSaveScript(s.id, editingScript.content)}
+                    className="px-3 py-1.5 rounded-xl bg-green-600 text-white text-sm hover:bg-green-700 transition-colors"
+                  >
+                    Save
+                  </button>
+                  <button 
+                    onClick={() => setEditingScript(null)}
+                    className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="text-sm opacity-90 whitespace-pre-line">{s.content}</div>
+                <div className="mt-2 flex gap-2">
+                  <button 
+                    onClick={() => copyToClipboard(s.content)}
+                    className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Copy
+                  </button>
+                  {tab !== "system" && !isReordering && (
+                    <>
+                      <button 
+                        onClick={() => handleEditScript(s)}
+                        className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => handleSaveAsNew(s)}
+                        className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        Save as new
+                      </button>
+                    </>
+                  )}
+                  {isReordering && tab !== "system" && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="w-4 h-4 border-2 border-gray-300 dark:border-gray-600 rounded"></div>
+                      Drag to reorder
+                    </div>
+                  )}
+                  {isReordering && tab === "system" && (
+                    <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
+                      <div className="w-4 h-4 border-2 border-amber-400 rounded"></div>
+                      Dan's System - Fixed Order
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -3538,7 +3754,7 @@ function SuccessTipsPanel() {
               <div>• Laminated Presenter Sheet</div>
               <div>• Tablet</div>
               <div>• Flyers and magazines</div>
-              <div>• A tracker</div>
+              <div>• A tracker (you're looking at it! 😉)</div>
               <div>• Your diary</div>
             </div>
           </div>
