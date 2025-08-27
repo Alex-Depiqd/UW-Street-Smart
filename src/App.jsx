@@ -6,7 +6,7 @@ import {
   Clock, Phone, FileText, FolderOpen, Share2, UploadCloud, 
   Moon, Sun, Settings, Bell, Search, Filter, MoreVertical,
   User, LogOut, HelpCircle, Info, Shield, Database, BarChart3, Target,
-  Upload, Trash2, AlertTriangle, Camera, Globe, File, ExternalLink, Eye, Maximize
+  Upload, Trash2, AlertTriangle, Camera, Globe, File, ExternalLink, Eye, Maximize, Menu, Edit, Copy
 } from "lucide-react";
 import { config } from './config';
 
@@ -1349,29 +1349,20 @@ export default function App() {
         </div>
       </div>
 
-      {/* Mobile Navigation Bar - Collapsible */}
+      {/* Mobile Header - Simple */}
       <div className="lg:hidden sticky top-16 z-30 bg-white/80 dark:bg-gray-950/80 backdrop-blur border-b border-gray-200/50 dark:border-gray-800/50">
         <div className="max-w-6xl mx-auto px-3 sm:px-4">
-          {/* Collapsible Header */}
           <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setMobileNavCollapsed(!mobileNavCollapsed)}
-                className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              >
-                {mobileNavCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-              </button>
-              <div className="text-sm font-medium">
-                {view === "dashboard" && "Dashboard"}
-                {view === "campaigns" && "Campaigns"}
-                {view === "streets" && "Streets"}
-                {view === "reports" && "Reports"}
-                {view === "property" && "Property"}
-              </div>
+            <div className="text-sm font-medium">
+              {view === "dashboard" && "Dashboard"}
+              {view === "campaigns" && "Campaigns"}
+              {view === "streets" && "Streets"}
+              {view === "reports" && "Reports"}
+              {view === "property" && "Property"}
             </div>
             <div className="flex items-center gap-3">
               {/* Quick Stats Summary */}
-              {mobileNavCollapsed && view === "dashboard" && activeCampaign && (
+              {view === "dashboard" && activeCampaign && (
                 <div className="flex items-center gap-2 text-xs">
                   <div className="flex items-center gap-1">
                     <UploadCloud className="w-3 h-3 text-green-600" />
@@ -1394,31 +1385,11 @@ export default function App() {
               )}
             </div>
           </div>
-
-          {/* Collapsible Navigation */}
-          {!mobileNavCollapsed && (
-            <div className="pb-2">
-              <div className="grid grid-cols-4 gap-1">
-                <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
-                <NavButton icon={<Target className="w-4 h-4 flex-shrink-0"/>} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
-                <NavButton icon={<MapPin className="w-4 h-4 flex-shrink-0"/>} label="Streets" active={view === "streets"} onClick={() => setView("streets")} />
-                <NavButton icon={<FileText className="w-4 h-4 flex-shrink-0"/>} label="Reports" active={view === "reports"} onClick={() => setView("reports")} />
-              </div>
-              {activeCampaign && (
-                <div className="mt-2 text-center px-2">
-                  <div className="text-xs opacity-70 mb-1">Active Campaign</div>
-                  <div className="text-sm font-medium truncate bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 px-2 py-1 rounded-lg">
-                    {activeCampaign.name}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
       {/* Content Area */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 pb-20 lg:pb-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 pb-24 lg:pb-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
         {/* Sidebar - Hidden on mobile */}
         <div className="hidden lg:block lg:col-span-1 space-y-3">
           <SectionCard title="Navigate" icon={FolderOpen}>
@@ -1774,38 +1745,10 @@ export default function App() {
         </div>
       </div>
 
-      {/* Mobile Floating Action Button */}
-      <div className="lg:hidden fixed bottom-20 right-4 z-40">
-        <div className="flex flex-col gap-2">
-          {/* Quick Actions FAB */}
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => setShowScripts(true)}
-              className="w-12 h-12 rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition-all flex items-center justify-center"
-              title="Scripts"
-            >
-              <MessageSquare className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setShowDocuments(true)}
-              className="w-12 h-12 rounded-full bg-green-600 text-white shadow-lg hover:bg-green-700 transition-all flex items-center justify-center"
-              title="Documents"
-            >
-              <File className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setShowLinks(true)}
-              className="w-12 h-12 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center"
-              title="Quick Links"
-            >
-              <Link2 className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </div>
+
 
       {/* Footer Hint */}
-      <div className="max-w-6xl mx-auto px-4 pb-8 text-xs opacity-70">
+      <div className="max-w-6xl mx-auto px-4 pb-12 lg:pb-8 text-xs opacity-70">
         UW Street Smart - NL Activity Tracker v1.0.0 | Built for UW partners making a difference in their communities. | © 2025 Alex Cameron. All rights reserved.
       </div>
     </div>
@@ -3070,9 +3013,16 @@ function PhotoModal({ open, onClose, onSave }) {
 function ScriptsPanel() {
   const [tab, setTab] = useState("system");
   const [editingScript, setEditingScript] = useState(null);
-  const [customScripts, setCustomScripts] = useState({});
-  const [showCustomScripts, setShowCustomScripts] = useState(false);
-  const [scriptOrder, setScriptOrder] = useState({});
+  const [customScripts, setCustomScripts] = useState(() => {
+    const saved = localStorage.getItem('partner_scripts');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [showNewScriptModal, setShowNewScriptModal] = useState(false);
+  const [newScriptData, setNewScriptData] = useState({ title: '', content: '' });
+  const [scriptOrder, setScriptOrder] = useState(() => {
+    const saved = localStorage.getItem('partner_script_order');
+    return saved ? JSON.parse(saved) : {};
+  });
   const [isReordering, setIsReordering] = useState(false);
   const [draggedItem, setDraggedItem] = useState(null);
   
@@ -3113,15 +3063,16 @@ function ScriptsPanel() {
   
   const items = tab === "system" ? danCrooksSystem : seedScripts[tab];
 
-  // Copy script to clipboard
-  const copyToClipboard = async (text) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      // You could add a toast notification here
-      console.log('Script copied to clipboard');
-    } catch (err) {
-      console.error('Failed to copy: ', err);
-    }
+  // Save custom scripts to localStorage
+  const saveCustomScripts = (scripts) => {
+    setCustomScripts(scripts);
+    localStorage.setItem('partner_scripts', JSON.stringify(scripts));
+  };
+
+  // Save script order to localStorage
+  const saveScriptOrder = (order) => {
+    setScriptOrder(order);
+    localStorage.setItem('partner_script_order', JSON.stringify(order));
   };
 
   // Handle edit script
@@ -3131,14 +3082,16 @@ function ScriptsPanel() {
 
   // Handle save edited script
   const handleSaveScript = (scriptId, newContent) => {
-    setCustomScripts(prev => ({
-      ...prev,
+    const updatedScripts = {
+      ...customScripts,
       [scriptId]: {
         ...editingScript,
         content: newContent,
-        isCustom: true
+        isCustom: true,
+        category: tab
       }
-    }));
+    };
+    saveCustomScripts(updatedScripts);
     setEditingScript(null);
   };
 
@@ -3148,14 +3101,39 @@ function ScriptsPanel() {
     const newScript = {
       ...originalScript,
       id: newId,
-      title: `${originalScript.title} (Custom)`,
-      isCustom: true
+      title: `${originalScript.title} (Copy)`,
+      isCustom: true,
+      category: tab
     };
     
-    setCustomScripts(prev => ({
-      ...prev,
+    const updatedScripts = {
+      ...customScripts,
       [newId]: newScript
-    }));
+    };
+    saveCustomScripts(updatedScripts);
+  };
+
+  // Handle create new script
+  const handleCreateNewScript = () => {
+    if (!newScriptData.title.trim() || !newScriptData.content.trim()) return;
+    
+    const newId = `custom_${Date.now()}`;
+    const newScript = {
+      id: newId,
+      title: newScriptData.title,
+      content: newScriptData.content,
+      isCustom: true,
+      category: tab
+    };
+    
+    const updatedScripts = {
+      ...customScripts,
+      [newId]: newScript
+    };
+    saveCustomScripts(updatedScripts);
+    
+    setNewScriptData({ title: '', content: '' });
+    setShowNewScriptModal(false);
   };
 
   // Get all scripts including custom ones
@@ -3206,10 +3184,11 @@ function ScriptsPanel() {
 
     // Save the new order
     const newOrder = items.map((item, index) => ({ id: item.id, order: index }));
-    setScriptOrder(prev => ({
-      ...prev,
+    const updatedOrder = {
+      ...scriptOrder,
       [tab]: newOrder
-    }));
+    };
+    saveScriptOrder(updatedOrder);
 
     setDraggedItem(null);
   };
@@ -3235,8 +3214,9 @@ function ScriptsPanel() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <div className="grid grid-cols-4 gap-2">
+      <div className="space-y-3 mb-4">
+        {/* Tab Navigation - Mobile Optimized */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
           {tabs.map(t => (
             <button 
               key={t.key} 
@@ -3252,17 +3232,28 @@ function ScriptsPanel() {
           ))}
         </div>
         
+        {/* Action Buttons - Mobile Optimized */}
         {tab !== "system" && (
-          <button
-            onClick={() => setIsReordering(!isReordering)}
-            className={`px-3 py-2 rounded-xl text-sm transition-colors ${
-              isReordering 
-                ? 'bg-green-600 text-white' 
-                : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            {isReordering ? 'Done' : 'Reorder'}
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              onClick={() => setShowNewScriptModal(true)}
+              className="px-3 py-2 rounded-xl bg-green-600 text-white text-sm hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              New Script
+            </button>
+            <button
+              onClick={() => setIsReordering(!isReordering)}
+              className={`px-3 py-2 rounded-xl text-sm transition-colors flex items-center justify-center gap-2 ${
+                isReordering 
+                  ? 'bg-amber-600 text-white' 
+                  : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              {isReordering ? <Check className="w-4 h-4" /> : <Settings className="w-4 h-4" />}
+              {isReordering ? 'Done Reordering' : 'Reorder'}
+            </button>
+          </div>
         )}
       </div>
       <div className="space-y-3">
@@ -3318,26 +3309,22 @@ function ScriptsPanel() {
             ) : (
               <>
                 <div className="text-sm opacity-90 whitespace-pre-line">{s.content}</div>
-                <div className="mt-2 flex gap-2">
-                  <button 
-                    onClick={() => copyToClipboard(s.content)}
-                    className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    Copy
-                  </button>
+                <div className="mt-3 flex flex-col sm:flex-row gap-2">
                   {tab !== "system" && !isReordering && (
                     <>
                       <button 
                         onClick={() => handleEditScript(s)}
-                        className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        className="px-3 py-2 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                       >
+                        <Edit className="w-4 h-4" />
                         Edit
                       </button>
                       <button 
                         onClick={() => handleSaveAsNew(s)}
-                        className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        className="px-3 py-2 rounded-xl bg-green-600 text-white text-sm hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
                       >
-                        Save as new
+                        <Copy className="w-4 h-4" />
+                        Save as New
                       </button>
                     </>
                   )}
@@ -3359,6 +3346,63 @@ function ScriptsPanel() {
           </div>
         ))}
       </div>
+
+      {/* New Script Modal */}
+      {showNewScriptModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Create New Script</h3>
+              <button
+                onClick={() => setShowNewScriptModal(false)}
+                className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Script Title</label>
+                <input
+                  type="text"
+                  value={newScriptData.title}
+                  onChange={(e) => setNewScriptData({...newScriptData, title: e.target.value})}
+                  placeholder="e.g., My Custom Opener"
+                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Script Content</label>
+                <textarea
+                  value={newScriptData.content}
+                  onChange={(e) => setNewScriptData({...newScriptData, content: e.target.value})}
+                  placeholder="Type or paste your script here..."
+                  rows={6}
+                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                />
+              </div>
+              
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleCreateNewScript}
+                  disabled={!newScriptData.title.trim() || !newScriptData.content.trim()}
+                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Create Script
+                </button>
+                <button
+                  onClick={() => setShowNewScriptModal(false)}
+                  className="px-4 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
