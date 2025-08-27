@@ -2315,6 +2315,12 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
             >
               <Link2 className="w-4 h-4"/> Links
             </button>
+            <button 
+              onClick={() => setShowUtilityLogos(true)} 
+              className="flex-1 px-3 py-2 rounded-xl bg-purple-600 text-white text-sm flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors"
+            >
+              <Globe className="w-4 h-4"/> Utilities
+            </button>
           </div>
         </div>
 
@@ -2732,6 +2738,38 @@ function PhotoModal({ open, onClose, onSave }) {
   );
 }
 
+function UtilityLogosModal({ open, onClose }) {
+  return (
+    <Drawer open={open} onClose={onClose} title="Utility Company Logos">
+      <div className="space-y-4">
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          Reference logos for major UK utility and telecommunications companies. Useful for identifying current providers during doorstep conversations.
+        </div>
+        
+        <div className="bg-purple-900 rounded-xl p-4">
+          <img 
+            src="/utility-logos.png" 
+            alt="UK Utility Company Logos" 
+            className="w-full h-auto rounded-lg"
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'block';
+            }}
+          />
+          <div className="hidden text-center text-white text-sm py-8">
+            <div className="mb-2">Image not found</div>
+            <div>Please add utility-logos.png to the public folder</div>
+          </div>
+        </div>
+        
+        <div className="text-xs text-gray-500 dark:text-gray-400">
+          <strong>Companies shown:</strong> OVO, ScottishPower, Octopus Energy, EE, EDF, Vodafone, Virgin Media, O2, Sky, Plusnet, BT, British Gas, E.ON
+        </div>
+      </div>
+    </Drawer>
+  );
+}
+
 function ScriptsPanel() {
   const [tab, setTab] = useState("opener");
   const tabs = [
@@ -2783,6 +2821,8 @@ function ScriptsPanel() {
 }
 
 function LinksPanel({ links }) {
+  const [showUtilityLogos, setShowUtilityLogos] = useState(false);
+  
   const linkRows = [
     { label: "Connector sign‑up", url: links?.connector, icon: Link2 },
     { label: "Quote / eligibility form", url: links?.quote, icon: FileText },
@@ -2806,9 +2846,24 @@ function LinksPanel({ links }) {
           <ChevronRight className="w-4 h-4 opacity-60"/>
         </a>
       ))}
+      
+      <button 
+        onClick={() => setShowUtilityLogos(true)}
+        className="w-full flex items-center justify-between p-3 rounded-2xl border bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+      >
+        <div className="flex items-center gap-2 text-sm">
+          <Globe className="w-4 h-4"/> Utility Company Logos
+        </div>
+        <ChevronRight className="w-4 h-4 opacity-60"/>
+      </button>
       <div className="text-xs opacity-70">
         Tip: add UTM tags to links so scans/visits attribute to this campaign.
       </div>
+      
+      <UtilityLogosModal 
+        open={showUtilityLogos} 
+        onClose={() => setShowUtilityLogos(false)} 
+      />
     </div>
   );
 }
