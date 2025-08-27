@@ -4304,7 +4304,7 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
     }
   };
 
-  // Google Maps JavaScript SDK search function using new Data API
+  // Simple Google Places API search - no OpenStreetMap needed
   const searchAddressesWithGoogle = async (query) => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -4313,12 +4313,11 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
 
     setIsSearching(true);
     try {
-      console.log('Using Google Maps JavaScript SDK for search:', query);
+      console.log('Searching Google Places API for:', query);
       
       // Load Google Maps SDK if not already loaded
       if (!window.google || !window.google.maps) {
         console.log('Loading Google Maps SDK...');
-        console.log('Using API key:', GOOGLE_PLACES_API_KEY ? 'present' : 'missing');
         try {
           await window.loadGoogleMapsSDK(GOOGLE_PLACES_API_KEY);
           console.log('Google Maps SDK loaded successfully');
@@ -4329,62 +4328,37 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
         }
       }
 
-      // Wait for google.maps to be fully available (guards against racing)
-      await new Promise((resolve, reject) => {
-        let attempts = 0;
-        const checkInterval = setInterval(() => {
-          if (window.google && window.google.maps && window.google.maps.importLibrary) {
-            clearInterval(checkInterval);
-            resolve();
+      // Use the stable AutocompleteService (still works, just deprecated)
+      if (!window.google.maps.places) {
+        console.error('Google Maps Places library not available');
+        setSearchResults([]);
+        return;
+      }
+
+      const { AutocompleteService } = window.google.maps.places;
+      const service = new AutocompleteService();
+
+      // Get place predictions
+      const predictions = await new Promise((resolve, reject) => {
+        service.getPlacePredictions({
+          input: query,
+          componentRestrictions: { country: 'gb' },
+          types: ['geocode', 'establishment']
+        }, (predictions, status) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK) {
+            resolve(predictions || []);
+          } else {
+            reject(new Error(`Places API error: ${status}`));
           }
-          if (++attempts > 200) {
-            clearInterval(checkInterval);
-            reject(new Error('Maps failed to load with importLibrary support'));
-          }
-        }, 25);
+        });
       });
 
-      // Use the new Places API (recommended by Google)
-      let suggestions = [];
-      
-      try {
-        const placesLibrary = await google.maps.importLibrary('places');
-        if (!placesLibrary || !placesLibrary.AutocompleteSessionToken || !placesLibrary.AutocompleteSuggestion) {
-          throw new Error('New Places API not available - make sure Places API (New) is enabled in Google Cloud Console');
-        }
-        
-        console.log('Using new Places API');
-        const { AutocompleteSessionToken, AutocompleteSuggestion } = placesLibrary;
-        
-        const sessionToken = new AutocompleteSessionToken();
-        const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
-          input: query,
-          region: 'gb',
-          includedPrimaryTypes: ['postal_code', 'route', 'street_address', 'locality'],
-          sessionToken,
-        });
-        suggestions = response.suggestions || [];
-      } catch (error) {
-        console.error('New Places API failed:', error.message);
-        console.error('Please enable Places API (New) in Google Cloud Console');
-        await searchWithDemoData(query, true);
-        return;
-      }
+      console.log('Google Places results:', predictions);
 
-      console.log('Raw suggestions from API:', suggestions);
-      
-      if (!suggestions || suggestions.length === 0) {
-        console.log('No suggestions found for query:', query);
-        console.log('Falling back to demo data...');
-        await searchWithDemoData(query);
-        return;
-      }
-
-      // Convert new Places API format to UI display model
-      const results = suggestions.map(suggestion => {
-        const p = suggestion.placePrediction;
-        const mainText = p.structuredFormat?.mainText?.text || p.displayName?.text || p.formattedAddress || '';
-        const secondaryText = p.structuredFormat?.secondaryText?.text || '';
+      // Convert to our format
+      const results = predictions.map(prediction => {
+        const mainText = prediction.structured_formatting?.main_text || prediction.description || '';
+        const secondaryText = prediction.structured_formatting?.secondary_text || '';
         
         return {
           display_name: mainText,
@@ -4394,31 +4368,20 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
             village: '',
             city: ''
           },
-          place_id: p.id || p.placeId || '',
+          place_id: prediction.place_id,
           type: 'google_place',
-          raw: suggestion,
+          raw: prediction,
           street_name: mainText?.split(',')[0]?.trim() || '',
           postcode: mainText?.match(/[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i)?.[0] || '',
           village: mainText?.split(',').slice(1, -1).join(',').trim() || ''
         };
       });
+
       console.log('Processed results:', results);
-      console.log('First result display_name:', results[0]?.display_name);
-      console.log('First result address:', results[0]?.address);
-      
-      // If no valid results, fall back to demo data
-      if (!results.length || !results[0]?.display_name || results[0]?.display_name === 'Unknown Location') {
-        console.log('Falling back to demo data');
-        await searchWithDemoData(query, true);
-        return;
-      }
-      
-      console.log('Setting search results from Google:', results);
-      console.log('Results length:', results.length);
       setSearchResults(results);
       
     } catch (error) {
-      console.error('Google Maps SDK error:', error);
+      console.error('Google Places API error:', error);
       setSearchResults([]);
     } finally {
       setIsSearching(false);
@@ -4498,80 +4461,15 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
     }
   };
 
-  // Search for streets in a specific postcode or area
-  const searchStreetsInPostcode = async (postcodeOrArea) => {
-    console.log('searchStreetsInPostcode called with:', postcodeOrArea);
-    console.log('Setting isSearching to true');
-    setIsSearching(true);
-    
-    // Add timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      console.log('Street search timeout - forcing manual entry');
-      setAvailableStreets([]);
-      setIsSearching(false);
-      // Force manual entry if timeout occurs
-      setFormData(prev => ({
-        ...prev,
-        name: postcodeOrArea,
-        postcode: ''
-      }));
-      setStep('manual');
-    }, 5000); // 5 second timeout (reduced from 10)
-    try {
-      const params = new URLSearchParams({
-        q: `${postcodeOrArea} street`,
-        format: 'json',
-        addressdetails: '1',
-        limit: '20',
-        countrycodes: 'gb'
-      });
-
-      console.log('Fetching from OpenStreetMap:', `${NOMINATIM_BASE_URL}/search?${params}`);
-
-      const response = await fetch(`${NOMINATIM_BASE_URL}/search?${params}`, {
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'UW-Street-Smart-NL-Tracker/1.0'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('OpenStreetMap response:', data);
-        
-        // Filter for actual streets
-        const streets = data.filter(item => {
-          const address = item.address;
-          return address.road && address.postcode;
-        });
-        
-        console.log('Filtered streets:', streets);
-        setAvailableStreets(streets);
-        
-        // If no streets found, show a message
-        if (streets.length === 0) {
-          console.log('No streets found for this area');
-          setAvailableStreets([]);
-        }
-      } else {
-        console.error('OpenStreetMap response not ok:', response.status);
-        setAvailableStreets([]);
-      }
-    } catch (error) {
-      console.error('Street search error:', error);
-      setAvailableStreets([]);
-      // Force manual entry on error
-      setFormData(prev => ({
-        ...prev,
-        name: postcodeOrArea,
-        postcode: ''
-      }));
-      setStep('manual');
-    } finally {
-      console.log('searchStreetsInPostcode finally block - clearing timeout and setting isSearching to false');
-      clearTimeout(timeoutId);
-      setIsSearching(false);
-    }
+  // Simplified workflow - no OpenStreetMap needed
+  const handleStreetSelection = (streetName, postcode) => {
+    console.log('Handling street selection:', { streetName, postcode });
+    setFormData(prev => ({
+      ...prev,
+      name: streetName,
+      postcode: postcode
+    }));
+    setStep('manual');
   };
 
   // Handle postcode selection
@@ -4599,128 +4497,19 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
       return;
     }
     
-    // If we have just a street name (no postcode), try to get postcode from Google Places result
-    if (streetName && !postcode) {
-      console.log('Attempting to get postcode from Google Places result for:', streetName);
-      
-      // If we have the raw Google Places result, try to get the postcode
-      console.log('Checking for raw Google Places result:', result.raw);
-      console.log('Result type:', result.type);
-      
-      if (result.raw && result.raw.placePrediction) {
-        try {
-          console.log('Fetching details from Google Places...');
-          const place = result.raw.placePrediction.toPlace();
-          await place.fetchFields({
-            fields: ['addressComponents', 'formattedAddress'],
-          });
-          
-          // Extract postcode from address components
-          const addressComponents = place.addressComponents || [];
-          console.log('Address components:', addressComponents);
-          console.log('Full place object:', place);
-          console.log('Formatted address:', place.formattedAddress);
-          
-          const postcodeComponent = addressComponents.find(c => c.types.includes('postal_code'));
-          const extractedPostcode = postcodeComponent?.longName || '';
-          
-          console.log('Extracted postcode from Google Places:', extractedPostcode);
-          
-          // Also try to extract from formatted address
-          const formattedAddressPostcode = place.formattedAddress?.match(/[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i)?.[0] || 
-                                          place.formattedAddress?.match(/[A-Z]{1,2}[0-9][0-9A-Z]?/i)?.[0];
-          console.log('Postcode from formatted address:', formattedAddressPostcode);
-          
-          const finalPostcode = extractedPostcode || formattedAddressPostcode;
-          console.log('Final postcode to use:', finalPostcode);
-          
-          if (finalPostcode) {
-            // Use the extracted postcode for street search
-            console.log('Using final postcode for search:', finalPostcode);
-            setCurrentPostcode(finalPostcode);
-            setFormData(prev => ({ ...prev, postcode: finalPostcode }));
-            // Search for the specific street in this postcode area
-            await searchStreetsInPostcode(`${streetName}, ${finalPostcode}`);
-            setStep('streets');
-            return;
-          }
-          
-          // If no postcode from Google Places, try to extract from display name
-          console.log('No postcode from Google Places, trying to extract from display name');
-          const displayNamePostcode = displayName.match(/[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i)?.[0];
-          if (displayNamePostcode) {
-            console.log('Using postcode from display name:', displayNamePostcode);
-            setCurrentPostcode(displayNamePostcode);
-            setFormData(prev => ({ ...prev, postcode: displayNamePostcode }));
-            // Search for the specific street in this postcode area
-            await searchStreetsInPostcode(`${streetName}, ${displayNamePostcode}`);
-            setStep('streets');
-            return;
-          }
-        } catch (error) {
-          console.error('Error fetching Google Places details:', error);
-        }
-      }
-      
-      // Fallback to searching by street name
-      console.log('Falling back to street name search for:', streetName);
-      try {
-        setCurrentPostcode(streetName);
-        setFormData(prev => ({ ...prev, postcode: streetName }));
-        await searchStreetsInPostcode(streetName);
-        setStep('streets');
-      } catch (error) {
-        console.error('Error in street search:', error);
-        // Fallback to manual entry
-        setFormData(prev => ({
-          ...prev,
-          name: streetName,
-          postcode: ''
-        }));
-        setStep('manual');
-      }
-      return;
-    }
-    
-    // If we have a postcode, search for streets in that area
+    // If we have a postcode, go directly to manual entry
     if (postcode && postcode.match(/^[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}$/i)) {
-      console.log('Searching for streets in postcode:', postcode);
-      try {
-        setCurrentPostcode(postcode);
-        setFormData(prev => ({ ...prev, postcode: postcode }));
-        await searchStreetsInPostcode(postcode);
-        setStep('streets');
-      } catch (error) {
-        console.error('Error in postcode search:', error);
-        // Fallback to manual entry
-        setFormData(prev => ({
-          ...prev,
-          name: '',
-          postcode: postcode
-        }));
-        setStep('manual');
-      }
+      console.log('Valid postcode found, going to manual entry');
+      setFormData(prev => ({ ...prev, postcode: postcode }));
+      setStep('manual');
       return;
     }
     
-    // If we have a village/town, search for streets in that area
+    // If we have a village/town, go to manual entry
     if (village) {
-      console.log('Searching for streets in village:', village);
-      try {
-        setCurrentPostcode(village);
-        setFormData(prev => ({ ...prev, postcode: village }));
-        await searchStreetsInPostcode(village);
-        setStep('streets');
-      } catch (error) {
-        console.error('Error in village search:', error);
-        // Fallback to manual entry
-        setFormData(prev => ({
-          ...prev,
-          name: '',
-          postcode: village
-        }));
-        setStep('manual');
-      }
+      console.log('Village/town found, going to manual entry');
+      setFormData(prev => ({ ...prev, postcode: village }));
+      setStep('manual');
       return;
     }
     
