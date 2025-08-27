@@ -3466,83 +3466,22 @@ function DocumentsPanel({ onViewPdf }) {
   // Default UW documents (shared across all users)
   const defaultDocuments = [
     {
-      id: "neighbour-letter",
-      title: "Neighbour Letter Template",
-      description: "Standard letter template for dropping through doors",
-      type: "pdf",
-      url: "/documents/neighbour-letter-template.pdf",
-      fallbackUrl: "/documents/neighbour-letter-template.html",
-      icon: FileText,
-      category: "Templates",
-      isDefault: true
-    },
-    {
       id: "presenter-sheet",
       title: "£20k Giveaway Presenter",
       description: "Laminated presenter sheet for doorstep conversations",
-      type: "pdf",
-      url: "/documents/20k-giveaway-presenter.pdf",
-      fallbackUrl: "/documents/20k-giveaway-presenter.html",
+      type: "link",
+      url: "https://uw.co.uk/partner/portal/incentives/the-20k-giveaway/form",
       icon: FileText,
       category: "Sales Materials",
       isDefault: true
     },
-    {
-      id: "uw-brochure",
-      title: "UW Brochure",
-      description: "Official UW company brochure and information",
-      type: "pdf",
-      url: "/documents/uw-brochure.pdf",
-      icon: FileText,
-      category: "Marketing",
-      isDefault: true
-    },
-    {
-      id: "savings-calculator",
-      title: "Savings Calculator",
-      description: "Interactive tool to show potential savings",
-      type: "pdf",
-      url: "/documents/savings-calculator.pdf",
-      icon: FileText,
-      category: "Tools",
-      isDefault: true
-    },
-    {
-      id: "faq-sheet",
-      title: "Frequently Asked Questions",
-      description: "Common questions and answers for prospects",
-      type: "pdf",
-      url: "/documents/faq-sheet.pdf",
-      icon: FileText,
-      category: "Support",
-      isDefault: true
-    },
-    {
-      id: "partnership-guide",
-      title: "Partnership Guide",
-      description: "Complete guide to UW partnership opportunities",
-      type: "pdf",
-      url: "/documents/partnership-guide.pdf",
-      icon: FileText,
-      category: "Training",
-      isDefault: true
-    },
-    {
-      id: "convert-helper",
-      title: "Convert to PDF Helper",
-      description: "Tool to help convert HTML templates to PDF format",
-      type: "html",
-      url: "/documents/convert-to-pdf.html",
-      icon: FileText,
-      category: "Tools",
-      isDefault: true
-    },
+
     {
       id: "uw-presenter",
       title: "UW Presenter",
       description: "Official UW presenter document for doorstep conversations",
       type: "pdf",
-      url: "/documents/UW_Presenter.pdf",
+      url: "https://assets.ctfassets.net/ihl5uj459rzx/6UbKQzbKP2sHmMz3fEn648/93f3b2fb3b047f63d0005181c62535dc/UW_Presenter.pdf",
       icon: FileText,
       category: "Tools",
       isDefault: true
@@ -3681,13 +3620,16 @@ function DocumentsPanel({ onViewPdf }) {
                   if (doc.type === 'image') {
                     // For images, open in new tab
                     window.open(doc.url, '_blank');
+                  } else if (doc.type === 'link') {
+                    // For links, open in new tab
+                    window.open(doc.url, '_blank');
                   } else {
                     // For PDFs and HTML, use the PDF viewer
                     onViewPdf(doc.url, doc.title);
                   }
                 }}
                 className="p-2 rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
-                title={doc.type === 'image' ? "View Image" : "View Document"}
+                title={doc.type === 'image' ? "View Image" : doc.type === 'link' ? "Open Link" : "View Document"}
               >
                 <Eye className="w-4 h-4" />
               </button>
