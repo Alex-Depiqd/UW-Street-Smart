@@ -1393,7 +1393,7 @@ export default function App() {
       {/* Content Area */}
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 pb-32 lg:pb-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
         {/* Sidebar - Hidden on mobile */}
-        <div className="hidden lg:block lg:col-span-1 space-y-3">
+        <div className="hidden lg:block lg:col-span-1 xl:col-span-1 space-y-3">
           <SectionCard title="Navigate" icon={FolderOpen}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-2 xl:gap-3 min-w-0">
               <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
@@ -1773,14 +1773,14 @@ function NavButton({ icon, label, active, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-1 px-1 py-2 rounded-xl text-xs border transition-all min-w-0 lg:flex-row lg:gap-2 lg:px-1.5 xl:px-3 lg:text-sm ${
+      className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs border transition-all min-w-0 lg:flex-row lg:gap-2 lg:px-3 xl:px-3 lg:text-sm ${
         active 
           ? "bg-primary-600 text-white border-primary-600 shadow-md" 
           : "bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800"
       }`}
     >
       <span className="flex-shrink-0">{icon}</span>
-      <span className="text-center leading-tight break-words">{label}</span>
+      <span className="text-center leading-tight break-words text-xs lg:text-xs xl:text-sm overflow-hidden">{label}</span>
     </button>
   );
 }
