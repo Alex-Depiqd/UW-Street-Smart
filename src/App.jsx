@@ -226,6 +226,8 @@ export default function App() {
   const [showSuccessTips, setShowSuccessTips] = useState(false);
   const [showUtilityLogos, setShowUtilityLogos] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [floatingButtonsExpanded, setFloatingButtonsExpanded] = useState(false);
+  const [floatingButtonsVisible, setFloatingButtonsVisible] = useState(true);
 
 
 
@@ -243,6 +245,37 @@ export default function App() {
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
   const activeStreet = useMemo(() => activeCampaign?.streets.find(s => s.id === activeStreetId), [activeCampaign, activeStreetId]);
   const activeProperty = useMemo(() => activeStreet?.properties.find(p => p.id === activePropertyId), [activeStreet, activePropertyId]);
+
+  // Floating buttons scroll and interaction handling
+  useEffect(() => {
+    let scrollTimeout;
+    let lastScrollY = window.scrollY;
+
+    const handleScroll = () => {
+      setFloatingButtonsVisible(false);
+      setFloatingButtonsExpanded(false);
+      
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        setFloatingButtonsVisible(true);
+      }, 1000);
+    };
+
+    const handleInteraction = () => {
+      setFloatingButtonsExpanded(false);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('click', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+      clearTimeout(scrollTimeout);
+    };
+  }, []);
 
   // Derived stats for dashboard
   const stats = useMemo(() => {
@@ -1621,8 +1654,12 @@ export default function App() {
 
 
       {/* Mobile Floating Action Buttons */}
-      <div className="lg:hidden fixed bottom-6 right-6 z-50">
-        <div className="flex flex-col gap-2">
+      <div className={`lg:hidden fixed bottom-6 right-6 z-50 transition-all duration-300 ${
+        floatingButtonsVisible ? 'opacity-100' : 'opacity-0'
+      }`}>
+        <div className={`flex flex-col gap-2 transition-all duration-300 ${
+          floatingButtonsExpanded ? 'translate-x-0' : 'translate-x-8'
+        }`}>
           <button 
             onClick={() => setShowScripts(true)}
             className="w-12 h-12 rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition-colors flex items-center justify-center"
@@ -1637,7 +1674,24 @@ export default function App() {
           >
             <Link2 className="w-5 h-5" />
           </button>
+          <button 
+            onClick={() => setShowUtilityLogos(true)}
+            className="w-12 h-12 rounded-full bg-purple-600 text-white shadow-lg hover:bg-purple-700 transition-colors flex items-center justify-center"
+            title="Utility Logos"
+          >
+            <Globe className="w-5 h-5" />
+          </button>
         </div>
+        
+        {/* Tab to expand/collapse */}
+        <button 
+          onClick={() => setFloatingButtonsExpanded(!floatingButtonsExpanded)}
+          className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 w-8 h-16 rounded-l-full bg-gray-800 text-white shadow-lg transition-all duration-300 flex items-center justify-center ${
+            floatingButtonsExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          }`}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Footer Hint */}
@@ -2752,18 +2806,48 @@ function PhotoModal({ open, onClose, onSave }) {
 
 
 function ScriptsPanel() {
-  const [tab, setTab] = useState("opener");
+  const [tab, setTab] = useState("system");
   const tabs = [
+    { key: "system", label: "Dan's System" },
     { key: "opener", label: "Openers" },
     { key: "objection", label: "Objections" },
     { key: "closer", label: "Closers" },
     { key: "sms", label: "SMS/WhatsApp" },
   ];
-  const items = seedScripts[tab];
+  
+  const danCrooksSystem = [
+    {
+      id: "intro",
+      title: "1. INTRODUCTION",
+      content: "Hi, I'm Dan I live locally. I posted this through a couple of days ago. If you're anything like me, you probably didn't get a chance to look at it and you put it in the recycling bin. Am I right?"
+    },
+    {
+      id: "story",
+      title: "2. SHORT STORY", 
+      content: "In a nutshell, I'm partnered with a company called Utility Warehouse. What we do is we help people with some of the main utility companies like British Gas, BT and many others, to bring their bill down."
+    },
+    {
+      id: "presentation",
+      title: "3. PRESENTATION",
+      content: "I've spoken to quite a few of your neighbours who are getting fed up with paying a fortune for their utility bills. Because I'm the local partner in our area, my job is simply to put you on my list to check if you are eligible for any reductions."
+    },
+    {
+      id: "factfind",
+      title: "4. FACT FIND",
+      content: "• Have you heard of UW?\n• Are you with any of these companies?\n• In the last 6 months?\n• Have your bills gone up or down?\n• Are you a homeowner or a tenant?"
+    },
+    {
+      id: "appointment",
+      title: "5. ASK FOR APPOINTMENT",
+      content: "Fantastic, because if you are with them, what I can do is put you on my list and check if you are eligible for us to bring your bills down. Would that be ok? I can either book an appointment to pop back or if you are free now, I can run through bringing your bills down with you. What's best for you?"
+    }
+  ];
+  
+  const items = tab === "system" ? danCrooksSystem : seedScripts[tab];
 
   return (
     <div>
-      <div className="grid grid-cols-4 gap-2 mb-3">
+      <div className="grid grid-cols-5 gap-2 mb-3">
         {tabs.map(t => (
           <button 
             key={t.key} 
@@ -2802,14 +2886,40 @@ function ScriptsPanel() {
 }
 
 function UtilityLogosPanel() {
+  const [orientation, setOrientation] = useState('portrait');
+
+  useEffect(() => {
+    const handleOrientationChange = () => {
+      setOrientation(window.innerHeight > window.innerWidth ? 'portrait' : 'landscape');
+    };
+
+    // Set initial orientation
+    handleOrientationChange();
+
+    // Listen for orientation changes
+    window.addEventListener('orientationchange', handleOrientationChange);
+    window.addEventListener('resize', handleOrientationChange);
+
+    return () => {
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      window.removeEventListener('resize', handleOrientationChange);
+    };
+  }, []);
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 flex items-center justify-center p-4">
-        <div className="max-w-full max-h-full">
+        <div className={`max-w-full max-h-full ${
+          orientation === 'landscape' ? 'w-full h-full' : 'w-full'
+        }`}>
           <img 
             src="/utility-logos.png" 
             alt="UK Utility Company Logos" 
-            className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
+            className={`rounded-lg transition-all duration-300 ${
+              orientation === 'landscape' 
+                ? 'w-full h-full object-contain' 
+                : 'w-full h-auto max-h-[80vh] object-contain'
+            }`}
             onError={(e) => {
               e.target.style.display = 'none';
               e.target.nextSibling.style.display = 'block';
@@ -2822,7 +2932,9 @@ function UtilityLogosPanel() {
         </div>
       </div>
       
-      <div className="p-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-800">
+      <div className={`p-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-800 ${
+        orientation === 'landscape' ? 'flex-shrink-0' : ''
+      }`}>
         <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
           Reference logos for major UK utility and telecommunications companies. Useful for identifying current providers during doorstep conversations.
         </div>
@@ -3399,6 +3511,60 @@ function SuccessTipsPanel() {
               <div>• <strong>Follow up:</strong> 20+ properties</div>
               <div>• <strong>Conversations:</strong> 5+ meaningful chats</div>
               <div>• <strong>Interested leads:</strong> 1+ per day</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Dan Crooks' Expert Tips */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <Target className="w-5 h-5" />
+          Dan Crooks' Expert Tips (700+ Club)
+        </h3>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-xl border border-teal-200 dark:border-teal-800">
+            <div className="font-medium text-teal-800 dark:text-teal-200 mb-2">👁️ The SEE Method</div>
+            <div className="text-sm text-teal-700 dark:text-teal-300 space-y-1">
+              <div>• <strong>S</strong> - Smile</div>
+              <div>• <strong>E</strong> - Eye Contact</div>
+              <div>• <strong>E</strong> - Excitable</div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
+            <div className="font-medium text-orange-800 dark:text-orange-200 mb-2">📋 What You Need</div>
+            <div className="text-sm text-orange-700 dark:text-orange-300 space-y-1">
+              <div>• Laminated Presenter Sheet</div>
+              <div>• Tablet</div>
+              <div>• Flyers and magazines</div>
+              <div>• A tracker</div>
+              <div>• Your diary</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+            <div className="font-medium text-purple-800 dark:text-purple-200 mb-2">📅 Plan Ahead</div>
+            <div className="text-sm text-purple-700 dark:text-purple-300 space-y-1">
+              <div>• 30-40 a week</div>
+              <div>• Revisit 3-4 times</div>
+              <div>• Choose your area</div>
+              <div>• Focus on the right thing - Activity</div>
+              <div>• Be organised</div>
+              <div>• Prepare for the Nos</div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-pink-50 dark:bg-pink-900/20 rounded-xl border border-pink-200 dark:border-pink-800">
+            <div className="font-medium text-pink-800 dark:text-pink-200 mb-2">✍️ Get Ready to Sign</div>
+            <div className="text-sm text-pink-700 dark:text-pink-300 space-y-1">
+              <div>• Ask if you can sit down if they don't offer</div>
+              <div>• Build rapport – Even more important</div>
+              <div>• Do the Bill Review FIRST</div>
+              <div>• Sign them up – then talk partnership</div>
+              <div>• Show the ben video and explain more</div>
             </div>
           </div>
         </div>
