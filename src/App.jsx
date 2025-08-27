@@ -2298,7 +2298,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                       >
                         {p.label}
                         {p.followUpAt && (
-                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border border-white dark:border-gray-900 flex items-center justify-center">
+                          <div className="absolute top-0 right-0 w-3 h-3 bg-amber-500 rounded-full border border-white dark:border-gray-900 flex items-center justify-center transform translate-x-1 -translate-y-1">
                             <CalendarClock className="w-2 h-2 text-white" />
                           </div>
                         )}
@@ -2658,17 +2658,19 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                     setCurrentImageTitle("Property Photo");
                     setShowImageViewer(true);
                   }}
-                  className="w-full block"
+                  className="w-full block bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-colors overflow-hidden"
                 >
-                  <img 
-                    src={property.photo} 
-                    alt="Property photo" 
-                    className="w-full h-24 object-cover rounded-xl border border-gray-200 dark:border-gray-800 hover:opacity-90 transition-opacity"
-                  />
+                  <div className="w-full h-48 flex items-center justify-center">
+                    <img 
+                      src={property.photo} 
+                      alt="Property photo" 
+                      className="max-w-full max-h-full object-contain"
+                    />
+                  </div>
                 </button>
                 <button 
                   onClick={() => onUpdate({ photo: null })}
-                  className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                  className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-sm"
                 >
                   <X className="w-3 h-3" />
                 </button>
