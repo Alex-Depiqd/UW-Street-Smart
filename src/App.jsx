@@ -226,8 +226,7 @@ export default function App() {
   const [showSuccessTips, setShowSuccessTips] = useState(false);
   const [showUtilityLogos, setShowUtilityLogos] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [floatingButtonsExpanded, setFloatingButtonsExpanded] = useState(false);
-  const [floatingButtonsVisible, setFloatingButtonsVisible] = useState(true);
+
 
 
 
@@ -246,36 +245,7 @@ export default function App() {
   const activeStreet = useMemo(() => activeCampaign?.streets.find(s => s.id === activeStreetId), [activeCampaign, activeStreetId]);
   const activeProperty = useMemo(() => activeStreet?.properties.find(p => p.id === activePropertyId), [activeStreet, activePropertyId]);
 
-  // Floating buttons scroll and interaction handling
-  useEffect(() => {
-    let scrollTimeout;
-    let lastScrollY = window.scrollY;
 
-    const handleScroll = () => {
-      setFloatingButtonsVisible(false);
-      setFloatingButtonsExpanded(false);
-      
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        setFloatingButtonsVisible(true);
-      }, 1000);
-    };
-
-    const handleInteraction = () => {
-      setFloatingButtonsExpanded(false);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    window.addEventListener('click', handleInteraction);
-    window.addEventListener('touchstart', handleInteraction);
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('click', handleInteraction);
-      window.removeEventListener('touchstart', handleInteraction);
-      clearTimeout(scrollTimeout);
-    };
-  }, []);
 
   // Derived stats for dashboard
   const stats = useMemo(() => {
@@ -1653,46 +1623,7 @@ export default function App() {
 
 
 
-      {/* Mobile Floating Action Buttons */}
-      <div className={`lg:hidden fixed bottom-6 right-6 z-50 transition-all duration-300 ${
-        floatingButtonsVisible ? 'opacity-100' : 'opacity-0'
-      }`}>
-        <div className={`flex flex-col gap-2 transition-all duration-300 ${
-          floatingButtonsExpanded ? 'translate-x-0' : 'translate-x-8'
-        }`}>
-          <button 
-            onClick={() => setShowScripts(true)}
-            className="w-12 h-12 rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition-colors flex items-center justify-center"
-            title="Scripts"
-          >
-            <MessageSquare className="w-5 h-5" />
-          </button>
-          <button 
-            onClick={() => setShowLinks(true)}
-            className="w-12 h-12 rounded-full bg-gray-600 text-white shadow-lg hover:bg-gray-700 transition-colors flex items-center justify-center"
-            title="Quick Links"
-          >
-            <Link2 className="w-5 h-5" />
-          </button>
-          <button 
-            onClick={() => setShowUtilityLogos(true)}
-            className="w-12 h-12 rounded-full bg-purple-600 text-white shadow-lg hover:bg-purple-700 transition-colors flex items-center justify-center"
-            title="Utility Logos"
-          >
-            <Globe className="w-5 h-5" />
-          </button>
-        </div>
-        
-        {/* Tab to expand/collapse */}
-        <button 
-          onClick={() => setFloatingButtonsExpanded(!floatingButtonsExpanded)}
-          className={`absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 w-8 h-16 rounded-l-full bg-gray-800 text-white shadow-lg transition-all duration-300 flex items-center justify-center ${
-            floatingButtonsExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100'
-          }`}
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-      </div>
+
 
       {/* Footer Hint */}
       <div className="max-w-6xl mx-auto px-4 pb-8 text-xs opacity-70">
