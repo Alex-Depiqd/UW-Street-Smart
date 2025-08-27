@@ -1792,6 +1792,10 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
               <div className="text-base sm:text-lg font-semibold text-emerald-800 dark:text-emerald-200">{stats.outcomes.appointment_booked}</div>
               <div className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300">Appointment Booked</div>
             </div>
+            <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
+              <div className="text-base sm:text-lg font-semibold text-green-800 dark:text-green-200">{stats.outcomes.interested}</div>
+              <div className="text-xs sm:text-sm text-green-700 dark:text-green-300">Interested</div>
+            </div>
             <div className="p-2 sm:p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-500 dark:border-amber-500">
               <div className="text-base sm:text-lg font-semibold text-amber-800 dark:text-amber-200">{stats.outcomes.no_for_now}</div>
               <div className="text-xs sm:text-sm text-amber-700 dark:text-amber-300">No for Now</div>
@@ -3752,179 +3756,189 @@ function AboutPanel() {
 function SuccessTipsPanel() {
   return (
     <div className="space-y-6">
-      {/* Timing & Strategy */}
+      {/* Strategy & Mindset */}
       <div className="space-y-3">
         <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Clock className="w-5 h-5" />
-          Timing & Strategy
+          <Target className="w-5 h-5" />
+          Strategy & Mindset
         </h3>
         <div className="grid md:grid-cols-2 gap-3">
           <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
-            <div className="font-medium text-green-800 dark:text-green-200 mb-2">🎯 Best Drop Times</div>
+            <div className="font-medium text-green-800 dark:text-green-200 mb-2">🎯 It's a Numbers Game</div>
             <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
-              <div>• <strong>Evenings:</strong> 6-8pm (people home from work)</div>
-              <div>• <strong>Weekends:</strong> 10am-2pm (avoid meal times)</div>
-              <div>• <strong>Avoid:</strong> Monday mornings, Friday evenings</div>
+              <div>• Don't expect every door to say "yes"</div>
+              <div>• Consistency and persistence pay off</div>
+              <div>• Track your numbers to see progress</div>
+              <div>• Each "no" brings you closer to a "yes"</div>
             </div>
           </div>
           
           <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-            <div className="font-medium text-blue-800 dark:text-blue-200 mb-2">📝 Follow Up Timing</div>
+            <div className="font-medium text-blue-800 dark:text-blue-200 mb-2">💡 The Fortune is in the Follow-up</div>
             <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-              <div>• <strong>Return:</strong> 2-3 days after dropping letters</div>
-              <div>• <strong>Best times:</strong> Same as drop times</div>
-              <div>• <strong>Multiple attempts:</strong> Try 3-4 times before marking as "No Answer"</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Conversation Techniques */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <MessageSquare className="w-5 h-5" />
-          Conversation Techniques
-        </h3>
-        <div className="space-y-3">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
-            <div className="font-medium text-purple-800 dark:text-purple-200 mb-2">💡 Opening Lines</div>
-            <div className="text-sm text-purple-700 dark:text-purple-300 space-y-2">
-              <div><strong>Standard:</strong> "Hi! I'm [Name] and I'm local. I've been helping neighbours in this area save money on their household bills. I dropped a letter through earlier - have you had a chance to look at it?"</div>
-              <div><strong>Direct:</strong> "Hi! I'm helping families in [Area] save money on their bills. I left a letter earlier - would you like me to check if you could save money too?"</div>
-              <div><strong>Community:</strong> "Hi! I'm from UW and I've been working with families in this neighbourhood to reduce their bills. Have you seen the letter I dropped through?"</div>
-            </div>
-          </div>
-          
-          <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
-            <div className="font-medium text-amber-800 dark:text-amber-200 mb-2">🎭 Handling Objections</div>
-            <div className="text-sm text-amber-700 dark:text-amber-300 space-y-2">
-              <div><strong>"Not interested":</strong> "Totally fine! If things change, the letter has a QR code for a quick checker. No sales calls, just the numbers. Have a great day!"</div>
-              <div><strong>"Already with UW":</strong> "That's great! You might be eligible for additional savings or better bundles. Would you like me to check your current setup?"</div>
-              <div><strong>"Too busy":</strong> "I understand! It literally takes 2 minutes to check. If you're not saving money, you're not interested. If you are, we can book a proper time."</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Success Metrics */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <BarChart3 className="w-5 h-5" />
-          Success Metrics & Goals
-        </h3>
-        <div className="grid md:grid-cols-2 gap-3">
-          <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800">
-            <div className="font-medium text-indigo-800 dark:text-indigo-200 mb-2">📊 Realistic Targets</div>
-            <div className="text-sm text-indigo-700 dark:text-indigo-300 space-y-1">
-              <div>• <strong>Drop rate:</strong> 50-100 letters per session</div>
-              <div>• <strong>Conversation rate:</strong> 15-25% of drops</div>
-              <div>• <strong>Interest rate:</strong> 5-10% of conversations</div>
-              <div>• <strong>Success rate:</strong> 2-5% of conversations</div>
-            </div>
-          </div>
-          
-          <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800">
-            <div className="font-medium text-emerald-800 dark:text-emerald-200 mb-2">🎯 Daily Goals</div>
-            <div className="text-sm text-emerald-700 dark:text-emerald-300 space-y-1">
-              <div>• <strong>Drop:</strong> 50+ letters</div>
-              <div>• <strong>Follow up:</strong> 20+ properties</div>
-              <div>• <strong>Conversations:</strong> 5+ meaningful chats</div>
-              <div>• <strong>Interested leads:</strong> 1+ per day</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Dan Crooks' Expert Tips */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Target className="w-5 h-5" />
-          Dan Crooks' Expert Tips (700+ Club)
-        </h3>
-        <div className="grid md:grid-cols-2 gap-3">
-          <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-xl border border-teal-200 dark:border-teal-800">
-            <div className="font-medium text-teal-800 dark:text-teal-200 mb-2">👁️ The SEE Method</div>
-            <div className="text-sm text-teal-700 dark:text-teal-300 space-y-1">
-              <div>• <strong>S</strong> - Smile</div>
-              <div>• <strong>E</strong> - Eye Contact</div>
-              <div>• <strong>E</strong> - Excitable</div>
-            </div>
-          </div>
-          
-          <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
-            <div className="font-medium text-orange-800 dark:text-orange-200 mb-2">📋 What You Need</div>
-            <div className="text-sm text-orange-700 dark:text-orange-300 space-y-1">
-              <div>• Laminated Presenter Sheet</div>
-              <div>• Tablet</div>
-              <div>• Flyers and magazines</div>
-              <div>• A tracker (you're looking at it! 😉)</div>
-              <div>• Your diary</div>
+              <div>• Posting alone won't get results</div>
+              <div>• Real success comes from knocking back</div>
+              <div>• Don't overwhelm yourself with too many letters</div>
+              <div>• Post manageable numbers you can confidently follow up</div>
             </div>
           </div>
         </div>
         
         <div className="grid md:grid-cols-2 gap-3">
           <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
-            <div className="font-medium text-purple-800 dark:text-purple-200 mb-2">📅 Plan Ahead</div>
+            <div className="font-medium text-purple-800 dark:text-purple-200 mb-2">😊 Smile & Stay Positive</div>
             <div className="text-sm text-purple-700 dark:text-purple-300 space-y-1">
-              <div>• 30-40 a week</div>
-              <div>• Revisit 3-4 times</div>
-              <div>• Choose your area</div>
-              <div>• Focus on the right thing - Activity</div>
-              <div>• Be organised</div>
-              <div>• Prepare for the Nos</div>
+              <div>• Your body language and tone matter</div>
+              <div>• Positivity makes people more receptive</div>
+              <div>• Remember - you're offering help, not selling</div>
+              <div>• You're giving neighbours a chance to save money</div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+            <div className="font-medium text-amber-800 dark:text-amber-200 mb-2">🎭 Confidence Boosters</div>
+            <div className="text-sm text-amber-700 dark:text-amber-300 space-y-1">
+              <div>• Practice scripts until they feel natural</div>
+              <div>• Don't read robotically - make it yours</div>
+              <div>• Dress smart but approachable</div>
+              <div>• Think "friendly neighbour," not "salesperson"</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Following Up */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <Clock className="w-5 h-5" />
+          Following Up
+        </h3>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800">
+            <div className="font-medium text-indigo-800 dark:text-indigo-200 mb-2">⚡ Act Quickly</div>
+            <div className="text-sm text-indigo-700 dark:text-indigo-300 space-y-1">
+              <div>• Follow up within 2-3 days of dropping letters</div>
+              <div>• While people still remember it</div>
+              <div>• Best times: Evenings 6-8pm, weekends 10am-2pm</div>
+              <div>• Try 3-4 times before marking as "No Answer"</div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800">
+            <div className="font-medium text-emerald-800 dark:text-emerald-200 mb-2">🗣️ Simple Opener</div>
+            <div className="text-sm text-emerald-700 dark:text-emerald-300 space-y-2">
+              <div><strong>Start with:</strong> "Hi, I'm [Name], I live locally in [area]. I popped this letter through your door a couple of days ago — did you see it?"</div>
+              <div><strong>If yes:</strong> Move straight into: "I've been helping neighbours save money on all their utility bills. Would saving money help you?"</div>
+              <div><strong>If no:</strong> Hand them a spare letter or card and use the same line</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-xl border border-teal-200 dark:border-teal-800">
+            <div className="font-medium text-teal-800 dark:text-teal-200 mb-2">📅 Booking Appointments</div>
+            <div className="text-sm text-teal-700 dark:text-teal-300 space-y-1">
+              <div>• Don't just ask if they want one</div>
+              <div>• Use an alternative close:</div>
+              <div>• "When's good for you — daytime, evenings, or weekends?"</div>
+              <div>• Always carry your diary (or My Planner)</div>
             </div>
           </div>
           
           <div className="p-4 bg-pink-50 dark:bg-pink-900/20 rounded-xl border border-pink-200 dark:border-pink-800">
-            <div className="font-medium text-pink-800 dark:text-pink-200 mb-2">✍️ Get Ready to Sign</div>
-            <div className="text-sm text-pink-700 dark:text-pink-300 space-y-1">
-              <div>• Ask if you can sit down if they don't offer</div>
-              <div>• Build rapport – Even more important</div>
-              <div>• Do the Bill Review FIRST</div>
-              <div>• Sign them up – then talk partnership</div>
-              <div>• Show the ben video and explain more</div>
+            <div className="font-medium text-pink-800 dark:text-pink-200 mb-2">📞 Building Rapport & Courtesy</div>
+            <div className="text-sm text-pink-700 dark:text-pink-300 space-y-2">
+              <div>Some people won't be ready for an appointment. That's fine.</div>
+              <div><strong>Courtesy call script:</strong> "I come around here quite often — would you prefer I give you a quick courtesy call next time rather than just pop by?"</div>
+              <div>Don't ask directly for their number — pause after that line, and most people will naturally offer it.</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Best Practices */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Check className="w-5 h-5" />
-          Best Practices
-        </h3>
-        <div className="space-y-2">
-          <div className="p-3 bg-gray-50 dark:bg-gray-900/20 rounded-xl border border-gray-200 dark:border-gray-800">
-            <div className="text-sm space-y-1">
-              <div>• <strong>Dress appropriately:</strong> Smart casual, UW branded if possible</div>
-              <div>• <strong>Be confident:</strong> You're offering genuine value, not selling</div>
-              <div>• <strong>Listen actively:</strong> Understand their situation before suggesting solutions</div>
-              <div>• <strong>Follow up promptly:</strong> Use the app to track and schedule follow-ups</div>
-              <div>• <strong>Stay positive:</strong> Every "no" gets you closer to a "yes"</div>
-              <div>• <strong>Use the app:</strong> Track everything to improve your approach</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Common Mistakes */}
+      {/* Handling Rejection */}
       <div className="space-y-3">
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <AlertTriangle className="w-5 h-5" />
-          Common Mistakes to Avoid
+          Handling Rejection
         </h3>
-        <div className="space-y-2">
-          <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
-            <div className="text-sm space-y-1">
-              <div>• <strong>Rushing conversations:</strong> Take time to build rapport</div>
-              <div>• <strong>Not following up:</strong> Most success comes from follow-up visits</div>
-              <div>• <strong>Poor timing:</strong> Avoid meal times and early mornings</div>
-              <div>• <strong>Being pushy:</strong> Respect "no" and move on gracefully</div>
-              <div>• <strong>Not tracking activity:</strong> Use the app to learn what works</div>
-              <div>• <strong>Giving up too early:</strong> Try multiple times before marking as "No Answer"</div>
+        <div className="space-y-3">
+          <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
+            <div className="font-medium text-red-800 dark:text-red-200 mb-2">🛡️ The Disarming Line</div>
+            <div className="text-sm text-red-700 dark:text-red-300 space-y-2">
+              <div>If you get a frosty or blunt "No", don't take it personally.</div>
+              <div><strong>Use the disarming line:</strong> "Can I take your name off the list?"</div>
+              <div>They'll usually say "yes, please" or "thank you" — leaving you with a polite exit instead of rejection.</div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* What to Wear & Present */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <User className="w-5 h-5" />
+          What to Wear & How to Present
+        </h3>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
+            <div className="font-medium text-orange-800 dark:text-orange-200 mb-2">👔 Dress Smart but Approachable</div>
+            <div className="text-sm text-orange-700 dark:text-orange-300 space-y-1">
+              <div>• Think "friendly neighbour," not "salesperson"</div>
+              <div>• Comfortable shoes are essential</div>
+              <div>• You'll be walking a lot</div>
+              <div>• UW branded if possible</div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-cyan-50 dark:bg-cyan-900/20 rounded-xl border border-cyan-200 dark:border-cyan-800">
+            <div className="font-medium text-cyan-800 dark:text-cyan-200 mb-2">📋 What to Carry</div>
+            <div className="text-sm text-cyan-700 dark:text-cyan-300 space-y-1">
+              <div>• Your diary (or My Planner)</div>
+              <div>• Backup materials (Neighbour Letter, £20k Giveaway Presenter)</div>
+              <div>• Have one clear outcome in mind: booking a short appointment</div>
+              <div>• Keep it short, simple, and neighbourly</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* What to Say */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <MessageSquare className="w-5 h-5" />
+          What to Say
+        </h3>
+        <div className="space-y-3">
+          <div className="p-4 bg-gray-50 dark:bg-gray-900/20 rounded-xl border border-gray-200 dark:border-gray-800">
+            <div className="font-medium text-gray-800 dark:text-gray-200 mb-2">💬 Keep It Simple</div>
+            <div className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+              <div>• Keep it short, simple, and neighbourly</div>
+              <div>• Avoid jargon or long explanations</div>
+              <div>• Always bring backup materials in case someone wants more info</div>
+              <div>• Have one clear outcome in mind: booking a short appointment</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Success Summary */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <CheckCircle className="w-5 h-5" />
+          Success Summary
+        </h3>
+        <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-xl border border-green-200 dark:border-green-800">
+          <div className="font-medium text-green-800 dark:text-green-200 mb-2">✅ In Short:</div>
+          <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
+            <div>Succeeding with Neighbour Letters comes down to:</div>
+            <div>• <strong>Posting consistently</strong></div>
+            <div>• <strong>Following up quickly</strong></div>
+            <div>• <strong>Keeping it friendly and simple</strong></div>
+            <div>• <strong>Handling rejection gracefully</strong></div>
+            <div>• <strong>Booking appointments using alternative closes</strong></div>
+            <div>• <strong>Thinking like a helpful neighbour, not a salesperson</strong></div>
+            <div>— and you'll win trust and results.</div>
           </div>
         </div>
       </div>
