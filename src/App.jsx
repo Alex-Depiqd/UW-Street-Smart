@@ -6,7 +6,7 @@ import {
   Clock, Phone, FileText, FolderOpen, Share2, UploadCloud, 
   Moon, Sun, Settings, Bell, Search, Filter, MoreVertical,
   User, LogOut, HelpCircle, Info, Shield, Database, BarChart3, Target,
-  Upload, Trash2, AlertTriangle, Camera, Globe
+  Upload, Trash2, AlertTriangle, Camera, Globe, File, ExternalLink, Eye
 } from "lucide-react";
 import { config } from './config';
 
@@ -225,7 +225,12 @@ export default function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showSuccessTips, setShowSuccessTips] = useState(false);
   const [showUtilityLogos, setShowUtilityLogos] = useState(false);
+  const [showDocuments, setShowDocuments] = useState(false);
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [currentPdfUrl, setCurrentPdfUrl] = useState("");
+  const [currentPdfTitle, setCurrentPdfTitle] = useState("");
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [mobileNavCollapsed, setMobileNavCollapsed] = useState(false);
 
 
 
@@ -1344,28 +1349,76 @@ export default function App() {
         </div>
       </div>
 
-      {/* Mobile Navigation Bar */}
+      {/* Mobile Navigation Bar - Collapsible */}
       <div className="lg:hidden sticky top-16 z-30 bg-white/80 dark:bg-gray-950/80 backdrop-blur border-b border-gray-200/50 dark:border-gray-800/50">
-        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2">
-          <div className="grid grid-cols-4 gap-1">
-            <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
-            <NavButton icon={<Target className="w-4 h-4 flex-shrink-0"/>} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
-            <NavButton icon={<MapPin className="w-4 h-4 flex-shrink-0"/>} label="Streets" active={view === "streets"} onClick={() => setView("streets")} />
-            <NavButton icon={<FileText className="w-4 h-4 flex-shrink-0"/>} label="Reports" active={view === "reports"} onClick={() => setView("reports")} />
-          </div>
-          {activeCampaign && (
-            <div className="mt-2 text-center px-2">
-              <div className="text-xs opacity-70 mb-1">Active Campaign</div>
-              <div className="text-sm font-medium truncate bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 px-2 py-1 rounded-lg">
-                {activeCampaign.name}
+        <div className="max-w-6xl mx-auto px-3 sm:px-4">
+          {/* Collapsible Header */}
+          <div className="flex items-center justify-between py-2">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setMobileNavCollapsed(!mobileNavCollapsed)}
+                className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                {mobileNavCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              </button>
+              <div className="text-sm font-medium">
+                {view === "dashboard" && "Dashboard"}
+                {view === "campaigns" && "Campaigns"}
+                {view === "streets" && "Streets"}
+                {view === "reports" && "Reports"}
+                {view === "property" && "Property"}
               </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Quick Stats Summary */}
+              {mobileNavCollapsed && view === "dashboard" && activeCampaign && (
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-1">
+                    <UploadCloud className="w-3 h-3 text-green-600" />
+                    <span className="text-green-600 font-medium">{stats.letters}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <MessageSquare className="w-3 h-3 text-blue-600" />
+                    <span className="text-blue-600 font-medium">{stats.convos}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3 text-primary-600" />
+                    <span className="text-primary-600 font-medium">{stats.interested}</span>
+                  </div>
+                </div>
+              )}
+              {activeCampaign && (
+                <div className="text-xs opacity-70 truncate max-w-24">
+                  {activeCampaign.name}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Collapsible Navigation */}
+          {!mobileNavCollapsed && (
+            <div className="pb-2">
+              <div className="grid grid-cols-4 gap-1">
+                <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
+                <NavButton icon={<Target className="w-4 h-4 flex-shrink-0"/>} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
+                <NavButton icon={<MapPin className="w-4 h-4 flex-shrink-0"/>} label="Streets" active={view === "streets"} onClick={() => setView("streets")} />
+                <NavButton icon={<FileText className="w-4 h-4 flex-shrink-0"/>} label="Reports" active={view === "reports"} onClick={() => setView("reports")} />
+              </div>
+              {activeCampaign && (
+                <div className="mt-2 text-center px-2">
+                  <div className="text-xs opacity-70 mb-1">Active Campaign</div>
+                  <div className="text-sm font-medium truncate bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 px-2 py-1 rounded-lg">
+                    {activeCampaign.name}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
 
       {/* Content Area */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 pb-20 lg:pb-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
         {/* Sidebar - Hidden on mobile */}
         <div className="hidden lg:block lg:col-span-1 space-y-3">
           <SectionCard title="Navigate" icon={FolderOpen}>
@@ -1381,9 +1434,10 @@ export default function App() {
           </SectionCard>
 
           <SectionCard title="Quick Drawers" icon={Share2}>
-            <div className="grid grid-cols-3 gap-2 min-w-0">
+            <div className="grid grid-cols-2 gap-2 min-w-0">
               <NavButton icon={<MessageSquare className="w-4 h-4 flex-shrink-0"/>} label="Scripts" onClick={() => setShowScripts(true)} />
               <NavButton icon={<Link2 className="w-4 h-4 flex-shrink-0"/>} label="Links" onClick={() => setShowLinks(true)} />
+              <NavButton icon={<File className="w-4 h-4 flex-shrink-0"/>} label="Documents" onClick={() => setShowDocuments(true)} />
               <NavButton icon={<Globe className="w-4 h-4 flex-shrink-0"/>} label="Logos" onClick={() => setShowUtilityLogos(true)} />
             </div>
             <div className="mt-3 text-xs opacity-70">
@@ -1516,6 +1570,18 @@ export default function App() {
       </Drawer>
       <Drawer open={showLinks} onClose={()=>setShowLinks(false)} title="Quick Links">
         <LinksPanel links={activeCampaign?.links} />
+      </Drawer>
+      <Drawer open={showDocuments} onClose={()=>setShowDocuments(false)} title="Documents & PDFs" size="large">
+        <DocumentsPanel 
+          onViewPdf={(url, title) => {
+            setCurrentPdfUrl(url);
+            setCurrentPdfTitle(title);
+            setShowPdfViewer(true);
+          }}
+        />
+      </Drawer>
+      <Drawer open={showPdfViewer} onClose={()=>setShowPdfViewer(false)} title={currentPdfTitle} size="full">
+        <PdfViewer url={currentPdfUrl} title={currentPdfTitle} />
       </Drawer>
       <Drawer open={showUtilityLogos} onClose={()=>setShowUtilityLogos(false)} title="Utility Company Logos" size="large">
         <UtilityLogosPanel />
@@ -1654,6 +1720,89 @@ export default function App() {
 
 
 
+
+      {/* Mobile Bottom Tab Bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
+        <div className="flex items-center justify-around py-2">
+          <button
+            onClick={() => setView("dashboard")}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+              view === "dashboard"
+                ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+            }`}
+          >
+            <BarChart3 className="w-5 h-5" />
+            <span className="text-xs">Dashboard</span>
+          </button>
+          
+          <button
+            onClick={() => setView("campaigns")}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+              view === "campaigns"
+                ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+            }`}
+          >
+            <Target className="w-5 h-5" />
+            <span className="text-xs">Campaigns</span>
+          </button>
+          
+          <button
+            onClick={() => setView("streets")}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+              view === "streets"
+                ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+            }`}
+          >
+            <MapPin className="w-5 h-5" />
+            <span className="text-xs">Streets</span>
+          </button>
+          
+          <button
+            onClick={() => setView("reports")}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+              view === "reports"
+                ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span className="text-xs">Reports</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Floating Action Button */}
+      <div className="lg:hidden fixed bottom-20 right-4 z-40">
+        <div className="flex flex-col gap-2">
+          {/* Quick Actions FAB */}
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => setShowScripts(true)}
+              className="w-12 h-12 rounded-full bg-primary-600 text-white shadow-lg hover:bg-primary-700 transition-all flex items-center justify-center"
+              title="Scripts"
+            >
+              <MessageSquare className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setShowDocuments(true)}
+              className="w-12 h-12 rounded-full bg-green-600 text-white shadow-lg hover:bg-green-700 transition-all flex items-center justify-center"
+              title="Documents"
+            >
+              <File className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setShowLinks(true)}
+              className="w-12 h-12 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center"
+              title="Quick Links"
+            >
+              <Link2 className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Footer Hint */}
       <div className="max-w-6xl mx-auto px-4 pb-8 text-xs opacity-70">
@@ -2376,6 +2525,12 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
               className="flex-1 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               <Link2 className="w-4 h-4"/> Links
+            </button>
+            <button 
+              onClick={() => setShowDocuments(true)} 
+              className="flex-1 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              <File className="w-4 h-4"/> Documents
             </button>
             <button 
               onClick={() => setShowUtilityLogos(true)} 
@@ -3295,6 +3450,536 @@ function LinksPanel({ links }) {
       ))}
       <div className="text-xs opacity-70">
         Tip: add UTM tags to links so scans/visits attribute to this campaign.
+      </div>
+    </div>
+  );
+}
+
+function DocumentsPanel({ onViewPdf }) {
+  const [documents, setDocuments] = useState(() => {
+    // Load partner's custom documents from localStorage
+    const savedDocs = localStorage.getItem('partner_documents');
+    return savedDocs ? JSON.parse(savedDocs) : [];
+  });
+
+  const [showAddDocument, setShowAddDocument] = useState(false);
+  const [showManageDocuments, setShowManageDocuments] = useState(false);
+
+  // Default UW documents (shared across all users)
+  const defaultDocuments = [
+    {
+      id: "neighbour-letter",
+      title: "Neighbour Letter Template",
+      description: "Standard letter template for dropping through doors",
+      type: "pdf",
+      url: "/documents/neighbour-letter-template.pdf",
+      fallbackUrl: "/documents/neighbour-letter-template.html",
+      icon: FileText,
+      category: "Templates",
+      isDefault: true
+    },
+    {
+      id: "presenter-sheet",
+      title: "£20k Giveaway Presenter",
+      description: "Laminated presenter sheet for doorstep conversations",
+      type: "pdf",
+      url: "/documents/20k-giveaway-presenter.pdf",
+      fallbackUrl: "/documents/20k-giveaway-presenter.html",
+      icon: FileText,
+      category: "Sales Materials",
+      isDefault: true
+    },
+    {
+      id: "uw-brochure",
+      title: "UW Brochure",
+      description: "Official UW company brochure and information",
+      type: "pdf",
+      url: "/documents/uw-brochure.pdf",
+      icon: FileText,
+      category: "Marketing",
+      isDefault: true
+    },
+    {
+      id: "savings-calculator",
+      title: "Savings Calculator",
+      description: "Interactive tool to show potential savings",
+      type: "pdf",
+      url: "/documents/savings-calculator.pdf",
+      icon: FileText,
+      category: "Tools",
+      isDefault: true
+    },
+    {
+      id: "faq-sheet",
+      title: "Frequently Asked Questions",
+      description: "Common questions and answers for prospects",
+      type: "pdf",
+      url: "/documents/faq-sheet.pdf",
+      icon: FileText,
+      category: "Support",
+      isDefault: true
+    },
+    {
+      id: "partnership-guide",
+      title: "Partnership Guide",
+      description: "Complete guide to UW partnership opportunities",
+      type: "pdf",
+      url: "/documents/partnership-guide.pdf",
+      icon: FileText,
+      category: "Training",
+      isDefault: true
+    },
+    {
+      id: "convert-helper",
+      title: "Convert to PDF Helper",
+      description: "Tool to help convert HTML templates to PDF format",
+      type: "html",
+      url: "/documents/convert-to-pdf.html",
+      icon: FileText,
+      category: "Tools",
+      isDefault: true
+    }
+  ];
+
+  // Combine default and custom documents
+  const allDocuments = [...defaultDocuments, ...documents];
+
+  const saveDocuments = (newDocs) => {
+    setDocuments(newDocs);
+    localStorage.setItem('partner_documents', JSON.stringify(newDocs));
+  };
+
+  const addDocument = (newDoc) => {
+    const docWithId = {
+      ...newDoc,
+      id: `custom_${Date.now()}`,
+      isDefault: false
+    };
+    const updatedDocs = [...documents, docWithId];
+    saveDocuments(updatedDocs);
+    setShowAddDocument(false);
+  };
+
+  const removeDocument = (docId) => {
+    const updatedDocs = documents.filter(doc => doc.id !== docId);
+    saveDocuments(updatedDocs);
+  };
+
+  const categories = [...new Set(allDocuments.map(doc => doc.category))];
+  const [selectedCategory, setSelectedCategory] = useState("All");
+
+  const filteredDocuments = selectedCategory === "All" 
+    ? allDocuments 
+    : allDocuments.filter(doc => doc.category === selectedCategory);
+
+  return (
+    <div className="space-y-4">
+      {/* Header with Add/Manage buttons */}
+      <div className="flex items-center justify-between">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedCategory("All")}
+            className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${
+              selectedCategory === "All"
+                ? "bg-primary-600 text-white"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+            }`}
+          >
+            All
+          </button>
+          {categories.map(category => (
+            <button
+              key={category}
+              onClick={() => setSelectedCategory(category)}
+              className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${
+                selectedCategory === category
+                  ? "bg-primary-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowAddDocument(true)}
+            className="px-3 py-1.5 rounded-xl bg-green-600 text-white text-sm hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add Document
+          </button>
+          {documents.length > 0 && (
+            <button
+              onClick={() => setShowManageDocuments(true)}
+              className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+            >
+              <Settings className="w-4 h-4" />
+              Manage
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Documents List */}
+      <div className="space-y-2">
+        {filteredDocuments.map((doc) => (
+          <div
+            key={doc.id}
+            className={`flex items-center justify-between p-3 rounded-2xl border transition-colors ${
+              doc.isDefault 
+                ? "bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                : "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:border-green-400 hover:bg-green-100 dark:hover:bg-green-900/30"
+            }`}
+          >
+            <div className="flex items-center gap-3 flex-1">
+              <div className={`p-2 rounded-xl ${
+                doc.isDefault 
+                  ? "bg-blue-50 dark:bg-blue-900/20" 
+                  : "bg-green-100 dark:bg-green-900/30"
+              }`}>
+                <doc.icon className={`w-5 h-5 ${
+                  doc.isDefault 
+                    ? "text-blue-600 dark:text-blue-400" 
+                    : "text-green-600 dark:text-green-400"
+                }`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm flex items-center gap-2">
+                  {doc.title}
+                  {!doc.isDefault && (
+                    <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
+                      Custom
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">{doc.description}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">{doc.category}</div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onViewPdf(doc.url, doc.title)}
+                className="p-2 rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
+                title="View Document"
+              >
+                <Eye className="w-4 h-4" />
+              </button>
+              <a
+                href={doc.url}
+                target="_blank"
+                rel="noreferrer"
+                className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                title="Open in new tab"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
+              {!doc.isDefault && (
+                <button
+                  onClick={() => removeDocument(doc.id)}
+                  className="p-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                  title="Remove document"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="text-xs opacity-70 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+        <div className="font-medium text-blue-800 dark:text-blue-200 mb-1">💡 How to use:</div>
+        <div className="text-blue-700 dark:text-blue-300 space-y-1">
+          <div>• <strong>View Document:</strong> Opens document inline for quick reference</div>
+          <div>• <strong>Open in new tab:</strong> Downloads or opens in browser</div>
+          <div>• <strong>Show to customer:</strong> Use "View Document" to display on your device</div>
+          <div>• <strong>Add your own:</strong> Use "Add Document" to include your custom materials</div>
+        </div>
+      </div>
+
+      {/* Add Document Modal */}
+      {showAddDocument && (
+        <AddDocumentModal 
+          onAdd={addDocument} 
+          onClose={() => setShowAddDocument(false)} 
+        />
+      )}
+
+      {/* Manage Documents Modal */}
+      {showManageDocuments && (
+        <ManageDocumentsModal 
+          documents={documents}
+          onRemove={removeDocument}
+          onClose={() => setShowManageDocuments(false)} 
+        />
+      )}
+    </div>
+  );
+}
+
+function AddDocumentModal({ onAdd, onClose }) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [url, setUrl] = useState("");
+  const [category, setCategory] = useState("Templates");
+  const [type, setType] = useState("pdf");
+
+  const categories = ["Templates", "Sales Materials", "Marketing", "Tools", "Support", "Training"];
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title || !url) return;
+
+    onAdd({
+      title,
+      description,
+      url,
+      category,
+      type,
+      icon: FileText
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold mb-4">Add Custom Document</h3>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Document Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20"
+              placeholder="e.g., My Custom Brochure"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20"
+              placeholder="Brief description of the document"
+              rows={2}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Document URL</label>
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="w-full p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20"
+              placeholder="https://example.com/document.pdf"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Category</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20"
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Type</label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="w-full p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20"
+              >
+                <option value="pdf">PDF</option>
+                <option value="html">HTML</option>
+                <option value="link">External Link</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-3 rounded-xl bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+            >
+              Add Document
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ManageDocumentsModal({ documents, onRemove, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto">
+        <h3 className="text-lg font-semibold mb-4">Manage Custom Documents</h3>
+        
+        {documents.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="text-gray-500 dark:text-gray-400 mb-2">No custom documents yet</div>
+            <div className="text-sm text-gray-400 dark:text-gray-500">Add documents using the "Add Document" button</div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {documents.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-900/20"
+              >
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{doc.title}</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">{doc.description}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-500">{doc.category}</div>
+                </div>
+                <button
+                  onClick={() => onRemove(doc.id)}
+                  className="p-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                  title="Remove document"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-end pt-4">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PdfViewer({ url, title }) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [useFallback, setUseFallback] = useState(false);
+
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    setUseFallback(false);
+  }, [url]);
+
+  const handleLoad = () => {
+    setIsLoading(false);
+  };
+
+  const handleError = () => {
+    setIsLoading(false);
+    // Check if this is a PDF and we have a fallback HTML version
+    if (url.endsWith('.pdf') && !useFallback) {
+      const fallbackUrl = url.replace('.pdf', '.html');
+      setUseFallback(true);
+      // Try the fallback URL
+      const iframe = document.querySelector('iframe');
+      if (iframe) {
+        iframe.src = fallbackUrl;
+        setIsLoading(true);
+      }
+    } else {
+      setError("Failed to load document. Please try opening in a new tab instead.");
+    }
+  };
+
+  const isHtml = url.endsWith('.html');
+  const displayUrl = useFallback ? url.replace('.pdf', '.html') : url;
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Document Controls */}
+      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
+        <div className="text-sm font-medium">{title}</div>
+        <div className="flex gap-2">
+          <a
+            href={displayUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex items-center gap-2"
+          >
+            <ExternalLink className="w-4 h-4" />
+            Open in new tab
+          </a>
+          {!isHtml && (
+            <a
+              href={displayUrl}
+              download
+              className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Download
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Document Viewer */}
+      <div className="flex-1 relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-2"></div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                {isHtml ? "Loading document..." : "Loading PDF..."}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+            <div className="text-center p-4">
+              <div className="text-red-600 dark:text-red-400 mb-2">⚠️ {error}</div>
+              <a
+                href={displayUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+              >
+                Open in new tab
+              </a>
+            </div>
+          </div>
+        )}
+
+        <iframe
+          src={displayUrl}
+          className="w-full h-full border-0"
+          onLoad={handleLoad}
+          onError={handleError}
+          title={title}
+        />
       </div>
     </div>
   );
