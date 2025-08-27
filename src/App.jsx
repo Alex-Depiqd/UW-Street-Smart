@@ -2752,18 +2752,48 @@ function PhotoModal({ open, onClose, onSave }) {
 
 
 function ScriptsPanel() {
-  const [tab, setTab] = useState("opener");
+  const [tab, setTab] = useState("system");
   const tabs = [
+    { key: "system", label: "Dan's System" },
     { key: "opener", label: "Openers" },
     { key: "objection", label: "Objections" },
     { key: "closer", label: "Closers" },
     { key: "sms", label: "SMS/WhatsApp" },
   ];
-  const items = seedScripts[tab];
+  
+  const danCrooksSystem = [
+    {
+      id: "intro",
+      title: "1. INTRODUCTION",
+      content: "Hi, I'm Dan I live locally. I posted this through a couple of days ago. If you're anything like me, you probably didn't get a chance to look at it and you put it in the recycling bin. Am I right?"
+    },
+    {
+      id: "story",
+      title: "2. SHORT STORY", 
+      content: "In a nutshell, I'm partnered with a company called Utility Warehouse. What we do is we help people with some of the main utility companies like British Gas, BT and many others, to bring their bill down."
+    },
+    {
+      id: "presentation",
+      title: "3. PRESENTATION",
+      content: "I've spoken to quite a few of your neighbours who are getting fed up with paying a fortune for their utility bills. Because I'm the local partner in our area, my job is simply to put you on my list to check if you are eligible for any reductions."
+    },
+    {
+      id: "factfind",
+      title: "4. FACT FIND",
+      content: "• Have you heard of UW?\n• Are you with any of these companies?\n• In the last 6 months?\n• Have your bills gone up or down?\n• Are you a homeowner or a tenant?"
+    },
+    {
+      id: "appointment",
+      title: "5. ASK FOR APPOINTMENT",
+      content: "Fantastic, because if you are with them, what I can do is put you on my list and check if you are eligible for us to bring your bills down. Would that be ok? I can either book an appointment to pop back or if you are free now, I can run through bringing your bills down with you. What's best for you?"
+    }
+  ];
+  
+  const items = tab === "system" ? danCrooksSystem : seedScripts[tab];
 
   return (
     <div>
-      <div className="grid grid-cols-4 gap-2 mb-3">
+      <div className="grid grid-cols-5 gap-2 mb-3">
         {tabs.map(t => (
           <button 
             key={t.key} 
@@ -3399,6 +3429,60 @@ function SuccessTipsPanel() {
               <div>• <strong>Follow up:</strong> 20+ properties</div>
               <div>• <strong>Conversations:</strong> 5+ meaningful chats</div>
               <div>• <strong>Interested leads:</strong> 1+ per day</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Dan Crooks' Expert Tips */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <Target className="w-5 h-5" />
+          Dan Crooks' Expert Tips (700+ Club)
+        </h3>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-xl border border-teal-200 dark:border-teal-800">
+            <div className="font-medium text-teal-800 dark:text-teal-200 mb-2">👁️ The SEE Method</div>
+            <div className="text-sm text-teal-700 dark:text-teal-300 space-y-1">
+              <div>• <strong>S</strong> - Smile</div>
+              <div>• <strong>E</strong> - Eye Contact</div>
+              <div>• <strong>E</strong> - Excitable</div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
+            <div className="font-medium text-orange-800 dark:text-orange-200 mb-2">📋 What You Need</div>
+            <div className="text-sm text-orange-700 dark:text-orange-300 space-y-1">
+              <div>• Laminated Presenter Sheet</div>
+              <div>• Tablet</div>
+              <div>• Flyers and magazines</div>
+              <div>• A tracker</div>
+              <div>• Your diary</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+            <div className="font-medium text-purple-800 dark:text-purple-200 mb-2">📅 Plan Ahead</div>
+            <div className="text-sm text-purple-700 dark:text-purple-300 space-y-1">
+              <div>• 30-40 a week</div>
+              <div>• Revisit 3-4 times</div>
+              <div>• Choose your area</div>
+              <div>• Focus on the right thing - Activity</div>
+              <div>• Be organised</div>
+              <div>• Prepare for the Nos</div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-pink-50 dark:bg-pink-900/20 rounded-xl border border-pink-200 dark:border-pink-800">
+            <div className="font-medium text-pink-800 dark:text-pink-200 mb-2">✍️ Get Ready to Sign</div>
+            <div className="text-sm text-pink-700 dark:text-pink-300 space-y-1">
+              <div>• Ask if you can sit down if they don't offer</div>
+              <div>• Build rapport – Even more important</div>
+              <div>• Do the Bill Review FIRST</div>
+              <div>• Sign them up – then talk partnership</div>
+              <div>• Show the ben video and explain more</div>
             </div>
           </div>
         </div>
