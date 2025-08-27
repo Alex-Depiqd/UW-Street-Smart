@@ -1395,7 +1395,7 @@ export default function App() {
         {/* Sidebar - Hidden on mobile */}
         <div className="hidden lg:block lg:col-span-1 xl:col-span-1 space-y-3">
           <SectionCard title="Navigate" icon={FolderOpen}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-2 xl:gap-3 min-w-0">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-2 xl:gap-3 min-w-0 w-full">
               <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
               <NavButton icon={<Target className="w-4 h-4 flex-shrink-0"/>} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
               <NavButton icon={<MapPin className="w-4 h-4 flex-shrink-0"/>} label="Streets" active={view === "streets"} onClick={() => setView("streets")} />
@@ -1407,7 +1407,7 @@ export default function App() {
           </SectionCard>
 
           <SectionCard title="Quick Drawers" icon={Share2}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 min-w-0">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 min-w-0 w-full">
               <NavButton icon={<MessageSquare className="w-4 h-4 flex-shrink-0"/>} label="Scripts" onClick={() => setShowScripts(true)} />
               <NavButton icon={<Link2 className="w-4 h-4 flex-shrink-0"/>} label="Links" onClick={() => setShowLinks(true)} />
               <NavButton icon={<File className="w-4 h-4 flex-shrink-0"/>} label="Documents" onClick={() => setShowDocuments(true)} />
@@ -1773,7 +1773,7 @@ function NavButton({ icon, label, active, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs border transition-all min-w-0 lg:flex-row lg:gap-2 lg:px-3 xl:px-3 lg:text-sm ${
+      className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs border transition-all min-w-0 w-full lg:flex-row lg:gap-2 lg:px-3 xl:px-3 lg:text-sm ${
         active 
           ? "bg-primary-600 text-white border-primary-600 shadow-md" 
           : "bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800"
