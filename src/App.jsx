@@ -2661,7 +2661,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                   onClick={() => onViewImage(property.photo, "Property Photo")}
                   onTouchStart={(e) => e.stopPropagation()}
                   onTouchEnd={(e) => e.stopPropagation()}
-                  className="w-full block bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-colors overflow-hidden touch-manipulation photo-viewer-button cursor-pointer"
+                  className="w-full block bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-colors overflow-hidden photo-viewer-button cursor-pointer"
                   style={{ touchAction: 'manipulation' }}
                 >
                   <div className="w-full h-48 flex items-center justify-center p-2">
@@ -2680,7 +2680,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
                   onTouchEnd={(e) => e.stopPropagation()}
-                  className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-sm touch-manipulation z-10"
+                  className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-sm z-10"
                   style={{ touchAction: 'manipulation' }}
                 >
                   <X className="w-3 h-3" />
