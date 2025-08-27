@@ -4292,9 +4292,11 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
     if (GOOGLE_PLACES_API_KEY) {
       try {
         console.log('Using Google Places API for search');
+        console.log('API key being used:', GOOGLE_PLACES_API_KEY.substring(0, 20) + '...');
         await searchAddressesWithGoogle(query);
       } catch (error) {
         console.error('Google Places API failed, falling back to demo data:', error);
+        console.error('This usually means API key restrictions are blocking the request');
         // Fallback to demo data if Google API fails
         await searchWithDemoData(query, true);
       }
@@ -4338,14 +4340,17 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
 
       // Get place predictions using the WORKING API
       const predictions = await new Promise((resolve, reject) => {
+        console.log('Making API call with query:', query);
         service.getPlacePredictions({
           input: query,
           componentRestrictions: { country: 'gb' },
           types: ['geocode', 'establishment']
         }, (predictions, status) => {
+          console.log('API response - status:', status, 'predictions:', predictions);
           if (status === window.google.maps.places.PlacesServiceStatus.OK) {
             resolve(predictions || []);
           } else {
+            console.error('Places API failed with status:', status);
             reject(new Error(`Places API error: ${status}`));
           }
         });
