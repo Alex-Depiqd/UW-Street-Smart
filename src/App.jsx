@@ -1528,6 +1528,7 @@ export default function App() {
               onUpdate={setProperty}
               onShowScripts={()=>setShowScripts(true)}
               onShowLinks={()=>setShowLinks(true)}
+              onShowDocuments={()=>setShowDocuments(true)}
               onToggleStatus={togglePropertyStatus}
             />
           )}
@@ -2373,7 +2374,7 @@ function ToggleRow({ label, value, onChange }) {
   );
 }
 
-function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onShowLinks, onToggleStatus }) {
+function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onShowLinks, onShowDocuments, onToggleStatus }) {
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showUtilityLogos, setShowUtilityLogos] = useState(false);
@@ -2470,7 +2471,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
               <Link2 className="w-4 h-4"/> Links
             </button>
             <button 
-              onClick={() => setShowDocuments(true)} 
+              onClick={onShowDocuments} 
               className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               <File className="w-4 h-4"/> Documents
