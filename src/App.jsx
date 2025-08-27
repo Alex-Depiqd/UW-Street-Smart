@@ -3538,7 +3538,7 @@ function SuccessTipsPanel() {
               <div>• Laminated Presenter Sheet</div>
               <div>• Tablet</div>
               <div>• Flyers and magazines</div>
-              <div>• A tracker</div>
+              <div>• A tracker (you're looking at it! 😉)</div>
               <div>• Your diary</div>
             </div>
           </div>
