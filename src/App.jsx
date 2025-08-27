@@ -1389,11 +1389,11 @@ export default function App() {
       </div>
 
       {/* Content Area */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 pb-24 lg:pb-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 pb-28 lg:pb-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
         {/* Sidebar - Hidden on mobile */}
         <div className="hidden lg:block lg:col-span-1 space-y-3">
           <SectionCard title="Navigate" icon={FolderOpen}>
-            <div className="grid grid-cols-2 gap-2 min-w-0">
+            <div className="grid grid-cols-2 gap-3 min-w-0">
               <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
               <NavButton icon={<Target className="w-4 h-4 flex-shrink-0"/>} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
               <NavButton icon={<MapPin className="w-4 h-4 flex-shrink-0"/>} label="Streets" active={view === "streets"} onClick={() => setView("streets")} />
@@ -1748,7 +1748,7 @@ export default function App() {
 
 
       {/* Footer Hint */}
-      <div className="max-w-6xl mx-auto px-4 pb-12 lg:pb-8 text-xs opacity-70">
+      <div className="max-w-6xl mx-auto px-4 pb-16 lg:pb-8 text-xs opacity-70">
         UW Street Smart - NL Activity Tracker v1.0.0 | Built for UW partners making a difference in their communities. | © 2025 Alex Cameron. All rights reserved.
       </div>
     </div>
@@ -2456,28 +2456,28 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
               </span>
             ) : 'Schedule follow‑up'}
           </button>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             <button 
               onClick={onShowScripts} 
-              className="flex-1 px-3 py-2 rounded-xl bg-primary-600 text-white text-sm flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors"
+              className="px-3 py-2 rounded-xl bg-primary-600 text-white text-sm flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors"
             >
               <MessageSquare className="w-4 h-4"/> Scripts
             </button>
             <button 
               onClick={onShowLinks} 
-              className="flex-1 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               <Link2 className="w-4 h-4"/> Links
             </button>
             <button 
               onClick={() => setShowDocuments(true)} 
-              className="flex-1 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               <File className="w-4 h-4"/> Documents
             </button>
             <button 
               onClick={() => setShowUtilityLogos(true)} 
-              className="flex-1 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               <Globe className="w-4 h-4"/> Logos
             </button>
