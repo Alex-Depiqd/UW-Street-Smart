@@ -2315,12 +2315,6 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
             >
               <Link2 className="w-4 h-4"/> Links
             </button>
-            <button 
-              onClick={() => setShowUtilityLogos(true)} 
-              className="flex-1 px-3 py-2 rounded-xl bg-purple-600 text-white text-sm flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors"
-            >
-              <Globe className="w-4 h-4"/> Utilities
-            </button>
           </div>
         </div>
 
@@ -2739,7 +2733,6 @@ function PhotoModal({ open, onClose, onSave }) {
 }
 
 function UtilityLogosModal({ open, onClose }) {
-  console.log('UtilityLogosModal render - open:', open);
   return (
     <Drawer open={open} onClose={onClose} title="Utility Company Logos">
       <div className="space-y-4">
@@ -2849,10 +2842,7 @@ function LinksPanel({ links }) {
       ))}
       
       <button 
-        onClick={() => {
-          console.log('Utility logos button clicked');
-          setShowUtilityLogos(true);
-        }}
+        onClick={() => setShowUtilityLogos(true)}
         className="w-full flex items-center justify-between p-3 rounded-2xl border bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
       >
         <div className="flex items-center gap-2 text-sm">
