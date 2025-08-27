@@ -1702,9 +1702,7 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
               >
                 <MapPin className="w-4 h-4"/> Go to Streets
               </button>
-              <button className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                <Plus className="w-4 h-4"/> Add Street
-              </button>
+
             </div>
           </div>
         ) : (
