@@ -3861,80 +3861,14 @@ function ManageDocumentsModal({ documents, onRemove, onClose }) {
 }
 
 function ImageViewer({ url, title }) {
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    setIsLoading(true);
-    setError(null);
-  }, [url]);
-
-  const handleLoad = () => {
-    setIsLoading(false);
-  };
-
-  const handleError = () => {
-    setIsLoading(false);
-    setError("Failed to load image. Please try opening in a new tab instead.");
-  };
-
   return (
     <div className="h-full flex flex-col">
-      {/* Image Controls */}
-      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
-        <div className="text-sm font-medium">{title}</div>
-        <div className="flex gap-2">
-          <a
-            href={url}
-            target="_blank"
-            rel="noreferrer"
-            className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex items-center gap-2"
-          >
-            <ExternalLink className="w-4 h-4" />
-            Open in new tab
-          </a>
-          <a
-            href={url}
-            download
-            className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-          >
-            <Download className="w-4 h-4" />
-            Download
-          </a>
-        </div>
-      </div>
-
       {/* Image Display */}
       <div className="flex-1 flex items-center justify-center p-4 bg-gray-100 dark:bg-gray-900">
-        {isLoading && (
-          <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
-            Loading image...
-          </div>
-        )}
-        
-        {error && (
-          <div className="text-center text-red-600 dark:text-red-400">
-            <div className="mb-2">{error}</div>
-            <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary-600 dark:text-primary-400 hover:underline"
-            >
-              Try opening in new tab
-            </a>
-          </div>
-        )}
-        
         <img
           src={url}
           alt={title}
-          className={`max-w-full max-h-full object-contain rounded-lg shadow-lg ${
-            isLoading || error ? 'hidden' : ''
-          }`}
-          onLoad={handleLoad}
-          onError={handleError}
+          className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
         />
       </div>
     </div>
