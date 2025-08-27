@@ -271,7 +271,7 @@ export default function App() {
         
         if (droppedToday) letters++;
         if (spokeToday) convos++;
-        if (resultToday && (p.result === "customer_signed" || p.result === "appointment_booked")) interested++;
+        if (resultToday && (p.result === "customer_signed" || p.result === "appointment_booked" || p.result === "interested")) interested++;
         if (followUpToday) followups++;
         
         // Track today's outcomes
@@ -2393,7 +2393,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
           />
           <div className="mt-4">
             <label className="text-xs opacity-70 mb-2 block">Conversation Outcome</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <OutcomeButton 
                 label="Customers Signed" 
                 value="customer_signed" 
@@ -2406,6 +2406,13 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                 value="appointment_booked" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'appointment_booked' })}
+                variant="success"
+              />
+              <OutcomeButton 
+                label="Interested" 
+                value="interested" 
+                current={property.result} 
+                onClick={() => onUpdate({ result: 'interested' })}
                 variant="success"
               />
               <OutcomeButton 
@@ -2579,7 +2586,7 @@ function FollowUpModal({ open, onClose, onSave }) {
     const followUpData = {
       dateTime: `${date}T${time}:00`,
       types: followUpTypes,
-      contactDetails: followUpTypes.message ? { name: contactName, phone: contactPhone } : null
+      contactDetails: (followUpTypes.message || followUpTypes.call) ? { name: contactName, phone: contactPhone } : null
     };
     onSave(followUpData);
   };
@@ -2602,8 +2609,8 @@ function FollowUpModal({ open, onClose, onSave }) {
                   colorScheme: 'light dark'
                 }}
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none dark:bg-white dark:rounded-sm dark:p-0.5">
-                <svg className="w-4 h-4 text-gray-500 dark:text-gray-900" fill="currentColor" viewBox="0 0 20 20">
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
                 </svg>
               </div>
@@ -2621,8 +2628,8 @@ function FollowUpModal({ open, onClose, onSave }) {
                   colorScheme: 'light dark'
                 }}
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none dark:bg-white dark:rounded-sm dark:p-0.5">
-                <svg className="w-4 h-4 text-gray-500 dark:text-gray-900" fill="currentColor" viewBox="0 0 20 20">
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                 </svg>
               </div>
@@ -2664,11 +2671,11 @@ function FollowUpModal({ open, onClose, onSave }) {
           </div>
         </div>
 
-        {/* Contact Details for Message Follow-up */}
-        {followUpTypes.message && (
+        {/* Contact Details for Message or Call Follow-up */}
+        {(followUpTypes.message || followUpTypes.call) && (
           <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
             <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-              Contact Details for Message
+              Contact Details for {followUpTypes.message && followUpTypes.call ? 'Message/Call' : followUpTypes.message ? 'Message' : 'Call'}
             </div>
             <div className="space-y-2">
               <div>
@@ -4112,7 +4119,7 @@ function Reports({ campaigns }) {
       </SectionCard>
       
       <SectionCard title="Conversation Outcomes" icon={MessageSquare}>
-        <div className="grid md:grid-cols-2 gap-3">
+        <div className="grid md:grid-cols-3 gap-3">
           <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
             <div className="text-lg font-semibold text-green-800 dark:text-green-200">{totals.outcomes.customer_signed}</div>
             <div className="text-sm text-green-700 dark:text-green-300">Customers Signed</div>
@@ -4120,6 +4127,10 @@ function Reports({ campaigns }) {
           <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500 dark:border-emerald-500">
             <div className="text-lg font-semibold text-emerald-800 dark:text-emerald-200">{totals.outcomes.appointment_booked}</div>
             <div className="text-sm text-emerald-700 dark:text-emerald-300">Appointment Booked</div>
+          </div>
+          <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
+            <div className="text-lg font-semibold text-green-800 dark:text-green-200">{totals.outcomes.interested}</div>
+            <div className="text-sm text-green-700 dark:text-green-300">Interested</div>
           </div>
           <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-500 dark:border-amber-500">
             <div className="text-lg font-semibold text-amber-800 dark:text-amber-200">{totals.outcomes.no_for_now}</div>
