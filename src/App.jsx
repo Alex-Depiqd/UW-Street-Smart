@@ -2739,6 +2739,7 @@ function PhotoModal({ open, onClose, onSave }) {
 }
 
 function UtilityLogosModal({ open, onClose }) {
+  console.log('UtilityLogosModal render - open:', open);
   return (
     <Drawer open={open} onClose={onClose} title="Utility Company Logos">
       <div className="space-y-4">
@@ -2848,7 +2849,10 @@ function LinksPanel({ links }) {
       ))}
       
       <button 
-        onClick={() => setShowUtilityLogos(true)}
+        onClick={() => {
+          console.log('Utility logos button clicked');
+          setShowUtilityLogos(true);
+        }}
         className="w-full flex items-center justify-between p-3 rounded-2xl border bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
       >
         <div className="flex items-center gap-2 text-sm">
