@@ -4328,37 +4328,32 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
         }
       }
 
-      // Use the stable AutocompleteService (still works, just deprecated)
-      if (!window.google.maps.places) {
-        console.error('Google Maps Places library not available');
-        setSearchResults([]);
-        return;
+      // Use the NEW AutocompleteSuggestion API (recommended by Google)
+      const placesLibrary = await google.maps.importLibrary('places');
+      if (!placesLibrary || !placesLibrary.AutocompleteSessionToken || !placesLibrary.AutocompleteSuggestion) {
+        throw new Error('New Places API not available');
       }
-
-      const { AutocompleteService } = window.google.maps.places;
-      const service = new AutocompleteService();
-
-      // Get place predictions
-      const predictions = await new Promise((resolve, reject) => {
-        service.getPlacePredictions({
-          input: query,
-          componentRestrictions: { country: 'gb' },
-          types: ['geocode', 'establishment']
-        }, (predictions, status) => {
-          if (status === window.google.maps.places.PlacesServiceStatus.OK) {
-            resolve(predictions || []);
-          } else {
-            reject(new Error(`Places API error: ${status}`));
-          }
-        });
+      
+      const { AutocompleteSessionToken, AutocompleteSuggestion } = placesLibrary;
+      const sessionToken = new AutocompleteSessionToken();
+      
+      // Get place predictions using the NEW API
+      const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+        input: query,
+        region: 'gb',
+        includedPrimaryTypes: ['postal_code', 'route', 'street_address', 'locality'],
+        sessionToken,
       });
+      
+      const predictions = response.suggestions || [];
 
       console.log('Google Places results:', predictions);
 
-      // Convert to our format
-      const results = predictions.map(prediction => {
-        const mainText = prediction.structured_formatting?.main_text || prediction.description || '';
-        const secondaryText = prediction.structured_formatting?.secondary_text || '';
+      // Convert NEW API format to our format
+      const results = predictions.map(suggestion => {
+        const p = suggestion.placePrediction;
+        const mainText = p.structuredFormat?.mainText?.text || p.displayName?.text || p.formattedAddress || '';
+        const secondaryText = p.structuredFormat?.secondaryText?.text || '';
         
         return {
           display_name: mainText,
@@ -4368,9 +4363,9 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
             village: '',
             city: ''
           },
-          place_id: prediction.place_id,
+          place_id: p.id || p.placeId || '',
           type: 'google_place',
-          raw: prediction,
+          raw: suggestion,
           street_name: mainText?.split(',')[0]?.trim() || '',
           postcode: mainText?.match(/[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i)?.[0] || '',
           village: mainText?.split(',').slice(1, -1).join(',').trim() || ''
