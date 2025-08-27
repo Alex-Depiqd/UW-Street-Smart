@@ -6,7 +6,7 @@ import {
   Clock, Phone, FileText, FolderOpen, Share2, UploadCloud, 
   Moon, Sun, Settings, Bell, Search, Filter, MoreVertical,
   User, LogOut, HelpCircle, Info, Shield, Database, BarChart3, Target,
-  Upload, Trash2, AlertTriangle, Camera, Globe, File, ExternalLink, Eye
+  Upload, Trash2, AlertTriangle, Camera, Globe, File, ExternalLink, Eye, Maximize
 } from "lucide-react";
 import { config } from './config';
 
@@ -3538,7 +3538,17 @@ function DocumentsPanel({ onViewPdf }) {
       icon: FileText,
       category: "Tools",
       isDefault: true
-    }
+    },
+    {
+      id: "uw-presenter",
+      title: "UW Presenter",
+      description: "Official UW presenter document for doorstep conversations",
+      type: "pdf",
+      url: "/documents/UW_Presenter.pdf",
+      icon: FileText,
+      category: "Tools",
+      isDefault: true
+    },
   ];
 
   // Combine default and custom documents
@@ -3885,6 +3895,7 @@ function PdfViewer({ url, title }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [useFallback, setUseFallback] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   useEffect(() => {
     setIsLoading(true);
@@ -3915,13 +3926,23 @@ function PdfViewer({ url, title }) {
 
   const isHtml = url.endsWith('.html');
   const displayUrl = useFallback ? url.replace('.pdf', '.html') : url;
+  const isPdf = url.endsWith('.pdf');
 
   return (
-    <div className="h-full flex flex-col">
+    <div className={`${isFullScreen ? 'fixed inset-0 z-50 bg-white dark:bg-gray-900' : 'h-full'} flex flex-col`}>
       {/* Document Controls */}
       <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
         <div className="text-sm font-medium">{title}</div>
         <div className="flex gap-2">
+          {isPdf && (
+            <button
+              onClick={() => setIsFullScreen(!isFullScreen)}
+              className="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+            >
+              {isFullScreen ? <X className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+              {isFullScreen ? 'Exit Full Screen' : 'Full Screen'}
+            </button>
+          )}
           <a
             href={displayUrl}
             target="_blank"
@@ -3974,11 +3995,12 @@ function PdfViewer({ url, title }) {
         )}
 
         <iframe
-          src={displayUrl}
+          src={`${displayUrl}${isPdf ? '#toolbar=1&navpanes=1&scrollbar=1&view=FitH' : ''}`}
           className="w-full h-full border-0"
           onLoad={handleLoad}
           onError={handleError}
           title={title}
+          allowFullScreen={true}
         />
       </div>
     </div>
