@@ -2909,6 +2909,12 @@ function ScriptsPanel() {
 
   // Drag and drop functionality
   const handleDragStart = (e, script) => {
+    // Protect Dan's System - no dragging allowed
+    if (tab === "system") {
+      e.preventDefault();
+      return;
+    }
+    
     setDraggedItem(script);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -2921,6 +2927,12 @@ function ScriptsPanel() {
   const handleDrop = (e, targetScript) => {
     e.preventDefault();
     if (!draggedItem || draggedItem.id === targetScript.id) return;
+
+    // Protect Dan's System - no reordering allowed
+    if (tab === "system") {
+      setDraggedItem(null);
+      return;
+    }
 
     const items = [...displayItems];
     const draggedIndex = items.findIndex(item => item.id === draggedItem.id);
@@ -3000,7 +3012,7 @@ function ScriptsPanel() {
                 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
                 : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800'
             } ${
-              isReordering ? 'cursor-move hover:shadow-lg' : ''
+              isReordering && tab !== "system" ? 'cursor-move hover:shadow-lg' : ''
             } ${
               draggedItem?.id === s.id ? 'opacity-50 scale-95' : ''
             }`}
@@ -3071,6 +3083,12 @@ function ScriptsPanel() {
                     <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                       <div className="w-4 h-4 border-2 border-gray-300 dark:border-gray-600 rounded"></div>
                       Drag to reorder
+                    </div>
+                  )}
+                  {isReordering && tab === "system" && (
+                    <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
+                      <div className="w-4 h-4 border-2 border-amber-400 rounded"></div>
+                      Dan's System - Fixed Order
                     </div>
                   )}
                 </div>
