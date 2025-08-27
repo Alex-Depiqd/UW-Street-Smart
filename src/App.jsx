@@ -306,9 +306,36 @@ export default function App() {
                 // Add timestamp for followUpAt changes
                 if (updates.followUpAt) {
                   newUpdates.followUpAt = updates.followUpAt;
-                  // Add follow-up note to property notes
-                  const followUpNote = `📅 Follow-up scheduled for ${updates.followUpAt}`;
+                  
+                  // Build detailed follow-up note
+                  let followUpNote = `📅 Follow-up scheduled for ${updates.followUpAt}`;
+                  
+                  // Add follow-up types if specified
+                  if (updates.followUpTypes) {
+                    const selectedTypes = [];
+                    if (updates.followUpTypes.call) selectedTypes.push('📞 Call');
+                    if (updates.followUpTypes.revisit) selectedTypes.push('🏠 Revisit');
+                    if (updates.followUpTypes.message) selectedTypes.push('💬 Message');
+                    
+                    if (selectedTypes.length > 0) {
+                      followUpNote += `\n📋 Type: ${selectedTypes.join(', ')}`;
+                    }
+                  }
+                  
+                  // Add contact details if provided
+                  if (updates.contactDetails && updates.contactDetails.name && updates.contactDetails.phone) {
+                    followUpNote += `\n👤 Contact: ${updates.contactDetails.name} (${updates.contactDetails.phone})`;
+                  }
+                  
                   newUpdates.notes = p.notes ? `${p.notes}\n\n${followUpNote}` : followUpNote;
+                  
+                  // Store follow-up types and contact details
+                  if (updates.followUpTypes) {
+                    newUpdates.followUpTypes = updates.followUpTypes;
+                  }
+                  if (updates.contactDetails) {
+                    newUpdates.contactDetails = updates.contactDetails;
+                  }
                 }
                 return { ...p, ...newUpdates };
               }
@@ -2274,6 +2301,13 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
               <Chip variant="warning" className="text-xs flex items-center gap-1">
                 <CalendarClock className="w-3 h-3" />
                 Follow-up: {property.followUpAt}
+                {property.followUpTypes && (
+                  <span className="ml-1">
+                    {property.followUpTypes.call && '📞'}
+                    {property.followUpTypes.revisit && '🏠'}
+                    {property.followUpTypes.message && '💬'}
+                  </span>
+                )}
               </Chip>
             )}
             <Chip variant="default" className="text-xs">
@@ -2313,7 +2347,18 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
             }`}
           >
             <CalendarClock className="w-4 h-4"/> 
-            {property.followUpAt ? `Follow-up: ${property.followUpAt}` : 'Schedule follow‑up'}
+            {property.followUpAt ? (
+              <span>
+                Follow-up: {property.followUpAt}
+                {property.followUpTypes && (
+                  <span className="ml-1">
+                    {property.followUpTypes.call && '📞'}
+                    {property.followUpTypes.revisit && '🏠'}
+                    {property.followUpTypes.message && '💬'}
+                  </span>
+                )}
+              </span>
+            ) : 'Schedule follow‑up'}
           </button>
           <div className="flex gap-2">
             <button 
@@ -2437,11 +2482,18 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
         </div>
       </SectionCard>
 
-      <FollowUpModal 
-        open={showFollowUp} 
-        onClose={()=>setShowFollowUp(false)} 
-        onSave={(dt)=>{ onUpdate({ followUpAt: dt }); setShowFollowUp(false); }} 
-      />
+                            <FollowUpModal
+                        open={showFollowUp} 
+                        onClose={()=>setShowFollowUp(false)} 
+                        onSave={(followUpData)=>{ 
+                          onUpdate({ 
+                            followUpAt: followUpData.dateTime,
+                            followUpTypes: followUpData.types,
+                            contactDetails: followUpData.contactDetails
+                          }); 
+                          setShowFollowUp(false); 
+                        }}
+                      />
       
       <PhotoModal 
         open={showPhotoModal} 
@@ -2508,10 +2560,35 @@ function OutcomeButton({ label, value, current, onClick, variant = "default" }) 
 function FollowUpModal({ open, onClose, onSave }) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const [followUpTypes, setFollowUpTypes] = useState({
+    call: false,
+    revisit: false,
+    message: false
+  });
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+
+  const handleTypeChange = (type) => {
+    setFollowUpTypes(prev => ({
+      ...prev,
+      [type]: !prev[type]
+    }));
+  };
+
+  const handleSave = () => {
+    const followUpData = {
+      dateTime: `${date}T${time}:00`,
+      types: followUpTypes,
+      contactDetails: followUpTypes.message ? { name: contactName, phone: contactPhone } : null
+    };
+    onSave(followUpData);
+  };
+
+  const hasSelectedTypes = Object.values(followUpTypes).some(Boolean);
 
   return (
     <Drawer open={open} onClose={onClose} title="Schedule follow‑up">
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs opacity-70">Date</label>
@@ -2552,9 +2629,76 @@ function FollowUpModal({ open, onClose, onSave }) {
             </div>
           </div>
         </div>
+
+        {/* Follow-up Type Checkboxes */}
+        <div>
+          <label className="text-xs opacity-70 mb-2 block">Follow-up Type (Optional)</label>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={followUpTypes.call} 
+                onChange={() => handleTypeChange('call')}
+                className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+              />
+              <span className="text-sm">📞 Call</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={followUpTypes.revisit} 
+                onChange={() => handleTypeChange('revisit')}
+                className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+              />
+              <span className="text-sm">🏠 Revisit</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={followUpTypes.message} 
+                onChange={() => handleTypeChange('message')}
+                className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+              />
+              <span className="text-sm">💬 Message</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Contact Details for Message Follow-up */}
+        {followUpTypes.message && (
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+            <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+              Contact Details for Message
+            </div>
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs opacity-70">Person's Name</label>
+                <input 
+                  type="text" 
+                  value={contactName} 
+                  onChange={e => setContactName(e.target.value)} 
+                  className="w-full mt-1 p-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/20 transition-colors"
+                  placeholder="e.g., John Smith"
+                />
+              </div>
+              <div>
+                <label className="text-xs opacity-70">Phone Number</label>
+                <input 
+                  type="tel" 
+                  value={contactPhone} 
+                  onChange={e => setContactPhone(e.target.value)} 
+                  className="w-full mt-1 p-2 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/20 transition-colors"
+                  placeholder="e.g., 07700 900000"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         <button 
-          onClick={()=>onSave(`${date}T${time}:00`)} 
-          className="w-full px-3 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+          onClick={handleSave} 
+          disabled={!date || !time}
+          className="w-full px-3 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
         >
           Save reminder
         </button>
