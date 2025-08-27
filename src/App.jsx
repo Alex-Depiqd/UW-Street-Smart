@@ -3477,7 +3477,7 @@ function DocumentsPanel({ onViewPdf, onViewImage }) {
       id: "uw-presenter",
       title: "UW Presenter",
       description: "Official UW presenter document for doorstep conversations",
-      type: "pdf",
+      type: "link",
       url: "https://assets.ctfassets.net/ihl5uj459rzx/6UbKQzbKP2sHmMz3fEn648/93f3b2fb3b047f63d0005181c62535dc/UW_Presenter.pdf",
       icon: FileText,
       category: "Tools",
@@ -3612,24 +3612,25 @@ function DocumentsPanel({ onViewPdf, onViewImage }) {
               </div>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  if (doc.type === 'image') {
-                    // For images, use the image viewer
-                    onViewImage(doc.url, doc.title);
-                  } else if (doc.type === 'link') {
-                    // For links, open in new tab
-                    window.open(doc.url, '_blank');
-                  } else {
-                    // For PDFs and HTML, use the PDF viewer
-                    onViewPdf(doc.url, doc.title);
-                  }
-                }}
-                className="p-2 rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
-                title={doc.type === 'image' ? "View Image" : doc.type === 'link' ? "Open Link" : "View Document"}
-              >
-                <Eye className="w-4 h-4" />
-              </button>
+              {/* Only show View Document button for images and PDFs, not for links */}
+              {(doc.type === 'image' || doc.type === 'pdf') && (
+                <button
+                  onClick={() => {
+                    if (doc.type === 'image') {
+                      // For images, use the image viewer
+                      onViewImage(doc.url, doc.title);
+                    } else {
+                      // For PDFs and HTML, use the PDF viewer
+                      onViewPdf(doc.url, doc.title);
+                    }
+                  }}
+                  className="p-2 rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
+                  title={doc.type === 'image' ? "View Image" : "View Document"}
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+              )}
+              {/* Show Open in new tab button for all types except images */}
               {doc.type !== 'image' && (
                 <a
                   href={doc.url}
@@ -3911,35 +3912,35 @@ function PdfViewer({ url, title }) {
 
   return (
     <div className={`${isFullScreen ? 'fixed inset-0 z-50 bg-white dark:bg-gray-900' : 'h-full'} flex flex-col`}>
-      {/* Document Controls */}
-      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
-        <div className="text-sm font-medium">{title}</div>
-        <div className="flex gap-2">
+      {/* Document Controls - Mobile Optimized */}
+      <div className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
+        <div className="text-xs sm:text-sm font-medium truncate flex-1 mr-2">{title}</div>
+        <div className="flex gap-1 sm:gap-2 flex-shrink-0">
           {isPdf && (
             <>
-              <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl px-2">
+              <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl px-1 sm:px-2">
                 <button
                   onClick={() => setZoomLevel(Math.max(50, zoomLevel - 25))}
                   className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
                   title="Zoom Out"
                 >
-                  <Minus className="w-4 h-4" />
+                  <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
                 </button>
-                <span className="text-xs font-medium min-w-[3rem] text-center">{zoomLevel}%</span>
+                <span className="text-xs font-medium min-w-[2rem] sm:min-w-[3rem] text-center">{zoomLevel}%</span>
                 <button
                   onClick={() => setZoomLevel(Math.min(200, zoomLevel + 25))}
                   className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
                   title="Zoom In"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
                 </button>
               </div>
               <button
                 onClick={() => setIsFullScreen(!isFullScreen)}
-                className="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+                className="px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-blue-600 text-white text-xs sm:text-sm hover:bg-blue-700 transition-colors flex items-center gap-1 sm:gap-2"
               >
-                {isFullScreen ? <X className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-                {isFullScreen ? 'Exit Full Screen' : 'Full Screen'}
+                {isFullScreen ? <X className="w-3 h-3 sm:w-4 sm:h-4" /> : <Maximize className="w-3 h-3 sm:w-4 sm:h-4" />}
+                <span className="hidden sm:inline">{isFullScreen ? 'Exit Full Screen' : 'Full Screen'}</span>
               </button>
             </>
           )}
@@ -3947,19 +3948,19 @@ function PdfViewer({ url, title }) {
             href={displayUrl}
             target="_blank"
             rel="noreferrer"
-            className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex items-center gap-2"
+            className="px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-primary-600 text-white text-xs sm:text-sm hover:bg-primary-700 transition-colors flex items-center gap-1 sm:gap-2"
           >
-            <ExternalLink className="w-4 h-4" />
-            Open in new tab
+            <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Open in new tab</span>
           </a>
           {!isHtml && (
             <a
               href={displayUrl}
               download
-              className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+              className="px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1 sm:gap-2"
             >
-              <Download className="w-4 h-4" />
-              Download
+              <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Download</span>
             </a>
           )}
         </div>
