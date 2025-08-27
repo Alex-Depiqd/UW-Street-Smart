@@ -224,7 +224,6 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showSuccessTips, setShowSuccessTips] = useState(false);
-  const [showUtilityLogos, setShowUtilityLogos] = useState(false);
   const [showDocuments, setShowDocuments] = useState(false);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
   const [currentPdfUrl, setCurrentPdfUrl] = useState("");
@@ -1409,7 +1408,6 @@ export default function App() {
               <NavButton icon={<MessageSquare className="w-4 h-4 flex-shrink-0"/>} label="Scripts" onClick={() => setShowScripts(true)} />
               <NavButton icon={<Link2 className="w-4 h-4 flex-shrink-0"/>} label="Links" onClick={() => setShowLinks(true)} />
               <NavButton icon={<File className="w-4 h-4 flex-shrink-0"/>} label="Documents" onClick={() => setShowDocuments(true)} />
-              <NavButton icon={<Globe className="w-4 h-4 flex-shrink-0"/>} label="Logos" onClick={() => setShowUtilityLogos(true)} />
             </div>
             <div className="mt-3 text-xs opacity-70">
               Open while on a property to speed up calls and messages.
@@ -1555,9 +1553,7 @@ export default function App() {
       <Drawer open={showPdfViewer} onClose={()=>setShowPdfViewer(false)} title={currentPdfTitle} size="full">
         <PdfViewer url={currentPdfUrl} title={currentPdfTitle} />
       </Drawer>
-      <Drawer open={showUtilityLogos} onClose={()=>setShowUtilityLogos(false)} title="Utility Company Logos" size="large">
-        <UtilityLogosPanel />
-      </Drawer>
+
       <Drawer open={showSettings} onClose={()=>setShowSettings(false)} title="Settings" size="small">
         <SettingsPanel 
           dark={dark} 
@@ -2377,7 +2373,6 @@ function ToggleRow({ label, value, onChange }) {
 function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onShowLinks, onShowDocuments, onToggleStatus }) {
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
-  const [showUtilityLogos, setShowUtilityLogos] = useState(false);
   const [notes, setNotes] = useState("");
 
   return (
@@ -2457,7 +2452,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
               </span>
             ) : 'Schedule follow‑up'}
           </button>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
             <button 
               onClick={onShowScripts} 
               className="px-3 py-2 rounded-xl bg-primary-600 text-white text-sm flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors"
@@ -2475,12 +2470,6 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
               className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               <File className="w-4 h-4"/> Documents
-            </button>
-            <button 
-              onClick={() => setShowUtilityLogos(true)} 
-              className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            >
-              <Globe className="w-4 h-4"/> Logos
             </button>
           </div>
         </div>
@@ -2611,9 +2600,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
         onSave={(photoData)=>{ onUpdate({ photo: photoData }); setShowPhotoModal(false); }} 
       />
       
-      <Drawer open={showUtilityLogos} onClose={()=>setShowUtilityLogos(false)} title="Utility Company Logos" size="full">
-        <UtilityLogosPanel />
-      </Drawer>
+
     </div>
   );
 }
@@ -3433,66 +3420,7 @@ function ScriptsPanel() {
   );
 }
 
-function UtilityLogosPanel() {
-  const [orientation, setOrientation] = useState('portrait');
 
-  useEffect(() => {
-    const handleOrientationChange = () => {
-      setOrientation(window.innerHeight > window.innerWidth ? 'portrait' : 'landscape');
-    };
-
-    // Set initial orientation
-    handleOrientationChange();
-
-    // Listen for orientation changes
-    window.addEventListener('orientationchange', handleOrientationChange);
-    window.addEventListener('resize', handleOrientationChange);
-
-    return () => {
-      window.removeEventListener('orientationchange', handleOrientationChange);
-      window.removeEventListener('resize', handleOrientationChange);
-    };
-  }, []);
-
-  return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className={`max-w-full max-h-full ${
-          orientation === 'landscape' ? 'w-full h-full' : 'w-full'
-        }`}>
-          <img 
-            src="/utility-logos.png" 
-            alt="UK Utility Company Logos" 
-            className={`rounded-lg transition-all duration-300 ${
-              orientation === 'landscape' 
-                ? 'w-full h-full object-contain' 
-                : 'w-full h-auto max-h-[80vh] object-contain'
-            }`}
-            onError={(e) => {
-              e.target.style.display = 'none';
-              e.target.nextSibling.style.display = 'block';
-            }}
-          />
-          <div className="hidden text-center text-white text-sm py-8">
-            <div className="mb-2">Image not found</div>
-            <div>Please add utility-logos.png to the public folder</div>
-          </div>
-        </div>
-      </div>
-      
-      <div className={`p-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-800 ${
-        orientation === 'landscape' ? 'flex-shrink-0' : ''
-      }`}>
-        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-          Reference logos for major UK utility and telecommunications companies. Useful for identifying current providers during doorstep conversations.
-        </div>
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          <strong>Companies shown:</strong> OVO, ScottishPower, Octopus Energy, EE, EDF, Vodafone, Virgin Media, O2, Sky, Plusnet, BT, British Gas, E.ON
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function LinksPanel({ links }) {
   const linkRows = [
@@ -3619,6 +3547,16 @@ function DocumentsPanel({ onViewPdf }) {
       category: "Tools",
       isDefault: true
     },
+    {
+      id: "utility-logos",
+      title: "Utility Company Logos",
+      description: "Reference logos for major UK utility and telecommunications companies",
+      type: "image",
+      url: "/utility-logos.png",
+      icon: Globe,
+      category: "Tools",
+      isDefault: true
+    },
   ];
 
   // Combine default and custom documents
@@ -3739,9 +3677,17 @@ function DocumentsPanel({ onViewPdf }) {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => onViewPdf(doc.url, doc.title)}
+                onClick={() => {
+                  if (doc.type === 'image') {
+                    // For images, open in new tab
+                    window.open(doc.url, '_blank');
+                  } else {
+                    // For PDFs and HTML, use the PDF viewer
+                    onViewPdf(doc.url, doc.title);
+                  }
+                }}
                 className="p-2 rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
-                title="View Document"
+                title={doc.type === 'image' ? "View Image" : "View Document"}
               >
                 <Eye className="w-4 h-4" />
               </button>
