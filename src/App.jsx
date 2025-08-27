@@ -2807,6 +2807,10 @@ function PhotoModal({ open, onClose, onSave }) {
 
 function ScriptsPanel() {
   const [tab, setTab] = useState("system");
+  const [editingScript, setEditingScript] = useState(null);
+  const [customScripts, setCustomScripts] = useState({});
+  const [showCustomScripts, setShowCustomScripts] = useState(false);
+  
   const tabs = [
     { key: "system", label: "Dan's System" },
     { key: "opener", label: "Openers" },
@@ -2844,6 +2848,62 @@ function ScriptsPanel() {
   
   const items = tab === "system" ? danCrooksSystem : seedScripts[tab];
 
+  // Copy script to clipboard
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // You could add a toast notification here
+      console.log('Script copied to clipboard');
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+    }
+  };
+
+  // Handle edit script
+  const handleEditScript = (script) => {
+    setEditingScript(script);
+  };
+
+  // Handle save edited script
+  const handleSaveScript = (scriptId, newContent) => {
+    setCustomScripts(prev => ({
+      ...prev,
+      [scriptId]: {
+        ...editingScript,
+        content: newContent,
+        isCustom: true
+      }
+    }));
+    setEditingScript(null);
+  };
+
+  // Handle save as new script
+  const handleSaveAsNew = (originalScript) => {
+    const newId = `custom_${Date.now()}`;
+    const newScript = {
+      ...originalScript,
+      id: newId,
+      title: `${originalScript.title} (Custom)`,
+      isCustom: true
+    };
+    
+    setCustomScripts(prev => ({
+      ...prev,
+      [newId]: newScript
+    }));
+  };
+
+  // Get all scripts including custom ones
+  const getAllScripts = () => {
+    const baseScripts = tab === "system" ? danCrooksSystem : seedScripts[tab];
+    const customScriptsForTab = Object.values(customScripts).filter(
+      script => script.category === tab || (tab === "system" && script.category === "system")
+    );
+    return [...baseScripts, ...customScriptsForTab];
+  };
+
+  const displayItems = getAllScripts();
+
   return (
     <div>
       <div className="grid grid-cols-4 gap-2 mb-3">
@@ -2862,25 +2922,73 @@ function ScriptsPanel() {
         ))}
       </div>
       <div className="space-y-3">
-        {items.map(s => (
-          <div key={s.id} className="p-3 rounded-2xl border bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800">
-            <div className="text-sm font-medium mb-1">{s.title}</div>
-            <div className="text-sm opacity-90">{s.content}</div>
-            <div className="mt-2 flex gap-2">
-              <button className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                Copy
-              </button>
-              {tab !== "system" && (
-                <>
-                  <button className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                    Edit
-                  </button>
-                  <button className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                    Save as new
-                  </button>
-                </>
+        {displayItems.map(s => (
+          <div key={s.id} className={`p-3 rounded-2xl border ${
+            s.isCustom 
+              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
+              : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800'
+          }`}>
+            <div className="text-sm font-medium mb-1 flex items-center gap-2">
+              {s.title}
+              {s.isCustom && (
+                <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                  Custom
+                </span>
               )}
             </div>
+            
+            {editingScript?.id === s.id ? (
+              <div className="space-y-2">
+                <textarea
+                  value={editingScript.content}
+                  onChange={(e) => setEditingScript({...editingScript, content: e.target.value})}
+                  className="w-full p-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm resize-none"
+                  rows={4}
+                />
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleSaveScript(s.id, editingScript.content)}
+                    className="px-3 py-1.5 rounded-xl bg-green-600 text-white text-sm hover:bg-green-700 transition-colors"
+                  >
+                    Save
+                  </button>
+                  <button 
+                    onClick={() => setEditingScript(null)}
+                    className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="text-sm opacity-90 whitespace-pre-line">{s.content}</div>
+                <div className="mt-2 flex gap-2">
+                  <button 
+                    onClick={() => copyToClipboard(s.content)}
+                    className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Copy
+                  </button>
+                  {tab !== "system" && (
+                    <>
+                      <button 
+                        onClick={() => handleEditScript(s)}
+                        className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => handleSaveAsNew(s)}
+                        className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        Save as new
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>
