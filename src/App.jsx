@@ -2810,6 +2810,9 @@ function ScriptsPanel() {
   const [editingScript, setEditingScript] = useState(null);
   const [customScripts, setCustomScripts] = useState({});
   const [showCustomScripts, setShowCustomScripts] = useState(false);
+  const [scriptOrder, setScriptOrder] = useState({});
+  const [isReordering, setIsReordering] = useState(false);
+  const [draggedItem, setDraggedItem] = useState(null);
   
   const tabs = [
     { key: "system", label: "Dan's System" },
@@ -2904,30 +2907,108 @@ function ScriptsPanel() {
 
   const displayItems = getAllScripts();
 
+  // Drag and drop functionality
+  const handleDragStart = (e, script) => {
+    setDraggedItem(script);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e, targetScript) => {
+    e.preventDefault();
+    if (!draggedItem || draggedItem.id === targetScript.id) return;
+
+    const items = [...displayItems];
+    const draggedIndex = items.findIndex(item => item.id === draggedItem.id);
+    const targetIndex = items.findIndex(item => item.id === targetScript.id);
+
+    // Remove dragged item and insert at target position
+    items.splice(draggedIndex, 1);
+    items.splice(targetIndex, 0, draggedItem);
+
+    // Save the new order
+    const newOrder = items.map((item, index) => ({ id: item.id, order: index }));
+    setScriptOrder(prev => ({
+      ...prev,
+      [tab]: newOrder
+    }));
+
+    setDraggedItem(null);
+  };
+
+  // Get ordered scripts
+  const getOrderedScripts = () => {
+    const items = getAllScripts();
+    const tabOrder = scriptOrder[tab];
+    
+    if (!tabOrder || tabOrder.length === 0) {
+      return items;
+    }
+
+    // Sort based on saved order
+    return items.sort((a, b) => {
+      const aOrder = tabOrder.find(order => order.id === a.id)?.order ?? 999;
+      const bOrder = tabOrder.find(order => order.id === b.id)?.order ?? 999;
+      return aOrder - bOrder;
+    });
+  };
+
+  const finalDisplayItems = getOrderedScripts();
+
   return (
     <div>
-      <div className="grid grid-cols-4 gap-2 mb-3">
-        {tabs.map(t => (
-          <button 
-            key={t.key} 
-            onClick={()=>setTab(t.key)} 
+      <div className="flex items-center justify-between mb-3">
+        <div className="grid grid-cols-4 gap-2">
+          {tabs.map(t => (
+            <button 
+              key={t.key} 
+              onClick={()=>setTab(t.key)} 
+              className={`px-3 py-2 rounded-xl text-sm transition-colors ${
+                tab===t.key 
+                  ? 'bg-primary-600 text-white' 
+                  : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        
+        {tab !== "system" && (
+          <button
+            onClick={() => setIsReordering(!isReordering)}
             className={`px-3 py-2 rounded-xl text-sm transition-colors ${
-              tab===t.key 
-                ? 'bg-primary-600 text-white' 
+              isReordering 
+                ? 'bg-green-600 text-white' 
                 : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
             }`}
           >
-            {t.label}
+            {isReordering ? 'Done' : 'Reorder'}
           </button>
-        ))}
+        )}
       </div>
       <div className="space-y-3">
-        {displayItems.map(s => (
-          <div key={s.id} className={`p-3 rounded-2xl border ${
-            s.isCustom 
-              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
-              : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800'
-          }`}>
+        {finalDisplayItems.map(s => (
+          <div 
+            key={s.id} 
+            className={`p-3 rounded-2xl border transition-all duration-200 ${
+              s.isCustom 
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
+                : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800'
+            } ${
+              isReordering ? 'cursor-move hover:shadow-lg' : ''
+            } ${
+              draggedItem?.id === s.id ? 'opacity-50 scale-95' : ''
+            }`}
+            draggable={isReordering && tab !== "system"}
+            onDragStart={(e) => isReordering && handleDragStart(e, s)}
+            onDragOver={isReordering ? handleDragOver : undefined}
+            onDrop={isReordering ? (e) => handleDrop(e, s) : undefined}
+          >
             <div className="text-sm font-medium mb-1 flex items-center gap-2">
               {s.title}
               {s.isCustom && (
@@ -2970,7 +3051,7 @@ function ScriptsPanel() {
                   >
                     Copy
                   </button>
-                  {tab !== "system" && (
+                  {tab !== "system" && !isReordering && (
                     <>
                       <button 
                         onClick={() => handleEditScript(s)}
@@ -2985,6 +3066,12 @@ function ScriptsPanel() {
                         Save as new
                       </button>
                     </>
+                  )}
+                  {isReordering && tab !== "system" && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="w-4 h-4 border-2 border-gray-300 dark:border-gray-600 rounded"></div>
+                      Drag to reorder
+                    </div>
                   )}
                 </div>
               </>
