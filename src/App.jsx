@@ -1584,7 +1584,11 @@ export default function App() {
 
       {/* New Street Modal */}
       <Drawer open={showNewStreetModal} onClose={()=>setShowNewStreetModal(false)} title="Add New Street" size="small">
-        <NewStreetForm onSubmit={createNewStreet} onCancel={() => setShowNewStreetModal(false)} />
+        <NewStreetForm 
+          onSubmit={createNewStreet} 
+          onCancel={() => setShowNewStreetModal(false)}
+          apiKey={GOOGLE_PLACES_API_KEY}
+        />
       </Drawer>
 
       {/* Import Streets Modal */}
@@ -4238,22 +4242,7 @@ function ImportStreetsForm({
   );
 }
 
-function NewStreetForm({ onSubmit, onCancel }) {
-  // Google Places API key (reactive to localStorage changes)
-  const [apiKey, setApiKey] = useState(localStorage.getItem('google_places_api_key') || '');
-  
-  // Listen for localStorage changes
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const newApiKey = localStorage.getItem('google_places_api_key') || '';
-      console.log('NewStreetForm: API key changed in localStorage:', newApiKey ? 'found' : 'not found');
-      setApiKey(newApiKey);
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-  
+function NewStreetForm({ onSubmit, onCancel, apiKey }) {
   const GOOGLE_PLACES_API_KEY = apiKey;
   
   const [step, setStep] = useState('options'); // 'options', 'postcode', 'streets', 'properties', 'manual'
@@ -4290,6 +4279,10 @@ function NewStreetForm({ onSubmit, onCancel }) {
   // Smart address search with Google Places API and caching
   const searchPostcodes = async (query) => {
     console.log('searchPostcodes called with:', query);
+    console.log('API key available:', !!GOOGLE_PLACES_API_KEY);
+    console.log('API key length:', GOOGLE_PLACES_API_KEY?.length || 0);
+    console.log('API key start:', GOOGLE_PLACES_API_KEY?.substring(0, 10) || 'none');
+    
     if (!query.trim()) {
       setSearchResults([]);
       return;
@@ -4325,6 +4318,7 @@ function NewStreetForm({ onSubmit, onCancel }) {
       // Load Google Maps SDK if not already loaded
       if (!window.google || !window.google.maps) {
         console.log('Loading Google Maps SDK...');
+        console.log('Using API key:', GOOGLE_PLACES_API_KEY ? 'present' : 'missing');
         try {
           await window.loadGoogleMapsSDK(GOOGLE_PLACES_API_KEY);
           console.log('Google Maps SDK loaded successfully');
