@@ -2447,28 +2447,91 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
         </div>
 
         <div className="mt-3 grid md:grid-cols-2 gap-3">
-          <button 
-            onClick={()=>setShowFollowUp(true)} 
-            className={`w-full px-3 py-2 rounded-xl flex items-center justify-center gap-2 text-sm transition-colors ${
-              property.followUpAt 
-                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700' 
-                : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            <CalendarClock className="w-4 h-4"/> 
-            {property.followUpAt ? (
-              <span>
-                Follow-up: {property.followUpAt}
-                {property.followUpTypes && (
-                  <span className="ml-1">
-                    {property.followUpTypes.call && '📞'}
-                    {property.followUpTypes.revisit && '🏠'}
-                    {property.followUpTypes.message && '💬'}
-                  </span>
-                )}
-              </span>
-            ) : 'Schedule follow‑up'}
-          </button>
+          <div className="relative">
+            <button 
+              onClick={()=>setShowFollowUp(true)} 
+              className={`w-full px-3 py-2 rounded-xl flex items-center justify-center gap-2 text-sm transition-colors ${
+                property.followUpAt 
+                  ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700' 
+                  : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <CalendarClock className="w-4 h-4"/> 
+              {property.followUpAt ? (
+                <span>
+                  Follow-up: {property.followUpAt}
+                  {property.followUpTypes && (
+                    <span className="ml-1">
+                      {property.followUpTypes.call && '📞'}
+                      {property.followUpTypes.revisit && '🏠'}
+                      {property.followUpTypes.message && '💬'}
+                    </span>
+                  )}
+                </span>
+              ) : 'Schedule follow‑up'}
+            </button>
+            
+            {/* Remove Follow-up Button - Only show when follow-up exists */}
+            {property.followUpAt && (
+              <button
+                onClick={() => {
+                  // Remove follow-up data
+                  onUpdate({ 
+                    followUpAt: null,
+                    followUpTypes: null,
+                    contactDetails: null
+                  });
+                  
+                  // Remove follow-up note from notes
+                  if (property.notes) {
+                    // Split notes into lines to process more carefully
+                    const noteLines = property.notes.split('\n');
+                    const filteredLines = [];
+                    let skipNextLines = false;
+                    
+                    for (let i = 0; i < noteLines.length; i++) {
+                      const line = noteLines[i];
+                      
+                      // Check if this line starts a follow-up note
+                      if (line.includes('📅 Follow-up scheduled:')) {
+                        skipNextLines = true;
+                        continue; // Skip this line
+                      }
+                      
+                      // If we're skipping lines, check if we've reached the end of the follow-up note
+                      if (skipNextLines) {
+                        // If we hit an empty line or a line that doesn't start with common follow-up patterns, stop skipping
+                        if (line.trim() === '' || 
+                            (!line.includes('Type:') && 
+                             !line.includes('Contact:') && 
+                             !line.startsWith('📞') && 
+                             !line.startsWith('🏠') && 
+                             !line.startsWith('💬'))) {
+                          skipNextLines = false;
+                          // Don't skip this line - it's the start of a new note
+                        } else {
+                          continue; // Skip this line (part of follow-up note)
+                        }
+                      }
+                      
+                      // Add this line if we're not skipping
+                      if (!skipNextLines) {
+                        filteredLines.push(line);
+                      }
+                    }
+                    
+                    // Join lines back together and clean up extra whitespace
+                    const updatedNotes = filteredLines.join('\n').replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+                    handleNotesChange(updatedNotes);
+                  }
+                }}
+                className="absolute -top-1 -right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-sm"
+                title="Remove follow-up"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
                     <div className="grid grid-cols-3 gap-2">
             <button 
               onClick={onShowScripts} 
@@ -2589,11 +2652,20 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
           {property.photo && (
             <div className="mt-3">
               <div className="relative">
-                <img 
-                  src={property.photo} 
-                  alt="Property photo" 
-                  className="w-full h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-800"
-                />
+                <button
+                  onClick={() => {
+                    setCurrentImageUrl(property.photo);
+                    setCurrentImageTitle("Property Photo");
+                    setShowImageViewer(true);
+                  }}
+                  className="w-full block"
+                >
+                  <img 
+                    src={property.photo} 
+                    alt="Property photo" 
+                    className="w-full h-24 object-cover rounded-xl border border-gray-200 dark:border-gray-800 hover:opacity-90 transition-opacity"
+                  />
+                </button>
                 <button 
                   onClick={() => onUpdate({ photo: null })}
                   className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
@@ -2858,8 +2930,8 @@ function FollowUpModal({ open, onClose, onSave }) {
 
 function PhotoModal({ open, onClose, onSave }) {
   const [capturedImage, setCapturedImage] = useState(null);
-  const [isCapturing, setIsCapturing] = useState(false);
-  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -2872,57 +2944,6 @@ function PhotoModal({ open, onClose, onSave }) {
     }
   };
 
-  const startCamera = async () => {
-    try {
-      setIsCapturing(true);
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment',
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        } 
-      });
-      
-      const video = document.createElement('video');
-      video.srcObject = stream;
-      video.autoplay = true;
-      video.style.width = '100%';
-      video.style.height = '300px';
-      video.style.objectFit = 'cover';
-      
-      const container = document.getElementById('camera-container');
-      if (container) {
-        container.innerHTML = '';
-        container.appendChild(video);
-      }
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      alert('Unable to access camera. Please use the gallery option instead.');
-      setIsCapturing(false);
-    }
-  };
-
-  const capturePhoto = () => {
-    const video = document.querySelector('#camera-container video');
-    if (video) {
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0);
-      
-      const photoData = canvas.toDataURL('image/jpeg', 0.8);
-      setCapturedImage(photoData);
-      
-      // Stop camera stream
-      const stream = video.srcObject;
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      setIsCapturing(false);
-    }
-  };
-
   const handleSave = () => {
     if (capturedImage) {
       onSave(capturedImage);
@@ -2932,19 +2953,13 @@ function PhotoModal({ open, onClose, onSave }) {
 
   const handleClose = () => {
     setCapturedImage(null);
-    setIsCapturing(false);
-    // Stop any active camera stream
-    const video = document.querySelector('#camera-container video');
-    if (video && video.srcObject) {
-      video.srcObject.getTracks().forEach(track => track.stop());
-    }
     onClose();
   };
 
   return (
     <Drawer open={open} onClose={handleClose} title="Add Property Photo">
       <div className="space-y-4">
-        {!capturedImage && !isCapturing && (
+        {!capturedImage && (
           <div className="space-y-3">
             <div className="text-sm text-gray-600 dark:text-gray-400">
               Take a photo or select from your gallery to document this property.
@@ -2952,7 +2967,7 @@ function PhotoModal({ open, onClose, onSave }) {
             
             <div className="grid grid-cols-2 gap-3">
               <button 
-                onClick={startCamera}
+                onClick={() => cameraInputRef.current?.click()}
                 className="px-4 py-3 rounded-xl bg-primary-600 text-white text-sm flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors"
               >
                 <Camera className="w-4 h-4" />
@@ -2960,7 +2975,7 @@ function PhotoModal({ open, onClose, onSave }) {
               </button>
               
               <button 
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => galleryInputRef.current?.click()}
                 className="px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               >
                 <Upload className="w-4 h-4" />
@@ -2968,46 +2983,24 @@ function PhotoModal({ open, onClose, onSave }) {
               </button>
             </div>
             
+            {/* Camera input - opens native camera */}
             <input 
-              ref={fileInputRef}
+              ref={cameraInputRef}
               type="file" 
               accept="image/*" 
               capture="environment"
               onChange={handleFileSelect}
               className="hidden"
             />
-          </div>
-        )}
-
-        {isCapturing && (
-          <div className="space-y-3">
-            <div id="camera-container" className="w-full h-64 bg-black rounded-xl overflow-hidden flex items-center justify-center">
-              <div className="text-white text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-                <div>Starting camera...</div>
-              </div>
-            </div>
             
-            <div className="flex gap-2">
-              <button 
-                onClick={capturePhoto}
-                className="flex-1 px-4 py-3 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
-              >
-                📸 Capture Photo
-              </button>
-              <button 
-                onClick={() => {
-                  setIsCapturing(false);
-                  const video = document.querySelector('#camera-container video');
-                  if (video && video.srcObject) {
-                    video.srcObject.getTracks().forEach(track => track.stop());
-                  }
-                }}
-                className="px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
+            {/* Gallery input - opens camera roll/file picker */}
+            <input 
+              ref={galleryInputRef}
+              type="file" 
+              accept="image/*" 
+              onChange={handleFileSelect}
+              className="hidden"
+            />
           </div>
         )}
 
@@ -3017,7 +3010,7 @@ function PhotoModal({ open, onClose, onSave }) {
               <img 
                 src={capturedImage} 
                 alt="Captured photo" 
-                className="w-full h-64 object-cover rounded-xl border border-gray-200 dark:border-gray-800"
+                className="w-full h-64 object-contain rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800"
               />
               <button 
                 onClick={() => setCapturedImage(null)}
@@ -3893,25 +3886,13 @@ function ManageDocumentsModal({ documents, onRemove, onClose }) {
 function ImageViewer({ url, title, onClose }) {
   return (
     <div className="h-full flex flex-col">
-      {/* Image Display with Close Button */}
-      <div className="flex-1 flex items-center justify-center p-4 bg-gray-100 dark:bg-gray-900 relative">
-        {/* Close Button - Always Visible and Accessible */}
-        <button
-          onClick={onClose}
-          className="absolute top-2 right-2 z-20 p-3 rounded-full bg-black/80 text-white hover:bg-black/90 transition-colors backdrop-blur-sm shadow-lg border border-white/30 min-w-[44px] min-h-[44px] flex items-center justify-center"
-          title="Close"
-        >
-          <X className="w-5 h-5" />
-        </button>
-        
-        {/* Image Container with Safe Area */}
-        <div className="w-full h-full flex items-center justify-center pt-12 pb-4 px-4">
-          <img
-            src={url}
-            alt={title}
-            className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
-          />
-        </div>
+      {/* Image Display */}
+      <div className="flex-1 flex items-center justify-center p-4 bg-gray-100 dark:bg-gray-900">
+        <img
+          src={url}
+          alt={title}
+          className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+        />
       </div>
     </div>
   );
