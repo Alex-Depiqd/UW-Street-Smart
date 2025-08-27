@@ -79,6 +79,20 @@ input, textarea, select {
   -ms-user-select: none;
 }
 
+/* Vertical tablet specific fixes */
+@media (min-width: 1024px) and (max-width: 1279px) and (orientation: portrait) {
+  .nav-button-vertical-tablet {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    font-size: 0.75rem !important;
+  }
+  
+  .nav-grid-vertical-tablet {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+}
+
 html {
   font-size: 16px;
   scroll-behavior: smooth;
