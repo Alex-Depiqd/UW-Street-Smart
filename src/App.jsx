@@ -4344,35 +4344,35 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
         }, 25);
       });
 
-      // Import the new Places library
-      const placesLibrary = await google.maps.importLibrary('places');
-      if (!placesLibrary || !placesLibrary.AutocompleteSessionToken || !placesLibrary.AutocompleteSuggestion) {
+      // Use the legacy AutocompleteService for better compatibility
+      if (!window.google.maps.places) {
         console.error('Google Maps Places library not available, falling back to demo data');
         await searchWithDemoData(query, true);
         return;
       }
       
-      const { AutocompleteSessionToken, AutocompleteSuggestion } = placesLibrary;
+      const { AutocompleteService, PlacesService } = window.google.maps.places;
       
       // Create session token for billing efficiency
-      let sessionToken = new AutocompleteSessionToken();
-
-      // Get place suggestions using new Data API with broader types
+      let sessionToken = new AutocompleteService();
+      
+      // Get place suggestions using legacy API (more stable)
       let suggestions = [];
       try {
-        const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
-          input: query,
-          region: 'gb',
-          includedPrimaryTypes: [
-            'postal_code',
-            'route',                    // streets
-            'street_address',
-            'locality',                 // towns/villages
-            'administrative_area_level_1' // counties
-          ],
-          sessionToken,
+        const response = await new Promise((resolve, reject) => {
+          sessionToken.getPlacePredictions({
+            input: query,
+            componentRestrictions: { country: 'gb' },
+            types: ['geocode', 'establishment']
+          }, (predictions, status) => {
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+              resolve(predictions);
+            } else {
+              reject(new Error(`Places API error: ${status}`));
+            }
+          });
         });
-        suggestions = response.suggestions || [];
+        suggestions = response || [];
       } catch (error) {
         console.error('Error fetching autocomplete suggestions:', error);
         await searchWithDemoData(query, true);
@@ -4388,82 +4388,28 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
         return;
       }
 
-      // Map suggestions to UI display model (no details fetch yet)
-      // ChatGPT's robust solution for handling new Places API field shapes
-      function labelFromPlacePrediction(p) {
-        const main =
-          p.structuredFormat?.mainText?.text ??
-          p.structured_formatting?.main_text?.text ??   // some builds
-          p.structured_formatting?.main_text ??         // old shape
-          p.text?.text ??
-          p.displayName?.text ??
-          p.displayName ??                              // sometimes a string
-          p.formattedAddress ??
-          "";
-
-        const secondary =
-          p.structuredFormat?.secondaryText?.text ??
-          p.structured_formatting?.secondary_text?.text ??
-          p.structured_formatting?.secondary_text ??
-          p.subtitle?.text ??
-          "";
-
-        return [main, secondary].filter(Boolean).join(" • ");
-      }
-
-      function normalizeSuggestion(s) {
-        if (s.placePrediction) {
-          return {
-            kind: "place",
-            label: labelFromPlacePrediction(s.placePrediction),
-            raw: s,
-          };
-        }
-        if (s.queryPrediction) {
-          const q = s.queryPrediction;
-          return {
-            kind: "query",
-            label: q.text?.text ?? q.text ?? "",
-            raw: s,
-          };
-        }
-        return { kind: "unknown", label: "", raw: s };
-      }
-
-      const toUiSuggestion = (s) => {
-        const normalized = normalizeSuggestion(s);
+      // Convert legacy API format to UI display model
+      const results = suggestions.map(prediction => {
+        const mainText = prediction.structured_formatting?.main_text || prediction.description || '';
+        const secondaryText = prediction.structured_formatting?.secondary_text || '';
+        
         return {
-          id: crypto.randomUUID(),
-          kind: normalized.kind,
-          main: normalized.label,
-          secondary: "",
-          raw: normalized.raw
+          display_name: mainText,
+          address: {
+            road: secondaryText || '',
+            postcode: '',
+            village: '',
+            city: ''
+          },
+          place_id: prediction.place_id,
+          type: 'google_place',
+          raw: prediction,
+          // Add parsed components for easier access
+          street_name: mainText?.split(',')[0]?.trim() || '',
+          postcode: mainText?.match(/[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i)?.[0] || '',
+          village: mainText?.split(',').slice(1, -1).join(',').trim() || ''
         };
-      };
-
-      const uiSuggestions = suggestions.map(toUiSuggestion);
-      console.log('UI Suggestions:', uiSuggestions);
-      console.log('First UI suggestion main:', uiSuggestions[0]?.main);
-      console.log('First UI suggestion secondary:', uiSuggestions[0]?.secondary);
-      console.log('First UI suggestion label:', uiSuggestions[0]?.main);
-
-      // Convert to the format expected by the UI
-      const results = uiSuggestions.map(suggestion => ({
-        display_name: suggestion.main || 'Unknown Location',
-        address: {
-          road: suggestion.secondary || '',
-          postcode: '',
-          village: '',
-          city: ''
-        },
-        place_id: suggestion.id,
-        type: suggestion.kind === 'place' ? 'google_place' : 'google_query',
-        raw: suggestion.raw,
-        // Add parsed components for easier access
-        street_name: suggestion.main?.split(',')[0]?.trim() || '',
-        postcode: suggestion.main?.match(/[A-Z]{1,2}[0-9][0-9A-Z]?\s*[0-9][A-Z]{2}/i)?.[0] || '',
-        village: suggestion.main?.split(',').slice(1, -1).join(',').trim() || ''
-      }));
+      });
       console.log('Processed results:', results);
       console.log('First result display_name:', results[0]?.display_name);
       console.log('First result address:', results[0]?.address);
