@@ -1561,8 +1561,8 @@ export default function App() {
       <Drawer open={showPdfViewer} onClose={()=>setShowPdfViewer(false)} title={currentPdfTitle} size="full">
         <PdfViewer url={currentPdfUrl} title={currentPdfTitle} />
       </Drawer>
-      <Drawer open={showImageViewer} onClose={()=>setShowImageViewer(false)} title={currentImageTitle} size="full">
-        <ImageViewer url={currentImageUrl} title={currentImageTitle} />
+      <Drawer open={showImageViewer} onClose={()=>setShowImageViewer(false)} title={currentImageTitle} size="large">
+        <ImageViewer url={currentImageUrl} title={currentImageTitle} onClose={()=>setShowImageViewer(false)} />
       </Drawer>
 
       <Drawer open={showSettings} onClose={()=>setShowSettings(false)} title="Settings" size="small">
@@ -2384,7 +2384,13 @@ function ToggleRow({ label, value, onChange }) {
 function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onShowLinks, onShowDocuments, onToggleStatus }) {
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(property.notes || "");
+
+  // Save notes when they change
+  const handleNotesChange = (newNotes) => {
+    setNotes(newNotes);
+    onUpdate({ notes: newNotes });
+  };
 
   return (
     <div className="space-y-4">
@@ -2486,10 +2492,18 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
         </div>
 
         <div className="mt-4">
-          <label className="text-xs opacity-70">Notes (avoid personal data)</label>
+          <div className="flex items-center justify-between">
+            <label className="text-xs opacity-70">Notes (avoid personal data)</label>
+            {notes !== (property.notes || "") && (
+              <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                <Check className="w-3 h-3" />
+                Saved
+              </span>
+            )}
+          </div>
           <textarea 
             value={notes} 
-            onChange={e=>setNotes(e.target.value)} 
+            onChange={e => handleNotesChange(e.target.value)} 
             className="w-full mt-1 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors" 
             rows={3} 
             placeholder="e.g., 'best after 6pm', 'steep steps'"
@@ -2596,11 +2610,38 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                         open={showFollowUp} 
                         onClose={()=>setShowFollowUp(false)} 
                         onSave={(followUpData)=>{ 
+                          // Create follow-up note
+                          const followUpNote = `📅 Follow-up scheduled: ${new Date(followUpData.dateTime).toLocaleString('en-GB', {
+                            dateStyle: 'short',
+                            timeStyle: 'short'
+                          })}`;
+                          
+                          const typeEmojis = [];
+                          if (followUpData.types.call) typeEmojis.push('📞 Call');
+                          if (followUpData.types.revisit) typeEmojis.push('🏠 Revisit');
+                          if (followUpData.types.message) typeEmojis.push('💬 Message');
+                          
+                          const typeNote = typeEmojis.length > 0 ? `\nType: ${typeEmojis.join(', ')}` : '';
+                          
+                          let contactNote = '';
+                          if (followUpData.contactDetails) {
+                            contactNote = `\nContact: ${followUpData.contactDetails.name}${followUpData.contactDetails.phone ? ` (${followUpData.contactDetails.phone})` : ''}`;
+                          }
+                          
+                          const fullNote = followUpNote + typeNote + contactNote;
+                          
+                          // Add to existing notes
+                          const updatedNotes = notes ? `${notes}\n\n${fullNote}` : fullNote;
+                          
                           onUpdate({ 
                             followUpAt: followUpData.dateTime,
                             followUpTypes: followUpData.types,
-                            contactDetails: followUpData.contactDetails
+                            contactDetails: followUpData.contactDetails,
+                            notes: updatedNotes
                           }); 
+                          
+                          // Update local notes state
+                          setNotes(updatedNotes);
                           setShowFollowUp(false); 
                         }}
                       />
@@ -3849,16 +3890,28 @@ function ManageDocumentsModal({ documents, onRemove, onClose }) {
   );
 }
 
-function ImageViewer({ url, title }) {
+function ImageViewer({ url, title, onClose }) {
   return (
     <div className="h-full flex flex-col">
-      {/* Image Display */}
-      <div className="flex-1 flex items-center justify-center p-4 bg-gray-100 dark:bg-gray-900">
-        <img
-          src={url}
-          alt={title}
-          className="w-full h-full object-contain rounded-lg shadow-lg"
-        />
+      {/* Image Display with Close Button */}
+      <div className="flex-1 flex items-center justify-center p-4 bg-gray-100 dark:bg-gray-900 relative">
+        {/* Close Button - Always Visible and Accessible */}
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 z-20 p-3 rounded-full bg-black/80 text-white hover:bg-black/90 transition-colors backdrop-blur-sm shadow-lg border border-white/30 min-w-[44px] min-h-[44px] flex items-center justify-center"
+          title="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        
+        {/* Image Container with Safe Area */}
+        <div className="w-full h-full flex items-center justify-center pt-12 pb-4 px-4">
+          <img
+            src={url}
+            alt={title}
+            className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+          />
+        </div>
       </div>
     </div>
   );
