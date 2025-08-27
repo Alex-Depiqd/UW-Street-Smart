@@ -1531,6 +1531,11 @@ export default function App() {
               onShowLinks={()=>setShowLinks(true)}
               onShowDocuments={()=>setShowDocuments(true)}
               onToggleStatus={togglePropertyStatus}
+              onViewImage={(url, title) => {
+                setCurrentImageUrl(url);
+                setCurrentImageTitle(title);
+                setShowImageViewer(true);
+              }}
             />
           )}
           {view === "reports" && <Reports campaigns={campaigns} />}
@@ -2381,7 +2386,7 @@ function ToggleRow({ label, value, onChange }) {
   );
 }
 
-function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onShowLinks, onShowDocuments, onToggleStatus }) {
+function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onShowLinks, onShowDocuments, onToggleStatus, onViewImage }) {
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [notes, setNotes] = useState(property.notes || "");
@@ -2653,11 +2658,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
             <div className="mt-3">
               <div className="relative">
                 <button
-                  onClick={() => {
-                    setCurrentImageUrl(property.photo);
-                    setCurrentImageTitle("Property Photo");
-                    setShowImageViewer(true);
-                  }}
+                  onClick={() => onViewImage(property.photo, "Property Photo")}
                   className="w-full block bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-colors overflow-hidden"
                 >
                   <div className="w-full h-48 flex items-center justify-center">
