@@ -6,7 +6,7 @@ import {
   Clock, Phone, FileText, FolderOpen, Share2, UploadCloud, 
   Moon, Sun, Settings, Bell, Search, Filter, MoreVertical,
   User, LogOut, HelpCircle, Info, Shield, Database, BarChart3, Target,
-  Upload, Trash2, AlertTriangle, Camera, Globe, File, ExternalLink, Eye, Maximize, Menu, Edit, Copy
+  Upload, Trash2, AlertTriangle, Camera, Globe, File, ExternalLink, Eye, Maximize, Menu, Edit, Copy, Minus
 } from "lucide-react";
 import { config } from './config';
 
@@ -3023,7 +3023,6 @@ function ScriptsPanel() {
     return saved ? JSON.parse(saved) : {};
   });
   const [isReordering, setIsReordering] = useState(false);
-  const [draggedItem, setDraggedItem] = useState(null);
   
   const tabs = [
     { key: "system", label: "Dan's System" },
@@ -3160,40 +3159,23 @@ function ScriptsPanel() {
 
   const displayItems = getAllScripts();
 
-  // Drag and drop functionality
-  const handleDragStart = (e, script) => {
-    // Protect Dan's System - no dragging allowed
-    if (tab === "system") {
-      e.preventDefault();
-      return;
-    }
-    
-    setDraggedItem(script);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleDrop = (e, targetScript) => {
-    e.preventDefault();
-    if (!draggedItem || draggedItem.id === targetScript.id) return;
-
+  // Move script up or down functionality
+  const moveScript = (scriptId, direction) => {
     // Protect Dan's System - no reordering allowed
-    if (tab === "system") {
-      setDraggedItem(null);
-      return;
+    if (tab === "system") return;
+
+    const items = [...getAllScripts()];
+    const currentIndex = items.findIndex(item => item.id === scriptId);
+    
+    if (direction === 'up' && currentIndex > 0) {
+      // Move up
+      [items[currentIndex], items[currentIndex - 1]] = [items[currentIndex - 1], items[currentIndex]];
+    } else if (direction === 'down' && currentIndex < items.length - 1) {
+      // Move down
+      [items[currentIndex], items[currentIndex + 1]] = [items[currentIndex + 1], items[currentIndex]];
+    } else {
+      return; // Can't move further
     }
-
-    const items = [...displayItems];
-    const draggedIndex = items.findIndex(item => item.id === draggedItem.id);
-    const targetIndex = items.findIndex(item => item.id === targetScript.id);
-
-    // Remove dragged item and insert at target position
-    items.splice(draggedIndex, 1);
-    items.splice(targetIndex, 0, draggedItem);
 
     // Save the new order
     const newOrder = items.map((item, index) => ({ id: item.id, order: index }));
@@ -3202,8 +3184,6 @@ function ScriptsPanel() {
       [tab]: newOrder
     };
     saveScriptOrder(updatedOrder);
-
-    setDraggedItem(null);
   };
 
   // Get ordered scripts
@@ -3270,22 +3250,14 @@ function ScriptsPanel() {
         )}
       </div>
       <div className="space-y-3">
-        {finalDisplayItems.map(s => (
+        {finalDisplayItems.map((s, index) => (
           <div 
             key={s.id} 
             className={`p-3 rounded-2xl border transition-all duration-200 ${
               s.isCustom 
                 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
                 : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800'
-            } ${
-              isReordering && tab !== "system" ? 'cursor-move hover:shadow-lg' : ''
-            } ${
-              draggedItem?.id === s.id ? 'opacity-50 scale-95' : ''
             }`}
-            draggable={isReordering && tab !== "system"}
-            onDragStart={(e) => isReordering && handleDragStart(e, s)}
-            onDragOver={isReordering ? handleDragOver : undefined}
-            onDrop={isReordering ? (e) => handleDrop(e, s) : undefined}
           >
             <div className="text-sm font-medium mb-1 flex items-center gap-2">
               {s.title}
@@ -3351,9 +3323,23 @@ function ScriptsPanel() {
                     </>
                   )}
                   {isReordering && tab !== "system" && (
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <div className="w-4 h-4 border-2 border-gray-300 dark:border-gray-600 rounded"></div>
-                      Drag to reorder
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => moveScript(s.id, 'up')}
+                        disabled={index === 0}
+                        className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Move Up"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => moveScript(s.id, 'down')}
+                        disabled={index === finalDisplayItems.length - 1}
+                        className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Move Down"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
                     </div>
                   )}
                   {isReordering && tab === "system" && (
@@ -3644,15 +3630,17 @@ function DocumentsPanel({ onViewPdf, onViewImage }) {
               >
                 <Eye className="w-4 h-4" />
               </button>
-              <a
-                href={doc.url}
-                target="_blank"
-                rel="noreferrer"
-                className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                title="Open in new tab"
-              >
-                <ExternalLink className="w-4 h-4" />
-              </a>
+              {doc.type !== 'image' && (
+                <a
+                  href={doc.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  title="Open in new tab"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              )}
               {!doc.isDefault && (
                 <button
                   onClick={() => removeDocument(doc.id)}
@@ -3671,7 +3659,7 @@ function DocumentsPanel({ onViewPdf, onViewImage }) {
         <div className="font-medium text-blue-800 dark:text-blue-200 mb-1">💡 How to use:</div>
         <div className="text-blue-700 dark:text-blue-300 space-y-1">
           <div>• <strong>View Document:</strong> Opens document inline for quick reference</div>
-          <div>• <strong>Open in new tab:</strong> Downloads or opens in browser</div>
+          <div>• <strong>Open in new tab:</strong> Available for PDFs and links (not images)</div>
           <div>• <strong>Show to customer:</strong> Use "View Document" to display on your device</div>
           <div>• <strong>Add your own:</strong> Use "Add Document" to include your custom materials</div>
         </div>
@@ -3868,7 +3856,7 @@ function ImageViewer({ url, title }) {
         <img
           src={url}
           alt={title}
-          className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+          className="w-full h-full object-contain rounded-lg shadow-lg"
         />
       </div>
     </div>
@@ -3880,6 +3868,7 @@ function PdfViewer({ url, title }) {
   const [error, setError] = useState(null);
   const [useFallback, setUseFallback] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(100);
 
   useEffect(() => {
     setIsLoading(true);
@@ -3911,6 +3900,14 @@ function PdfViewer({ url, title }) {
   const isHtml = url.endsWith('.html');
   const displayUrl = useFallback ? url.replace('.pdf', '.html') : url;
   const isPdf = url.endsWith('.pdf');
+  
+  // Enhanced PDF parameters for better viewing
+  const getPdfUrl = () => {
+    if (!isPdf) return displayUrl;
+    const baseParams = 'toolbar=1&navpanes=1&scrollbar=1&view=FitH&pagemode=thumbs&statusbar=1';
+    const zoomParam = `&zoom=${zoomLevel}`;
+    return `${displayUrl}#${baseParams}${zoomParam}`;
+  };
 
   return (
     <div className={`${isFullScreen ? 'fixed inset-0 z-50 bg-white dark:bg-gray-900' : 'h-full'} flex flex-col`}>
@@ -3919,13 +3916,32 @@ function PdfViewer({ url, title }) {
         <div className="text-sm font-medium">{title}</div>
         <div className="flex gap-2">
           {isPdf && (
-            <button
-              onClick={() => setIsFullScreen(!isFullScreen)}
-              className="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
-            >
-              {isFullScreen ? <X className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-              {isFullScreen ? 'Exit Full Screen' : 'Full Screen'}
-            </button>
+            <>
+              <div className="flex items-center gap-2 bg-white dark:bg-gray-800 rounded-xl px-2">
+                <button
+                  onClick={() => setZoomLevel(Math.max(50, zoomLevel - 25))}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                  title="Zoom Out"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-medium min-w-[3rem] text-center">{zoomLevel}%</span>
+                <button
+                  onClick={() => setZoomLevel(Math.min(200, zoomLevel + 25))}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                  title="Zoom In"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+              <button
+                onClick={() => setIsFullScreen(!isFullScreen)}
+                className="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                {isFullScreen ? <X className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+                {isFullScreen ? 'Exit Full Screen' : 'Full Screen'}
+              </button>
+            </>
           )}
           <a
             href={displayUrl}
@@ -3979,12 +3995,16 @@ function PdfViewer({ url, title }) {
         )}
 
         <iframe
-          src={`${displayUrl}${isPdf ? '#toolbar=1&navpanes=1&scrollbar=1&view=FitH' : ''}`}
+          src={getPdfUrl()}
           className="w-full h-full border-0"
           onLoad={handleLoad}
           onError={handleError}
           title={title}
           allowFullScreen={true}
+          style={{
+            minHeight: '100%',
+            height: '100%'
+          }}
         />
       </div>
     </div>
