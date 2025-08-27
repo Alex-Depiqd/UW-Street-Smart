@@ -306,6 +306,9 @@ export default function App() {
                 // Add timestamp for followUpAt changes
                 if (updates.followUpAt) {
                   newUpdates.followUpAt = updates.followUpAt;
+                  // Add follow-up note to property notes
+                  const followUpNote = `📅 Follow-up scheduled for ${updates.followUpAt}`;
+                  newUpdates.notes = p.notes ? `${p.notes}\n\n${followUpNote}` : followUpNote;
                 }
                 return { ...p, ...newUpdates };
               }
@@ -2149,7 +2152,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                       <button 
                         key={p.id} 
                         onClick={()=>onOpenProperty(s.id, p.id)} 
-                        className={`px-2 py-1 rounded-lg text-xs transition-colors flex-shrink-0 ${buttonStyle}`}
+                        className={`px-2 py-1 rounded-lg text-xs transition-colors flex-shrink-0 relative ${buttonStyle}`}
                         title={
                           p.result && p.result !== 'none' 
                             ? `Outcome: ${p.result.replace('_', ' ')}` 
@@ -2163,6 +2166,11 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                         }
                       >
                         {p.label}
+                        {p.followUpAt && (
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border border-white dark:border-gray-900 flex items-center justify-center">
+                            <CalendarClock className="w-2 h-2 text-white" />
+                          </div>
+                        )}
                       </button>
                     );
                   })}
@@ -2261,9 +2269,17 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
         title={`${property.label} · ${street.name}`} 
         icon={Home} 
         actions={
-          <Chip variant="default" className="text-xs">
-            {street.postcode}
-          </Chip>
+          <div className="flex items-center gap-2">
+            {property.followUpAt && (
+              <Chip variant="warning" className="text-xs flex items-center gap-1">
+                <CalendarClock className="w-3 h-3" />
+                Follow-up: {property.followUpAt}
+              </Chip>
+            )}
+            <Chip variant="default" className="text-xs">
+              {street.postcode}
+            </Chip>
+          </div>
         }
       >
         <div className="grid md:grid-cols-3 gap-3">
@@ -2290,9 +2306,14 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
         <div className="mt-3 grid md:grid-cols-2 gap-3">
           <button 
             onClick={()=>setShowFollowUp(true)} 
-            className="w-full px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center gap-2 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            className={`w-full px-3 py-2 rounded-xl flex items-center justify-center gap-2 text-sm transition-colors ${
+              property.followUpAt 
+                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700' 
+                : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
           >
-            <CalendarClock className="w-4 h-4"/> Schedule follow‑up
+            <CalendarClock className="w-4 h-4"/> 
+            {property.followUpAt ? `Follow-up: ${property.followUpAt}` : 'Schedule follow‑up'}
           </button>
           <div className="flex gap-2">
             <button 
@@ -3979,6 +4000,42 @@ function Reports({ campaigns }) {
 
         </div>
       </SectionCard>
+      
+      {/* Follow-ups Section */}
+      {totals.followups > 0 && (
+        <SectionCard title="Scheduled Follow-ups" icon={CalendarClock}>
+          <div className="space-y-3">
+            {filteredAndSortedData
+              .filter(r => r.followUpAt)
+              .slice(0, 10) // Show first 10 follow-ups
+              .map((r, index) => (
+                <div key={`${r.campaign}-${r.street}-${r.property}-${index}`} className="flex items-center justify-between p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-800 flex items-center justify-center">
+                      <CalendarClock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                      <div className="font-medium text-sm">{r.property}, {r.street}</div>
+                      <div className="text-xs text-amber-700 dark:text-amber-300">{r.campaign}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-medium text-sm text-amber-800 dark:text-amber-200">{r.followUpAt}</div>
+                    <div className="text-xs text-amber-600 dark:text-amber-400">
+                      {r.spoke ? 'Spoke' : r.knocked ? 'Knocked' : r.dropped ? 'Dropped' : 'No activity'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            {filteredAndSortedData.filter(r => r.followUpAt).length > 10 && (
+              <div className="text-center text-sm text-amber-600 dark:text-amber-400">
+                +{filteredAndSortedData.filter(r => r.followUpAt).length - 10} more follow-ups scheduled
+              </div>
+            )}
+          </div>
+        </SectionCard>
+      )}
+      
       <SectionCard title="Activity log" icon={ListChecks}>
         {/* Search and Filter Controls */}
         <div className="mb-4 space-y-3">
@@ -5764,7 +5821,15 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
                 </div>
               ) : (
                 <>
-                  <span className="text-sm">{property.label}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">{property.label}</span>
+                    {property.followUpAt && (
+                      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-xs">
+                        <CalendarClock className="w-3 h-3" />
+                        {property.followUpAt}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1">
                     <button 
                       onClick={() => {
