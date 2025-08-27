@@ -160,6 +160,7 @@ const Drawer = ({ open, onClose, title, children, size = "default" }) => {
     small: "max-h-[60vh]",
     default: "max-h-[80vh]",
     large: "max-h-[90vh]",
+    full: "h-screen",
   };
   
   return (
@@ -1659,7 +1660,7 @@ function NavButton({ icon, label, active, onClick }) {
       }`}
     >
       <span className="flex-shrink-0">{icon}</span>
-      <span className="truncate text-center leading-tight">{label}</span>
+      <span className="text-center leading-tight break-words">{label}</span>
     </button>
   );
 }
@@ -2259,6 +2260,7 @@ function ToggleRow({ label, value, onChange }) {
 function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onShowLinks, onToggleStatus }) {
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [showUtilityLogos, setShowUtilityLogos] = useState(false);
   const [notes, setNotes] = useState("");
 
   return (
@@ -2319,6 +2321,12 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
               className="flex-1 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               <Link2 className="w-4 h-4"/> Links
+            </button>
+            <button 
+              onClick={() => setShowUtilityLogos(true)} 
+              className="flex-1 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              <Globe className="w-4 h-4"/> Logos
             </button>
           </div>
         </div>
@@ -2434,6 +2442,10 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
         onClose={()=>setShowPhotoModal(false)} 
         onSave={(photoData)=>{ onUpdate({ photo: photoData }); setShowPhotoModal(false); }} 
       />
+      
+      <Drawer open={showUtilityLogos} onClose={()=>setShowUtilityLogos(false)} title="Utility Company Logos" size="full">
+        <UtilityLogosPanel />
+      </Drawer>
     </div>
   );
 }
@@ -2791,29 +2803,32 @@ function ScriptsPanel() {
 
 function UtilityLogosPanel() {
   return (
-    <div className="space-y-4">
-      <div className="text-sm text-gray-600 dark:text-gray-400">
-        Reference logos for major UK utility and telecommunications companies. Useful for identifying current providers during doorstep conversations.
-      </div>
-      
-      <div className="bg-purple-900 rounded-xl p-4">
-        <img 
-          src="/utility-logos.png" 
-          alt="UK Utility Company Logos" 
-          className="w-full h-auto rounded-lg"
-          onError={(e) => {
-            e.target.style.display = 'none';
-            e.target.nextSibling.style.display = 'block';
-          }}
-        />
-        <div className="hidden text-center text-white text-sm py-8">
-          <div className="mb-2">Image not found</div>
-          <div>Please add utility-logos.png to the public folder</div>
+    <div className="h-full flex flex-col">
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="max-w-full max-h-full">
+          <img 
+            src="/utility-logos.png" 
+            alt="UK Utility Company Logos" 
+            className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'block';
+            }}
+          />
+          <div className="hidden text-center text-white text-sm py-8">
+            <div className="mb-2">Image not found</div>
+            <div>Please add utility-logos.png to the public folder</div>
+          </div>
         </div>
       </div>
       
-      <div className="text-xs text-gray-500 dark:text-gray-400">
-        <strong>Companies shown:</strong> OVO, ScottishPower, Octopus Energy, EE, EDF, Vodafone, Virgin Media, O2, Sky, Plusnet, BT, British Gas, E.ON
+      <div className="p-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-800">
+        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+          Reference logos for major UK utility and telecommunications companies. Useful for identifying current providers during doorstep conversations.
+        </div>
+        <div className="text-xs text-gray-500 dark:text-gray-400">
+          <strong>Companies shown:</strong> OVO, ScottishPower, Octopus Energy, EE, EDF, Vodafone, Virgin Media, O2, Sky, Plusnet, BT, British Gas, E.ON
+        </div>
       </div>
     </div>
   );
