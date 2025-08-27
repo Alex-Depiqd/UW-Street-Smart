@@ -2315,12 +2315,6 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
             >
               <Link2 className="w-4 h-4"/> Links
             </button>
-            <button 
-              onClick={() => setShowUtilityLogos(true)} 
-              className="flex-1 px-3 py-2 rounded-xl bg-purple-600 text-white text-sm flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors"
-            >
-              <Globe className="w-4 h-4"/> Utilities
-            </button>
           </div>
         </div>
 
