@@ -2657,21 +2657,31 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
           {property.photo && (
             <div className="mt-3">
               <div className="relative">
-                <button
+                <div
                   onClick={() => onViewImage(property.photo, "Property Photo")}
-                  className="w-full block bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-colors overflow-hidden"
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => e.stopPropagation()}
+                  className="w-full block bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-colors overflow-hidden touch-manipulation photo-viewer-button cursor-pointer"
+                  style={{ touchAction: 'manipulation' }}
                 >
-                  <div className="w-full h-48 flex items-center justify-center">
+                  <div className="w-full h-48 flex items-center justify-center p-2">
                     <img 
                       src={property.photo} 
                       alt="Property photo" 
-                      className="max-w-full max-h-full object-contain"
+                      className="max-w-full max-h-full object-contain pointer-events-none"
+                      draggable="false"
                     />
                   </div>
-                </button>
+                </div>
                 <button 
-                  onClick={() => onUpdate({ photo: null })}
-                  className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdate({ photo: null });
+                  }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => e.stopPropagation()}
+                  className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-sm touch-manipulation z-10"
+                  style={{ touchAction: 'manipulation' }}
                 >
                   <X className="w-3 h-3" />
                 </button>
