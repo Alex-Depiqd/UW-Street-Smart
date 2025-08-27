@@ -2886,14 +2886,40 @@ function ScriptsPanel() {
 }
 
 function UtilityLogosPanel() {
+  const [orientation, setOrientation] = useState('portrait');
+
+  useEffect(() => {
+    const handleOrientationChange = () => {
+      setOrientation(window.innerHeight > window.innerWidth ? 'portrait' : 'landscape');
+    };
+
+    // Set initial orientation
+    handleOrientationChange();
+
+    // Listen for orientation changes
+    window.addEventListener('orientationchange', handleOrientationChange);
+    window.addEventListener('resize', handleOrientationChange);
+
+    return () => {
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      window.removeEventListener('resize', handleOrientationChange);
+    };
+  }, []);
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 flex items-center justify-center p-4">
-        <div className="max-w-full max-h-full">
+        <div className={`max-w-full max-h-full ${
+          orientation === 'landscape' ? 'w-full h-full' : 'w-full'
+        }`}>
           <img 
             src="/utility-logos.png" 
             alt="UK Utility Company Logos" 
-            className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
+            className={`rounded-lg transition-all duration-300 ${
+              orientation === 'landscape' 
+                ? 'w-full h-full object-contain' 
+                : 'w-full h-auto max-h-[80vh] object-contain'
+            }`}
             onError={(e) => {
               e.target.style.display = 'none';
               e.target.nextSibling.style.display = 'block';
@@ -2906,7 +2932,9 @@ function UtilityLogosPanel() {
         </div>
       </div>
       
-      <div className="p-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-800">
+      <div className={`p-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-800 ${
+        orientation === 'landscape' ? 'flex-shrink-0' : ''
+      }`}>
         <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
           Reference logos for major UK utility and telecommunications companies. Useful for identifying current providers during doorstep conversations.
         </div>
