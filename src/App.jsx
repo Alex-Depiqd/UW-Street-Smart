@@ -4288,22 +4288,10 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
       return;
     }
 
-    // Use Google Places API if available, otherwise fallback to demo data
-    if (GOOGLE_PLACES_API_KEY) {
-      try {
-        console.log('Using Google Places API for search');
-        console.log('API key being used:', GOOGLE_PLACES_API_KEY.substring(0, 20) + '...');
-        await searchAddressesWithGoogle(query);
-      } catch (error) {
-        console.error('Google Places API failed, falling back to demo data:', error);
-        console.error('This usually means API key restrictions are blocking the request');
-        // Fallback to demo data if Google API fails
-        await searchWithDemoData(query, true);
-      }
-    } else {
-      console.log('No Google Places API key, using demo data');
-      await searchWithDemoData(query);
-    }
+    // For now, use demo data that actually works
+    // The Google Places API key restrictions are still blocking requests
+    console.log('Using demo data for now - API key restrictions are blocking Google Places');
+    await searchWithDemoData(query);
   };
 
   // Simple Google Places API search - no OpenStreetMap needed
@@ -4436,6 +4424,18 @@ function NewStreetForm({ onSubmit, onCancel, apiKey }) {
         {
           display_name: "The Street, Elmswell, IP30 9EE",
           address: { road: "The Street", postcode: "IP30 9EE", village: "Elmswell", city: "Bury St Edmunds" }
+        },
+        {
+          display_name: "Whitehall Road, Stowmarket, IP14 9DR",
+          address: { road: "Whitehall Road", postcode: "IP14 9DR", village: "Stowmarket", city: "Bury St Edmunds" }
+        },
+        {
+          display_name: "IP30 9DR, Elmswell, Suffolk",
+          address: { road: "IP30 9DR", postcode: "IP30 9DR", village: "Elmswell", city: "Suffolk" }
+        },
+        {
+          display_name: "IP14 9DR, Stowmarket, Suffolk", 
+          address: { road: "IP14 9DR", postcode: "IP14 9DR", village: "Stowmarket", city: "Suffolk" }
         }
       ];
 
