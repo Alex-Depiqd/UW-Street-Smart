@@ -2812,7 +2812,6 @@ function ScriptsPanel() {
     { key: "opener", label: "Openers" },
     { key: "objection", label: "Objections" },
     { key: "closer", label: "Closers" },
-    { key: "sms", label: "SMS/WhatsApp" },
   ];
   
   const danCrooksSystem = [
@@ -2847,7 +2846,7 @@ function ScriptsPanel() {
 
   return (
     <div>
-      <div className="grid grid-cols-5 gap-2 mb-3">
+      <div className="grid grid-cols-4 gap-2 mb-3">
         {tabs.map(t => (
           <button 
             key={t.key} 
