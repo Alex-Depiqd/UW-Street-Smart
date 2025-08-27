@@ -91,6 +91,12 @@ input, textarea, select {
     grid-template-columns: 1fr !important;
     gap: 0.5rem !important;
   }
+  
+  .success-tips-vertical-tablet .section-card-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.5rem !important;
+  }
 }
 
 html {

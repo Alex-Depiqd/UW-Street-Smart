@@ -1420,6 +1420,7 @@ export default function App() {
           <SectionCard 
             title="Success Tips" 
             icon={Target}
+            className="success-tips-vertical-tablet"
             actions={
               <button 
                 onClick={() => setShowSuccessTips(true)}
