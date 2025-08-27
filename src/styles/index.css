@@ -92,7 +92,7 @@ input, textarea, select {
     gap: 0.5rem !important;
   }
   
-  .success-tips-vertical-tablet .section-card-header {
+  .success-tips-vertical-tablet > div:first-child {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 0.5rem !important;
