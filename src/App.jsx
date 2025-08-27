@@ -2830,14 +2830,7 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <h4 className="font-medium">API Configuration</h4>
-        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Address search functionality has been disabled. Manual entry only.
-          </div>
-        </div>
-      </div>
+
       
       <div className="space-y-2">
         <h4 className="font-medium">Appearance</h4>
