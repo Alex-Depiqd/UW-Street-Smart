@@ -2414,6 +2414,11 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [notes, setNotes] = useState(property.notes || "");
 
+  // Sync notes state when property changes
+  useEffect(() => {
+    setNotes(property.notes || "");
+  }, [property.notes]);
+
   // Save notes when they change
   const handleNotesChange = (newNotes) => {
     setNotes(newNotes);
@@ -2557,6 +2562,9 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                     const updatedNotes = filteredLines.join('\n').replace(/\n\s*\n\s*\n/g, '\n\n').trim();
                     console.log('Updated notes:', updatedNotes);
                     onUpdate({ notes: updatedNotes });
+                    // Update local notes state to reflect the change in the UI
+                    setNotes(updatedNotes);
+                    console.log('Local notes state updated to:', updatedNotes);
                   }
                 }}
                 className="absolute -top-1 -right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-sm"
