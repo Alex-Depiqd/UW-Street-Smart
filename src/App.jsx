@@ -2521,8 +2521,9 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                     for (let i = 0; i < noteLines.length; i++) {
                       const line = noteLines[i];
                       
-                      // Check if this line starts a follow-up note
-                      if (line.includes('📅 Follow-up scheduled:') || line.includes('📅 Follow-up scheduled for')) {
+                      // Check if this line starts a follow-up note (with or without emoji)
+                      if (line.includes('Follow-up scheduled:') || line.includes('Follow-up scheduled for') || 
+                          line.includes('📅 Follow-up scheduled:') || line.includes('📅 Follow-up scheduled for')) {
                         console.log('Found follow-up note start at line', i, ':', line);
                         skipNextLines = true;
                         continue; // Skip this line
@@ -2747,6 +2748,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                           }
                           
                           const fullNote = followUpNote + typeNote + contactNote;
+                          console.log('Created follow-up note:', fullNote);
                           
                           // Handle notes - if editing existing follow-up, replace the old note; otherwise add new note
                           let updatedNotes;
@@ -2760,8 +2762,9 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                               for (let i = 0; i < noteLines.length; i++) {
                                 const line = noteLines[i];
                                 
-                                // Check if this line starts a follow-up note
-                                if (line.includes('📅 Follow-up scheduled:') || line.includes('📅 Follow-up scheduled for')) {
+                                // Check if this line starts a follow-up note (with or without emoji)
+                                if (line.includes('Follow-up scheduled:') || line.includes('Follow-up scheduled for') || 
+                                    line.includes('📅 Follow-up scheduled:') || line.includes('📅 Follow-up scheduled for')) {
                                   skipNextLines = true;
                                   continue; // Skip this line
                                 }
