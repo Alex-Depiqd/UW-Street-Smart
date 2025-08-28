@@ -2183,40 +2183,41 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
         title={`Streets in ${campaign.name}`} 
         icon={MapPin} 
         actions={
-          <div className="flex flex-wrap gap-2 min-w-0 items-center">
-            <button 
-              onClick={onAddStreet}
-              className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex-shrink-0"
-            >
-              <Plus className="w-4 h-4"/> Add street
-            </button>
-            
-            {/* Status Guide */}
-            <div className="flex items-center gap-3 text-xs opacity-70 border-l border-gray-200 dark:border-gray-700 pl-3">
+          <button 
+            onClick={onAddStreet}
+            className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex-shrink-0"
+          >
+            <Plus className="w-4 h-4"/> Add street
+          </button>
+        }
+      >
+        
+        {/* Status Guide - Full Screen Only */}
+        <div className="hidden lg:block mb-4">
+          <div className="flex items-center gap-4 text-xs opacity-70">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">🎯 Outcomes:</span>
               <div className="flex items-center gap-1">
-                <span className="font-medium">🎯 Outcomes:</span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3 h-3 rounded border-2 border-green-500 bg-green-50"></span>
-                  <span className="w-3 h-3 rounded border-2 border-emerald-500 bg-emerald-50"></span>
-                  <span className="w-3 h-3 rounded border-2 border-amber-500 bg-amber-50"></span>
-                  <span className="w-3 h-3 rounded border-2 border-sky-500 bg-sky-50"></span>
-                  <span className="w-3 h-3 rounded border-2 border-red-500 bg-red-50"></span>
-                  <span className="w-3 h-3 rounded border-2 border-slate-500 bg-slate-50"></span>
-                  <span className="w-3 h-3 rounded border-2 border-purple-500 bg-purple-50"></span>
-                </span>
+                <span className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700" title="Customer Signed">CS</span>
+                <span className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700" title="Appointment Booked">AB</span>
+                <span className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700" title="No for Now">NN</span>
+                <span className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700" title="Already with UW">UW</span>
+                <span className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700" title="Not Interested">NI</span>
+                <span className="w-4 h-4 rounded border-2 border-slate-500 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-700" title="No Answer">NA</span>
+                <span className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700" title="No Cold Callers">NC</span>
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">📊 Progress:</span>
               <div className="flex items-center gap-1">
-                <span className="font-medium">📊 Progress:</span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3 h-3 rounded border border-orange-300 bg-orange-50/50"></span>
-                  <span className="w-3 h-3 rounded border border-indigo-300 bg-indigo-50/50"></span>
-                  <span className="w-3 h-3 rounded border border-teal-300 bg-teal-50/50"></span>
-                </span>
+                <span className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700" title="Dropped">D</span>
+                <span className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700" title="Knocked">K</span>
+                <span className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700" title="Spoke">S</span>
               </div>
             </div>
           </div>
-        }
-      >
+        </div>
+        
         <SectionCard 
           title="Search & Filter" 
           icon={Search}
