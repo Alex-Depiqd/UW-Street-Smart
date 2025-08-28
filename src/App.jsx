@@ -4826,6 +4826,10 @@ function Reports({ campaigns }) {
       spoke: p.spoke, 
       result: p.result || 'none', 
       followUpAt: p.followUpAt || '',
+      followUpTypes: p.followUpTypes || {},
+      campaignId: c.id,
+      streetId: s.id,
+      propertyId: p.id,
       droppedAt: p.droppedAt || '',
       knockedAt: p.knockedAt || '',
       spokeAt: p.spokeAt || '',
@@ -5031,7 +5035,11 @@ function Reports({ campaigns }) {
           <SectionCard title="Follow-ups Due Today" icon={CalendarClock}>
             <div className="space-y-3">
               {followUpsDueToday.map((r, index) => (
-                <div key={`${r.campaign}-${r.street}-${r.property}-${index}`} className="flex items-center justify-between p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                <div 
+                  key={`${r.campaign}-${r.street}-${r.property}-${index}`} 
+                  className="flex items-center justify-between p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                  onClick={() => { setActiveCampaignId(r.campaignId); setActiveStreetId(r.streetId); setActivePropertyId(r.propertyId); setView('property'); }}
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-800 flex items-center justify-center">
                       <CalendarClock className="w-4 h-4 text-red-600 dark:text-red-400" />
@@ -5048,8 +5056,11 @@ function Reports({ campaigns }) {
                         minute: '2-digit' 
                       })}
                     </div>
-                    <div className="text-xs text-red-600 dark:text-red-400">
-                      {r.spoke ? 'Spoke' : r.knocked ? 'Knocked' : r.dropped ? 'Dropped' : 'No activity'}
+                    <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                      {r.followUpTypes?.call && <span title="Call">📞</span>}
+                      {r.followUpTypes?.revisit && <span title="Revisit">🏠</span>}
+                      {r.followUpTypes?.message && <span title="Message">💬</span>}
+                      {!r.followUpTypes || (!r.followUpTypes.call && !r.followUpTypes.revisit && !r.followUpTypes.message) ? 'Follow-up' : ''}
                     </div>
                   </div>
                 </div>
@@ -5067,7 +5078,11 @@ function Reports({ campaigns }) {
               .filter(r => r.followUpAt)
               .slice(0, 10) // Show first 10 follow-ups
               .map((r, index) => (
-                <div key={`${r.campaign}-${r.street}-${r.property}-${index}`} className="flex items-center justify-between p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                <div 
+                  key={`${r.campaign}-${r.street}-${r.property}-${index}`} 
+                  className="flex items-center justify-between p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                  onClick={() => { setActiveCampaignId(r.campaignId); setActiveStreetId(r.streetId); setActivePropertyId(r.propertyId); setView('property'); }}
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-800 flex items-center justify-center">
                       <CalendarClock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -5079,8 +5094,11 @@ function Reports({ campaigns }) {
                   </div>
                   <div className="text-right">
                     <div className="font-medium text-sm text-amber-800 dark:text-amber-200">{r.followUpAt}</div>
-                    <div className="text-xs text-amber-600 dark:text-amber-400">
-                      {r.spoke ? 'Spoke' : r.knocked ? 'Knocked' : r.dropped ? 'Dropped' : 'No activity'}
+                    <div className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      {r.followUpTypes?.call && <span title="Call">📞</span>}
+                      {r.followUpTypes?.revisit && <span title="Revisit">🏠</span>}
+                      {r.followUpTypes?.message && <span title="Message">💬</span>}
+                      {!r.followUpTypes || (!r.followUpTypes.call && !r.followUpTypes.revisit && !r.followUpTypes.message) ? 'Follow-up' : ''}
                     </div>
                   </div>
                 </div>
