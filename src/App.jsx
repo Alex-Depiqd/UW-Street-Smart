@@ -271,7 +271,7 @@ export default function App() {
 
   // Derived stats for dashboard
   const stats = useMemo(() => {
-    let letters = 0, convos = 0, interested = 0, followups = 0;
+    let letters = 0, knocked = 0, convos = 0, interested = 0, followups = 0;
     let outcomes = {
       interested: 0,
       customer_signed: 0,
@@ -287,6 +287,7 @@ export default function App() {
       s.properties.forEach(p => {
         // Check if activity was logged today
         const droppedToday = p.dropped && p.droppedAt === today;
+        const knockedToday = p.knocked && p.knockedAt === today;
         const spokeToday = p.spoke && p.spokeAt === today;
         const resultToday = p.result && p.resultAt === today;
         
@@ -294,6 +295,7 @@ export default function App() {
         const followUpDueToday = p.followUpAt && p.followUpAt.split('T')[0] === today;
         
         if (droppedToday) letters++;
+        if (knockedToday) knocked++;
         if (spokeToday) convos++;
         if (resultToday && (p.result === "customer_signed" || p.result === "appointment_booked" || p.result === "interested")) interested++;
         if (followUpDueToday) followups++;
@@ -304,7 +306,7 @@ export default function App() {
         }
       });
     });
-    return { letters, convos, interested, followups, outcomes };
+    return { letters, knocked, convos, interested, followups, outcomes };
   }, [activeCampaign]);
 
   const setProperty = (updates) => {
@@ -1388,6 +1390,10 @@ export default function App() {
                     <span className="text-green-600 font-medium">{stats.letters}</span>
                   </div>
                   <div className="flex items-center gap-1">
+                    <Check className="w-3 h-3 text-indigo-600" />
+                    <span className="text-indigo-600 font-medium">{stats.knocked}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
                     <MessageSquare className="w-3 h-3 text-blue-600" />
                     <span className="text-blue-600 font-medium">{stats.convos}</span>
                   </div>
@@ -1893,11 +1899,12 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
         }
       >
         {hasData ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-            <Stat icon={UploadCloud} label="Letters dropped today" value={stats.letters} />
-            <Stat icon={MessageSquare} label="Conversations today" value={stats.convos} />
-            <Stat icon={CheckCircle} label="Successes today" value={stats.interested} />
-            <Stat icon={CalendarClock} label="Follow‑ups due today" value={stats.followups} />
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
+            <Stat icon={UploadCloud} label="Letters dropped" value={stats.letters} />
+            <Stat icon={Check} label="Knocked" value={stats.knocked} />
+            <Stat icon={MessageSquare} label="Conversations" value={stats.convos} />
+            <Stat icon={CheckCircle} label="Successes" value={stats.interested} />
+            <Stat icon={CalendarClock} label="Follow Ups Due" value={stats.followups} />
           </div>
         ) : (
           <div className="text-center py-6">
@@ -2176,13 +2183,37 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
         title={`Streets in ${campaign.name}`} 
         icon={MapPin} 
         actions={
-          <div className="flex flex-wrap gap-2 min-w-0">
+          <div className="flex flex-wrap gap-2 min-w-0 items-center">
             <button 
               onClick={onAddStreet}
               className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex-shrink-0"
             >
               <Plus className="w-4 h-4"/> Add street
             </button>
+            
+            {/* Status Guide */}
+            <div className="flex items-center gap-3 text-xs opacity-70 border-l border-gray-200 dark:border-gray-700 pl-3">
+              <div className="flex items-center gap-1">
+                <span className="font-medium">🎯 Outcomes:</span>
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded border-2 border-green-500 bg-green-50"></span>
+                  <span className="w-3 h-3 rounded border-2 border-emerald-500 bg-emerald-50"></span>
+                  <span className="w-3 h-3 rounded border-2 border-amber-500 bg-amber-50"></span>
+                  <span className="w-3 h-3 rounded border-2 border-sky-500 bg-sky-50"></span>
+                  <span className="w-3 h-3 rounded border-2 border-red-500 bg-red-50"></span>
+                  <span className="w-3 h-3 rounded border-2 border-slate-500 bg-slate-50"></span>
+                  <span className="w-3 h-3 rounded border-2 border-purple-500 bg-purple-50"></span>
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-medium">📊 Progress:</span>
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded border border-orange-300 bg-orange-50/50"></span>
+                  <span className="w-3 h-3 rounded border border-indigo-300 bg-indigo-50/50"></span>
+                  <span className="w-3 h-3 rounded border border-teal-300 bg-teal-50/50"></span>
+                </span>
+              </div>
+            </div>
           </div>
         }
       >
