@@ -2665,60 +2665,29 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
 
   // Scroll to top when PropertyView mounts
   useEffect(() => {
-    // Check for CSS issues and try to fix them
+    // Simple, reliable scroll to top
     const scrollToTop = () => {
-      console.log('Attempting to scroll to top...');
+      console.log('Simple scroll to top attempt...');
       
-      // First, check if there are any CSS issues preventing scroll
-      const html = document.documentElement;
-      const body = document.body;
-      
-      console.log('Current CSS overflow values:', {
-        htmlOverflow: getComputedStyle(html).overflow,
-        bodyOverflow: getComputedStyle(body).overflow,
-        htmlHeight: getComputedStyle(html).height,
-        bodyHeight: getComputedStyle(body).height
-      });
-      
-      // Try to force scrollable behavior
-      html.style.overflow = 'auto';
-      body.style.overflow = 'auto';
-      html.style.height = 'auto';
-      body.style.height = 'auto';
-      
-      // Try all possible scroll methods
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-      
-      // Also try smooth scrolling
-      window.scrollTo({ top: 0, behavior: 'instant' });
-      document.documentElement.scrollTo({ top: 0, behavior: 'instant' });
-      document.body.scrollTo({ top: 0, behavior: 'instant' });
-      
-      // Try scrolling the main content area if it exists
-      const mainContent = document.querySelector('.max-w-7xl');
-      if (mainContent) {
-        mainContent.scrollTop = 0;
-        mainContent.scrollTo({ top: 0, behavior: 'instant' });
+      // Use the most reliable method for mobile
+      if ('scrollBehavior' in document.documentElement.style) {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      } else {
+        // Fallback for older browsers
+        window.scrollTo(0, 0);
       }
       
-      console.log('Scroll position after attempt:', window.scrollY, document.documentElement.scrollTop, document.body.scrollTop);
-      
-      // Check if we're still not at the top and keep trying
-      if (window.scrollY > 0 || document.documentElement.scrollTop > 0 || document.body.scrollTop > 0) {
-        console.log('Still not at top, trying again...');
-        setTimeout(scrollToTop, 100);
-      }
+      console.log('Scroll attempt completed');
     };
     
-    // Start the persistent scroll
+    // Try immediately
     scrollToTop();
     
-    // Also try a few more times with longer delays
-    setTimeout(scrollToTop, 200);
-    setTimeout(scrollToTop, 1000);
-    setTimeout(scrollToTop, 2000);
+    // Try again after a short delay to ensure component is fully rendered
+    setTimeout(scrollToTop, 100);
+    
+    // Final attempt after longer delay
+    setTimeout(scrollToTop, 500);
   }, []);
 
   // Save notes when they change
