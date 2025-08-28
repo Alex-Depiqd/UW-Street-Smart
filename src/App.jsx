@@ -266,29 +266,7 @@ export default function App() {
   const activeStreet = useMemo(() => activeCampaign?.streets.find(s => s.id === activeStreetId), [activeCampaign, activeStreetId]);
   const activeProperty = useMemo(() => activeStreet?.properties.find(p => p.id === activePropertyId), [activeStreet, activePropertyId]);
 
-  // Scroll to top when navigating to property view
-  useEffect(() => {
-    if (view === 'property') {
-      // Use setTimeout to ensure the view has rendered before scrolling
-      setTimeout(() => {
-        // Force scroll to top with multiple methods
-        window.scrollTo(0, 0);
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-        
-        // Also try smooth scrolling
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
-        document.body.scrollTo({ top: 0, behavior: 'smooth' });
-        
-        // Also try scrolling the main content area if it exists
-        if (mainContentRef.current) {
-          mainContentRef.current.scrollTop = 0;
-          mainContentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-      }, 300);
-    }
-  }, [view, activePropertyId]);
+
 
 
 
@@ -2684,6 +2662,14 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
   useEffect(() => {
     setNotes(property.notes || "");
   }, [property.notes]);
+
+  // Scroll to top when PropertyView mounts
+  useEffect(() => {
+    // Force scroll to top immediately when component mounts
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, []);
 
   // Save notes when they change
   const handleNotesChange = (newNotes) => {
