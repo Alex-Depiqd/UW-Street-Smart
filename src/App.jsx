@@ -265,6 +265,16 @@ export default function App() {
   const activeStreet = useMemo(() => activeCampaign?.streets.find(s => s.id === activeStreetId), [activeCampaign, activeStreetId]);
   const activeProperty = useMemo(() => activeStreet?.properties.find(p => p.id === activePropertyId), [activeStreet, activePropertyId]);
 
+  // Scroll to top when navigating to property view
+  useEffect(() => {
+    if (view === 'property') {
+      // Use setTimeout to ensure the view has rendered before scrolling
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
+    }
+  }, [view, activePropertyId]);
+
 
 
 
@@ -1567,8 +1577,6 @@ export default function App() {
             setActiveStreetId(streetId);
             setActivePropertyId(propertyId);
             setView('property');
-            // Scroll to top when navigating to property view
-            window.scrollTo({ top: 0, behavior: 'smooth' });
           }} />}
         </div>
       </div>
