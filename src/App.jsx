@@ -1556,7 +1556,12 @@ export default function App() {
               }}
             />
           )}
-          {view === "reports" && <Reports campaigns={campaigns} />}
+          {view === "reports" && <Reports campaigns={campaigns} onNavigateToProperty={(campaignId, streetId, propertyId) => {
+            setActiveCampaignId(campaignId);
+            setActiveStreetId(streetId);
+            setActivePropertyId(propertyId);
+            setView('property');
+          }} />}
         </div>
       </div>
 
@@ -2507,6 +2512,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                   
                   // Remove follow-up note from notes
                   if (property.notes) {
+                    console.log('Original notes:', property.notes);
                     // Split notes into lines to process more carefully
                     const noteLines = property.notes.split('\n');
                     const filteredLines = [];
@@ -2517,6 +2523,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                       
                       // Check if this line starts a follow-up note
                       if (line.includes('📅 Follow-up scheduled:') || line.includes('📅 Follow-up scheduled for')) {
+                        console.log('Found follow-up note start at line', i, ':', line);
                         skipNextLines = true;
                         continue; // Skip this line
                       }
@@ -2530,9 +2537,11 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                              !line.startsWith('📞') && 
                              !line.startsWith('🏠') && 
                              !line.startsWith('💬'))) {
+                          console.log('Ending follow-up note skip at line', i, ':', line);
                           skipNextLines = false;
                           // Don't skip this line - it's the start of a new note
                         } else {
+                          console.log('Skipping follow-up note line', i, ':', line);
                           continue; // Skip this line (part of follow-up note)
                         }
                       }
@@ -2545,6 +2554,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                     
                     // Join lines back together and clean up extra whitespace
                     const updatedNotes = filteredLines.join('\n').replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+                    console.log('Updated notes:', updatedNotes);
                     onUpdate({ notes: updatedNotes });
                   }
                 }}
@@ -4864,7 +4874,7 @@ function SuccessTipsPanel() {
   );
 }
 
-function Reports({ campaigns }) {
+function Reports({ campaigns, onNavigateToProperty }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortColumn, setSortColumn] = useState("date");
@@ -5120,10 +5130,7 @@ function Reports({ campaigns }) {
                   }}
                   onClick={() => { 
                     console.log('Clicking follow-up due today:', r.campaignId, r.streetId, r.propertyId);
-                    setActiveCampaignId(r.campaignId); 
-                    setActiveStreetId(r.streetId); 
-                    setActivePropertyId(r.propertyId); 
-                    setView('property'); 
+                    onNavigateToProperty(r.campaignId, r.streetId, r.propertyId);
                     console.log('State change triggered');
                   }}
                 >
@@ -5176,10 +5183,7 @@ function Reports({ campaigns }) {
                   }}
                   onClick={() => { 
                     console.log('Clicking scheduled follow-up:', r.campaignId, r.streetId, r.propertyId);
-                    setActiveCampaignId(r.campaignId); 
-                    setActiveStreetId(r.streetId); 
-                    setActivePropertyId(r.propertyId); 
-                    setView('property'); 
+                    onNavigateToProperty(r.campaignId, r.streetId, r.propertyId);
                     console.log('State change triggered');
                   }}
                 >
