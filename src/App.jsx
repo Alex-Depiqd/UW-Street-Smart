@@ -287,12 +287,14 @@ export default function App() {
         const droppedToday = p.dropped && p.droppedAt === today;
         const spokeToday = p.spoke && p.spokeAt === today;
         const resultToday = p.result && p.resultAt === today;
-        const followUpToday = p.followUpAt && p.followUpAt.startsWith(today);
+        
+        // Check if follow-up is due today (date part matches today)
+        const followUpDueToday = p.followUpAt && p.followUpAt.split('T')[0] === today;
         
         if (droppedToday) letters++;
         if (spokeToday) convos++;
         if (resultToday && (p.result === "customer_signed" || p.result === "appointment_booked" || p.result === "interested")) interested++;
-        if (followUpToday) followups++;
+        if (followUpDueToday) followups++;
         
         // Track today's outcomes
         if (resultToday && p.result !== 'none') {
@@ -1888,7 +1890,7 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
             <Stat icon={UploadCloud} label="Letters dropped today" value={stats.letters} />
             <Stat icon={MessageSquare} label="Conversations today" value={stats.convos} />
             <Stat icon={CheckCircle} label="Successes today" value={stats.interested} />
-            <Stat icon={CalendarClock} label="Follow‑ups scheduled today" value={stats.followups} />
+            <Stat icon={CalendarClock} label="Follow‑ups due today" value={stats.followups} />
           </div>
         ) : (
           <div className="text-center py-6">
@@ -4976,7 +4978,7 @@ function Reports({ campaigns }) {
           <Stat icon={Check} label="Knocked" value={totals.knocked} />
           <Stat icon={MessageSquare} label="Spoke" value={totals.spoke} />
           <Stat icon={CheckCircle} label="Successes" value={totals.successes} />
-          <Stat icon={CalendarClock} label="Follow‑ups" value={totals.followups} />
+          <Stat icon={CalendarClock} label="Total Follow‑ups" value={totals.followups} />
         </div>
       </SectionCard>
       
@@ -5018,9 +5020,48 @@ function Reports({ campaigns }) {
         </div>
       </SectionCard>
       
-      {/* Follow-ups Section */}
+      {/* Follow-ups Due Today Section */}
+      {(() => {
+        const today = new Date().toISOString().split('T')[0];
+        const followUpsDueToday = filteredAndSortedData.filter(r => 
+          r.followUpAt && r.followUpAt.split('T')[0] === today
+        );
+        
+        return followUpsDueToday.length > 0 && (
+          <SectionCard title="Follow-ups Due Today" icon={CalendarClock}>
+            <div className="space-y-3">
+              {followUpsDueToday.map((r, index) => (
+                <div key={`${r.campaign}-${r.street}-${r.property}-${index}`} className="flex items-center justify-between p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-800 flex items-center justify-center">
+                      <CalendarClock className="w-4 h-4 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                      <div className="font-medium text-sm">{r.property}, {r.street}</div>
+                      <div className="text-xs text-red-700 dark:text-red-300">{r.campaign}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-medium text-sm text-red-800 dark:text-red-200">
+                      {new Date(r.followUpAt).toLocaleTimeString('en-GB', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </div>
+                    <div className="text-xs text-red-600 dark:text-red-400">
+                      {r.spoke ? 'Spoke' : r.knocked ? 'Knocked' : r.dropped ? 'Dropped' : 'No activity'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        );
+      })()}
+      
+      {/* All Scheduled Follow-ups Section */}
       {totals.followups > 0 && (
-        <SectionCard title="Scheduled Follow-ups" icon={CalendarClock}>
+        <SectionCard title="All Scheduled Follow-ups" icon={CalendarClock}>
           <div className="space-y-3">
             {filteredAndSortedData
               .filter(r => r.followUpAt)
