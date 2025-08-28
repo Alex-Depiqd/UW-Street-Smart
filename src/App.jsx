@@ -2149,6 +2149,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
   const [sortBy, setSortBy] = useState("name");
   const [showFilters, setShowFilters] = useState(false);
   const [showMobileKey, setShowMobileKey] = useState(false);
+  const [activeTooltip, setActiveTooltip] = useState(null);
 
   // Filter and sort streets
   const filteredStreets = useMemo(() => {
@@ -2190,7 +2191,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
               onClick={() => setShowMobileKey(!showMobileKey)}
               className="block lg:hidden px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
             >
-              {showMobileKey ? <X className="w-4 h-4"/> : <span className="text-xs font-bold">KEY</span>}
+              {showMobileKey ? <X className="w-4 h-4"/> : <span className="text-sm font-bold">KEY</span>}
             </button>
             
             {/* Add Street Button - Right aligned on mobile */}
@@ -2210,21 +2211,99 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
             <div className="flex items-center gap-2">
               <span className="font-medium">🎯 Outcomes:</span>
               <div className="flex items-center gap-1">
-                <span className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700" title="Customer Signed">CS</span>
-                <span className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700" title="Appointment Booked">AB</span>
-                <span className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700" title="No for Now">NN</span>
-                <span className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700" title="Already with UW">UW</span>
-                <span className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700" title="Not Interested">NI</span>
-                <span className="w-4 h-4 rounded border-2 border-slate-500 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-700" title="No Answer">NA</span>
-                <span className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700" title="No Cold Callers">NC</span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Customer Signed')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => setActiveTooltip(activeTooltip === 'Customer Signed' ? null : 'Customer Signed')}
+                >
+                  CS
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Appointment Booked')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => setActiveTooltip(activeTooltip === 'Appointment Booked' ? null : 'Appointment Booked')}
+                >
+                  AB
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Interested')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => setActiveTooltip(activeTooltip === 'Interested' ? null : 'Interested')}
+                >
+                  I
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('No for Now')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => setActiveTooltip(activeTooltip === 'No for Now' ? null : 'No for Now')}
+                >
+                  NN
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Already with UW')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => setActiveTooltip(activeTooltip === 'Already with UW' ? null : 'Already with UW')}
+                >
+                  UW
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Not Interested')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => setActiveTooltip(activeTooltip === 'Not Interested' ? null : 'Not Interested')}
+                >
+                  NI
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-slate-500 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('No Answer')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => setActiveTooltip(activeTooltip === 'No Answer' ? null : 'No Answer')}
+                >
+                  NA
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('No Cold Callers')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => setActiveTooltip(activeTooltip === 'No Cold Callers' ? null : 'No Cold Callers')}
+                >
+                  NC
+                </span>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="font-medium">📊 Progress:</span>
               <div className="flex items-center gap-1">
-                <span className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700" title="Dropped">D</span>
-                <span className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700" title="Knocked">K</span>
-                <span className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700" title="Spoke">S</span>
+                <span 
+                  className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Dropped')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => setActiveTooltip(activeTooltip === 'Dropped' ? null : 'Dropped')}
+                >
+                  D
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Knocked')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => setActiveTooltip(activeTooltip === 'Knocked' ? null : 'Knocked')}
+                >
+                  K
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Spoke')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => setActiveTooltip(activeTooltip === 'Spoke' ? null : 'Spoke')}
+                >
+                  S
+                </span>
               </div>
             </div>
           </div>
@@ -2246,21 +2325,77 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
               <div className="flex items-center gap-2">
                 <span className="font-medium">🎯 Outcomes:</span>
                 <div className="flex items-center gap-1 flex-wrap">
-                  <span className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700" title="Customer Signed">CS</span>
-                  <span className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700" title="Appointment Booked">AB</span>
-                  <span className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700" title="No for Now">NN</span>
-                  <span className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700" title="Already with UW">UW</span>
-                  <span className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700" title="Not Interested">NI</span>
-                  <span className="w-4 h-4 rounded border-2 border-slate-500 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-700" title="No Answer">NA</span>
-                  <span className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700" title="No Cold Callers">NC</span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
+                    onClick={() => setActiveTooltip(activeTooltip === 'Customer Signed' ? null : 'Customer Signed')}
+                  >
+                    CS
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700 cursor-help" 
+                    onClick={() => setActiveTooltip(activeTooltip === 'Appointment Booked' ? null : 'Appointment Booked')}
+                  >
+                    AB
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
+                    onClick={() => setActiveTooltip(activeTooltip === 'Interested' ? null : 'Interested')}
+                  >
+                    I
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700 cursor-help" 
+                    onClick={() => setActiveTooltip(activeTooltip === 'No for Now' ? null : 'No for Now')}
+                  >
+                    NN
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700 cursor-help" 
+                    onClick={() => setActiveTooltip(activeTooltip === 'Already with UW' ? null : 'Already with UW')}
+                  >
+                    UW
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700 cursor-help" 
+                    onClick={() => setActiveTooltip(activeTooltip === 'Not Interested' ? null : 'Not Interested')}
+                  >
+                    NI
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-slate-500 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-700 cursor-help" 
+                    onClick={() => setActiveTooltip(activeTooltip === 'No Answer' ? null : 'No Answer')}
+                  >
+                    NA
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700 cursor-help" 
+                    onClick={() => setActiveTooltip(activeTooltip === 'No Cold Callers' ? null : 'No Cold Callers')}
+                  >
+                    NC
+                  </span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-medium">📊 Progress:</span>
                 <div className="flex items-center gap-1">
-                  <span className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700" title="Dropped">D</span>
-                  <span className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700" title="Knocked">K</span>
-                  <span className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700" title="Spoke">S</span>
+                  <span 
+                    className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700 cursor-help" 
+                    onClick={() => setActiveTooltip(activeTooltip === 'Dropped' ? null : 'Dropped')}
+                  >
+                    D
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700 cursor-help" 
+                    onClick={() => setActiveTooltip(activeTooltip === 'Knocked' ? null : 'Knocked')}
+                  >
+                    K
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700 cursor-help" 
+                    onClick={() => setActiveTooltip(activeTooltip === 'Spoke' ? null : 'Spoke')}
+                  >
+                    S
+                  </span>
                 </div>
               </div>
             </div>
@@ -2470,6 +2605,13 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
           </div>
         )}
       </SectionCard>
+      
+      {/* Tooltip Display */}
+      {activeTooltip && (
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white px-3 py-2 rounded-lg text-sm shadow-lg">
+          {activeTooltip}
+        </div>
+      )}
     </div>
   );
 }
