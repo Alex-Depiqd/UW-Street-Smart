@@ -265,6 +265,11 @@ export default function App() {
   const activeStreet = useMemo(() => activeCampaign?.streets.find(s => s.id === activeStreetId), [activeCampaign, activeStreetId]);
   const activeProperty = useMemo(() => activeStreet?.properties.find(p => p.id === activePropertyId), [activeStreet, activePropertyId]);
 
+  // Debug state changes
+  useEffect(() => {
+    console.log('State changed:', { activeCampaignId, activeStreetId, activePropertyId, view, activeCampaign: activeCampaign?.name, activeStreet: activeStreet?.name, activeProperty: activeProperty?.label });
+  }, [activeCampaignId, activeStreetId, activePropertyId, view, activeCampaign, activeStreet, activeProperty]);
+
 
 
   // Derived stats for dashboard
@@ -5038,7 +5043,21 @@ function Reports({ campaigns }) {
                 <div 
                   key={`${r.campaign}-${r.street}-${r.property}-${index}`} 
                   className="flex items-center justify-between p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-                  onClick={() => { setActiveCampaignId(r.campaignId); setActiveStreetId(r.streetId); setActivePropertyId(r.propertyId); setView('property'); }}
+                  style={{ 
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'rgba(239, 68, 68, 0.2)',
+                    position: 'relative',
+                    zIndex: 10
+                  }}
+                  onClick={() => { 
+                    console.log('Clicking follow-up due today:', r.campaignId, r.streetId, r.propertyId);
+                    console.log('Current state before change:', { activeCampaignId, activeStreetId, activePropertyId, view });
+                    setActiveCampaignId(r.campaignId); 
+                    setActiveStreetId(r.streetId); 
+                    setActivePropertyId(r.propertyId); 
+                    setView('property'); 
+                    console.log('State change triggered');
+                  }}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-800 flex items-center justify-center">
@@ -5081,7 +5100,21 @@ function Reports({ campaigns }) {
                 <div 
                   key={`${r.campaign}-${r.street}-${r.property}-${index}`} 
                   className="flex items-center justify-between p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
-                  onClick={() => { setActiveCampaignId(r.campaignId); setActiveStreetId(r.streetId); setActivePropertyId(r.propertyId); setView('property'); }}
+                  style={{ 
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'rgba(245, 158, 11, 0.2)',
+                    position: 'relative',
+                    zIndex: 10
+                  }}
+                  onClick={() => { 
+                    console.log('Clicking scheduled follow-up:', r.campaignId, r.streetId, r.propertyId);
+                    console.log('Current state before change:', { activeCampaignId, activeStreetId, activePropertyId, view });
+                    setActiveCampaignId(r.campaignId); 
+                    setActiveStreetId(r.streetId); 
+                    setActivePropertyId(r.propertyId); 
+                    setView('property'); 
+                    console.log('State change triggered');
+                  }}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-800 flex items-center justify-center">
