@@ -2665,20 +2665,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
     setNotes(property.notes || "");
   }, [property.notes]);
 
-  // Show back to top button when navigating from reports
-  const [showBackToTop, setShowBackToTop] = useState(false);
-  
-  useEffect(() => {
-    // Show back to top button for a few seconds after navigation
-    setShowBackToTop(true);
-    const timer = setTimeout(() => setShowBackToTop(false), 5000);
-    return () => clearTimeout(timer);
-  }, []);
-  
-  const handleBackToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    setShowBackToTop(false);
-  };
+
 
   // Save notes when they change
   const handleNotesChange = (newNotes) => {
@@ -3423,20 +3410,7 @@ function PhotoModal({ open, onClose, onSave }) {
         )}
       </div>
       
-      {/* Back to Top Button - Mobile Only */}
-      {showBackToTop && (
-        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50 lg:hidden">
-          <button
-            onClick={handleBackToTop}
-            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 transition-all duration-200"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-            </svg>
-            Back to Top
-          </button>
-        </div>
-      )}
+
     </Drawer>
   );
 }
