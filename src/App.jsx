@@ -2148,6 +2148,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("name");
   const [showFilters, setShowFilters] = useState(false);
+  const [showMobileKey, setShowMobileKey] = useState(false);
 
   // Filter and sort streets
   const filteredStreets = useMemo(() => {
@@ -2183,12 +2184,23 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
         title={`Streets in ${campaign.name}`} 
         icon={MapPin} 
         actions={
-          <button 
-            onClick={onAddStreet}
-            className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex-shrink-0"
-          >
-            <Plus className="w-4 h-4"/> Add street
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Mobile Key Button */}
+            <button 
+              onClick={() => setShowMobileKey(!showMobileKey)}
+              className="block lg:hidden px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+            >
+              {showMobileKey ? <X className="w-4 h-4"/> : <span className="text-xs font-bold">KEY</span>}
+            </button>
+            
+            {/* Add Street Button - Right aligned on mobile */}
+            <button 
+              onClick={onAddStreet}
+              className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex-shrink-0"
+            >
+              <Plus className="w-4 h-4"/> Add street
+            </button>
+          </div>
         }
       >
         
@@ -2217,6 +2229,43 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
             </div>
           </div>
         </div>
+        
+        {/* Mobile Status Guide - Collapsible */}
+        {showMobileKey && (
+          <div className="lg:hidden mb-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-800">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium opacity-70">Status Guide</span>
+              <button 
+                onClick={() => setShowMobileKey(false)}
+                className="p-1 rounded-full bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">🎯 Outcomes:</span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700" title="Customer Signed">CS</span>
+                  <span className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700" title="Appointment Booked">AB</span>
+                  <span className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700" title="No for Now">NN</span>
+                  <span className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700" title="Already with UW">UW</span>
+                  <span className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700" title="Not Interested">NI</span>
+                  <span className="w-4 h-4 rounded border-2 border-slate-500 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-700" title="No Answer">NA</span>
+                  <span className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700" title="No Cold Callers">NC</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">📊 Progress:</span>
+                <div className="flex items-center gap-1">
+                  <span className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700" title="Dropped">D</span>
+                  <span className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700" title="Knocked">K</span>
+                  <span className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700" title="Spoke">S</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         
         <SectionCard 
           title="Search & Filter" 
