@@ -2150,6 +2150,24 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
   const [showFilters, setShowFilters] = useState(false);
   const [showMobileKey, setShowMobileKey] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState(null);
+  const [tooltipTimeout, setTooltipTimeout] = useState(null);
+
+  // Helper function to show tooltip with timeout
+  const showTooltip = (text) => {
+    // Clear any existing timeout
+    if (tooltipTimeout) {
+      clearTimeout(tooltipTimeout);
+    }
+    
+    setActiveTooltip(text);
+    
+    // Set timeout to hide tooltip after 3 seconds
+    const timeout = setTimeout(() => {
+      setActiveTooltip(null);
+    }, 3000);
+    
+    setTooltipTimeout(timeout);
+  };
 
   // Filter and sort streets
   const filteredStreets = useMemo(() => {
@@ -2215,7 +2233,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
                   onMouseEnter={() => setActiveTooltip('Customer Signed')}
                   onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => setActiveTooltip(activeTooltip === 'Customer Signed' ? null : 'Customer Signed')}
+                  onClick={() => showTooltip('Customer Signed')}
                 >
                   CS
                 </span>
@@ -2223,7 +2241,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700 cursor-help" 
                   onMouseEnter={() => setActiveTooltip('Appointment Booked')}
                   onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => setActiveTooltip(activeTooltip === 'Appointment Booked' ? null : 'Appointment Booked')}
+                  onClick={() => showTooltip('Appointment Booked')}
                 >
                   AB
                 </span>
@@ -2231,7 +2249,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
                   onMouseEnter={() => setActiveTooltip('Interested')}
                   onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => setActiveTooltip(activeTooltip === 'Interested' ? null : 'Interested')}
+                  onClick={() => showTooltip('Interested')}
                 >
                   I
                 </span>
@@ -2239,7 +2257,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700 cursor-help" 
                   onMouseEnter={() => setActiveTooltip('No for Now')}
                   onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => setActiveTooltip(activeTooltip === 'No for Now' ? null : 'No for Now')}
+                  onClick={() => showTooltip('No for Now')}
                 >
                   NN
                 </span>
@@ -2247,7 +2265,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700 cursor-help" 
                   onMouseEnter={() => setActiveTooltip('Already with UW')}
                   onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => setActiveTooltip(activeTooltip === 'Already with UW' ? null : 'Already with UW')}
+                  onClick={() => showTooltip('Already with UW')}
                 >
                   UW
                 </span>
@@ -2255,7 +2273,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700 cursor-help" 
                   onMouseEnter={() => setActiveTooltip('Not Interested')}
                   onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => setActiveTooltip(activeTooltip === 'Not Interested' ? null : 'Not Interested')}
+                  onClick={() => showTooltip('Not Interested')}
                 >
                   NI
                 </span>
@@ -2271,7 +2289,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700 cursor-help" 
                   onMouseEnter={() => setActiveTooltip('No Cold Callers')}
                   onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => setActiveTooltip(activeTooltip === 'No Cold Callers' ? null : 'No Cold Callers')}
+                  onClick={() => showTooltip('No Cold Callers')}
                 >
                   NC
                 </span>
@@ -2284,7 +2302,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700 cursor-help" 
                   onMouseEnter={() => setActiveTooltip('Dropped')}
                   onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => setActiveTooltip(activeTooltip === 'Dropped' ? null : 'Dropped')}
+                  onClick={() => showTooltip('Dropped')}
                 >
                   D
                 </span>
@@ -2292,7 +2310,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700 cursor-help" 
                   onMouseEnter={() => setActiveTooltip('Knocked')}
                   onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => setActiveTooltip(activeTooltip === 'Knocked' ? null : 'Knocked')}
+                  onClick={() => showTooltip('Knocked')}
                 >
                   K
                 </span>
@@ -2300,7 +2318,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700 cursor-help" 
                   onMouseEnter={() => setActiveTooltip('Spoke')}
                   onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => setActiveTooltip(activeTooltip === 'Spoke' ? null : 'Spoke')}
+                  onClick={() => showTooltip('Spoke')}
                 >
                   S
                 </span>
@@ -2327,49 +2345,49 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                 <div className="flex items-center gap-1 flex-wrap">
                   <span 
                     className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
-                    onClick={() => setActiveTooltip(activeTooltip === 'Customer Signed' ? null : 'Customer Signed')}
+                    onClick={() => showTooltip('Customer Signed')}
                   >
                     CS
                   </span>
                   <span 
                     className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700 cursor-help" 
-                    onClick={() => setActiveTooltip(activeTooltip === 'Appointment Booked' ? null : 'Appointment Booked')}
+                    onClick={() => showTooltip('Appointment Booked')}
                   >
                     AB
                   </span>
                   <span 
                     className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
-                    onClick={() => setActiveTooltip(activeTooltip === 'Interested' ? null : 'Interested')}
+                    onClick={() => showTooltip('Interested')}
                   >
                     I
                   </span>
                   <span 
                     className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700 cursor-help" 
-                    onClick={() => setActiveTooltip(activeTooltip === 'No for Now' ? null : 'No for Now')}
+                    onClick={() => showTooltip('No for Now')}
                   >
                     NN
                   </span>
                   <span 
                     className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700 cursor-help" 
-                    onClick={() => setActiveTooltip(activeTooltip === 'Already with UW' ? null : 'Already with UW')}
+                    onClick={() => showTooltip('Already with UW')}
                   >
                     UW
                   </span>
                   <span 
                     className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700 cursor-help" 
-                    onClick={() => setActiveTooltip(activeTooltip === 'Not Interested' ? null : 'Not Interested')}
+                    onClick={() => showTooltip('Not Interested')}
                   >
                     NI
                   </span>
                   <span 
                     className="w-4 h-4 rounded border-2 border-slate-500 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-700 cursor-help" 
-                    onClick={() => setActiveTooltip(activeTooltip === 'No Answer' ? null : 'No Answer')}
+                    onClick={() => showTooltip('No Answer')}
                   >
                     NA
                   </span>
                   <span 
                     className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700 cursor-help" 
-                    onClick={() => setActiveTooltip(activeTooltip === 'No Cold Callers' ? null : 'No Cold Callers')}
+                    onClick={() => showTooltip('No Cold Callers')}
                   >
                     NC
                   </span>
@@ -2380,19 +2398,19 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                 <div className="flex items-center gap-1">
                   <span 
                     className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700 cursor-help" 
-                    onClick={() => setActiveTooltip(activeTooltip === 'Dropped' ? null : 'Dropped')}
+                    onClick={() => showTooltip('Dropped')}
                   >
                     D
                   </span>
                   <span 
                     className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700 cursor-help" 
-                    onClick={() => setActiveTooltip(activeTooltip === 'Knocked' ? null : 'Knocked')}
+                    onClick={() => showTooltip('Knocked')}
                   >
                     K
                   </span>
                   <span 
                     className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700 cursor-help" 
-                    onClick={() => setActiveTooltip(activeTooltip === 'Spoke' ? null : 'Spoke')}
+                    onClick={() => showTooltip('Spoke')}
                   >
                     S
                   </span>
@@ -2608,7 +2626,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
       
       {/* Tooltip Display */}
       {activeTooltip && (
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white px-3 py-2 rounded-lg text-sm shadow-lg">
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-3 rounded-xl text-base font-medium shadow-xl border border-gray-700">
           {activeTooltip}
         </div>
       )}
