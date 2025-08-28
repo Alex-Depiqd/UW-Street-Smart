@@ -167,29 +167,42 @@ const Drawer = ({ open, onClose, title, children, size = "default" }) => {
     <AnimatePresence>
       {open && (
         <motion.div 
-          className="fixed inset-0 z-50" 
+          className="fixed inset-0 z-50 modal-overlay" 
           initial={{ opacity: 0 }} 
           animate={{ opacity: 1 }} 
           exit={{ opacity: 0 }}
         >
-          <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+          <div 
+            className="absolute inset-0 bg-black/40" 
+            onClick={onClose}
+            style={{ touchAction: 'none' }}
+          />
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 120, damping: 16 }}
-            className={`absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-900 rounded-t-3xl p-4 ${sizes[size]} overflow-y-auto`}
+            className={`absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-900 rounded-t-3xl p-4 ${sizes[size]} overflow-y-auto modal-content`}
+            style={{ touchAction: 'pan-y' }}
           >
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-base font-semibold">{title}</h3>
               <button 
                 className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
                 onClick={onClose}
+                style={{ 
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+                  position: 'relative',
+                  zIndex: 10
+                }}
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            {children}
+            <div className="modal-content">
+              {children}
+            </div>
           </motion.div>
         </motion.div>
       )}
@@ -5479,6 +5492,12 @@ function NewCampaignForm({
         <button 
           type="submit"
           className="flex-1 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+            position: 'relative',
+            zIndex: 10
+          }}
         >
           Create Campaign
         </button>
@@ -5486,6 +5505,12 @@ function NewCampaignForm({
           type="button"
           onClick={onCancel}
           className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+            position: 'relative',
+            zIndex: 10
+          }}
         >
           Cancel
         </button>
@@ -6468,6 +6493,12 @@ function NewStreetForm({ onSubmit, onCancel }) {
           <button 
             type="submit"
             className="flex-1 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+            style={{ 
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+              position: 'relative',
+              zIndex: 10
+            }}
           >
             Add Street
           </button>
@@ -6475,6 +6506,12 @@ function NewStreetForm({ onSubmit, onCancel }) {
             type="button"
             onClick={onCancel}
             className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            style={{ 
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+              position: 'relative',
+              zIndex: 10
+            }}
           >
             Cancel
           </button>
@@ -6652,6 +6689,12 @@ function EditCampaignForm({ campaign, onSubmit, onCancel }) {
         <button 
           type="submit"
           className="flex-1 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+            position: 'relative',
+            zIndex: 10
+          }}
         >
           Update Campaign
         </button>
@@ -6659,6 +6702,12 @@ function EditCampaignForm({ campaign, onSubmit, onCancel }) {
           type="button"
           onClick={onCancel}
           className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+            position: 'relative',
+            zIndex: 10
+          }}
         >
           Cancel
         </button>
@@ -6712,6 +6761,12 @@ function EditStreetForm({ street, onSubmit, onCancel }) {
         <button 
           type="submit"
           className="flex-1 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+            position: 'relative',
+            zIndex: 10
+          }}
         >
           Update Street
         </button>
@@ -6719,6 +6774,12 @@ function EditStreetForm({ street, onSubmit, onCancel }) {
           type="button"
           onClick={onCancel}
           className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+            position: 'relative',
+            zIndex: 10
+          }}
         >
           Cancel
         </button>
