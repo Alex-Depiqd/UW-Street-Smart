@@ -2665,7 +2665,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
 
   // Scroll to top when PropertyView mounts
   useEffect(() => {
-    // Force scroll to top with multiple attempts and longer delay
+    // Persistent scroll to top that keeps trying
     const scrollToTop = () => {
       console.log('Attempting to scroll to top...');
       
@@ -2687,19 +2687,21 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
       }
       
       console.log('Scroll position after attempt:', window.scrollY, document.documentElement.scrollTop, document.body.scrollTop);
+      
+      // Check if we're still not at the top and keep trying
+      if (window.scrollY > 0 || document.documentElement.scrollTop > 0 || document.body.scrollTop > 0) {
+        console.log('Still not at top, trying again...');
+        setTimeout(scrollToTop, 100);
+      }
     };
     
-    // Try immediately
+    // Start the persistent scroll
     scrollToTop();
     
-    // Try again after a short delay
-    setTimeout(scrollToTop, 100);
-    
-    // Try again after a longer delay
-    setTimeout(scrollToTop, 500);
-    
-    // Try one more time after everything should be rendered
+    // Also try a few more times with longer delays
+    setTimeout(scrollToTop, 200);
     setTimeout(scrollToTop, 1000);
+    setTimeout(scrollToTop, 2000);
   }, []);
 
   // Save notes when they change
