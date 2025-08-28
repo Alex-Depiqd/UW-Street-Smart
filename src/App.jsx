@@ -2665,10 +2665,41 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
 
   // Scroll to top when PropertyView mounts
   useEffect(() => {
-    // Force scroll to top immediately when component mounts
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
+    // Force scroll to top with multiple attempts and longer delay
+    const scrollToTop = () => {
+      console.log('Attempting to scroll to top...');
+      
+      // Try all possible scroll methods
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      
+      // Also try smooth scrolling
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      document.documentElement.scrollTo({ top: 0, behavior: 'instant' });
+      document.body.scrollTo({ top: 0, behavior: 'instant' });
+      
+      // Try scrolling the main content area if it exists
+      const mainContent = document.querySelector('.max-w-7xl');
+      if (mainContent) {
+        mainContent.scrollTop = 0;
+        mainContent.scrollTo({ top: 0, behavior: 'instant' });
+      }
+      
+      console.log('Scroll position after attempt:', window.scrollY, document.documentElement.scrollTop, document.body.scrollTop);
+    };
+    
+    // Try immediately
+    scrollToTop();
+    
+    // Try again after a short delay
+    setTimeout(scrollToTop, 100);
+    
+    // Try again after a longer delay
+    setTimeout(scrollToTop, 500);
+    
+    // Try one more time after everything should be rendered
+    setTimeout(scrollToTop, 1000);
   }, []);
 
   // Save notes when they change
