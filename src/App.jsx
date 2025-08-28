@@ -2665,9 +2665,26 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
 
   // Scroll to top when PropertyView mounts
   useEffect(() => {
-    // Persistent scroll to top that keeps trying
+    // Check for CSS issues and try to fix them
     const scrollToTop = () => {
       console.log('Attempting to scroll to top...');
+      
+      // First, check if there are any CSS issues preventing scroll
+      const html = document.documentElement;
+      const body = document.body;
+      
+      console.log('Current CSS overflow values:', {
+        htmlOverflow: getComputedStyle(html).overflow,
+        bodyOverflow: getComputedStyle(body).overflow,
+        htmlHeight: getComputedStyle(html).height,
+        bodyHeight: getComputedStyle(body).height
+      });
+      
+      // Try to force scrollable behavior
+      html.style.overflow = 'auto';
+      body.style.overflow = 'auto';
+      html.style.height = 'auto';
+      body.style.height = 'auto';
       
       // Try all possible scroll methods
       window.scrollTo(0, 0);
