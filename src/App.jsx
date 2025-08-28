@@ -260,6 +260,7 @@ export default function App() {
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
   const [addressLookupStep, setAddressLookupStep] = useState("search"); // search, select, import
   const [searchTimeout, setSearchTimeout] = useState(null);
+  const mainContentRef = useRef(null);
 
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
   const activeStreet = useMemo(() => activeCampaign?.streets.find(s => s.id === activeStreetId), [activeCampaign, activeStreetId]);
@@ -270,8 +271,22 @@ export default function App() {
     if (view === 'property') {
       // Use setTimeout to ensure the view has rendered before scrolling
       setTimeout(() => {
+        // Force scroll to top with multiple methods
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        
+        // Also try smooth scrolling
         window.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 100);
+        document.documentElement.scrollTo({ top: 0, behavior: 'smooth' });
+        document.body.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        // Also try scrolling the main content area if it exists
+        if (mainContentRef.current) {
+          mainContentRef.current.scrollTop = 0;
+          mainContentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 300);
     }
   }, [view, activePropertyId]);
 
@@ -1424,7 +1439,7 @@ export default function App() {
       </div>
 
       {/* Content Area */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 pb-32 lg:pb-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div ref={mainContentRef} className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 pb-32 lg:pb-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
         {/* Sidebar - Hidden on mobile */}
         <div className="hidden lg:block lg:col-span-1 space-y-3">
           <SectionCard title="Navigate" icon={FolderOpen}>
