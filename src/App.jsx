@@ -265,10 +265,7 @@ export default function App() {
   const activeStreet = useMemo(() => activeCampaign?.streets.find(s => s.id === activeStreetId), [activeCampaign, activeStreetId]);
   const activeProperty = useMemo(() => activeStreet?.properties.find(p => p.id === activePropertyId), [activeStreet, activePropertyId]);
 
-  // Debug state changes
-  useEffect(() => {
-    console.log('State changed:', { activeCampaignId, activeStreetId, activePropertyId, view, activeCampaign: activeCampaign?.name, activeStreet: activeStreet?.name, activeProperty: activeProperty?.label });
-  }, [activeCampaignId, activeStreetId, activePropertyId, view, activeCampaign, activeStreet, activeProperty]);
+
 
 
 
@@ -2519,7 +2516,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                       const line = noteLines[i];
                       
                       // Check if this line starts a follow-up note
-                      if (line.includes('📅 Follow-up scheduled:')) {
+                      if (line.includes('📅 Follow-up scheduled:') || line.includes('📅 Follow-up scheduled for')) {
                         skipNextLines = true;
                         continue; // Skip this line
                       }
@@ -2548,7 +2545,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                     
                     // Join lines back together and clean up extra whitespace
                     const updatedNotes = filteredLines.join('\n').replace(/\n\s*\n\s*\n/g, '\n\n').trim();
-                    handleNotesChange(updatedNotes);
+                    onUpdate({ notes: updatedNotes });
                   }
                 }}
                 className="absolute -top-1 -right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-sm"
@@ -2715,6 +2712,11 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                             <FollowUpModal
                         open={showFollowUp} 
                         onClose={()=>setShowFollowUp(false)} 
+                        existingFollowUp={property.followUpAt ? {
+                          followUpAt: property.followUpAt,
+                          followUpTypes: property.followUpTypes,
+                          contactDetails: property.contactDetails
+                        } : null}
                         onSave={(followUpData)=>{ 
                           // Create follow-up note
                           const followUpNote = `📅 Follow-up scheduled: ${new Date(followUpData.dateTime).toLocaleString('en-GB', {
@@ -2736,8 +2738,56 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                           
                           const fullNote = followUpNote + typeNote + contactNote;
                           
-                          // Add to existing notes
-                          const updatedNotes = notes ? `${notes}\n\n${fullNote}` : fullNote;
+                          // Handle notes - if editing existing follow-up, replace the old note; otherwise add new note
+                          let updatedNotes;
+                          if (property.followUpAt) {
+                            // Editing existing follow-up - remove old follow-up note and add new one
+                            if (property.notes) {
+                              const noteLines = property.notes.split('\n');
+                              const filteredLines = [];
+                              let skipNextLines = false;
+                              
+                              for (let i = 0; i < noteLines.length; i++) {
+                                const line = noteLines[i];
+                                
+                                // Check if this line starts a follow-up note
+                                if (line.includes('📅 Follow-up scheduled:') || line.includes('📅 Follow-up scheduled for')) {
+                                  skipNextLines = true;
+                                  continue; // Skip this line
+                                }
+                                
+                                // If we're skipping lines, check if we've reached the end of the follow-up note
+                                if (skipNextLines) {
+                                  // If we hit an empty line or a line that doesn't start with common follow-up patterns, stop skipping
+                                  if (line.trim() === '' || 
+                                      (!line.includes('Type:') && 
+                                       !line.includes('Contact:') && 
+                                       !line.startsWith('📞') && 
+                                       !line.startsWith('🏠') && 
+                                       !line.startsWith('💬'))) {
+                                    skipNextLines = false;
+                                    // Don't skip this line - it's the start of a new note
+                                  } else {
+                                    continue; // Skip this line (part of follow-up note)
+                                  }
+                                }
+                                
+                                // Add this line if we're not skipping
+                                if (!skipNextLines) {
+                                  filteredLines.push(line);
+                                }
+                              }
+                              
+                              // Join lines back together and add new follow-up note
+                              const cleanedNotes = filteredLines.join('\n').replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+                              updatedNotes = cleanedNotes ? `${cleanedNotes}\n\n${fullNote}` : fullNote;
+                            } else {
+                              updatedNotes = fullNote;
+                            }
+                          } else {
+                            // Creating new follow-up - add to existing notes
+                            updatedNotes = notes ? `${notes}\n\n${fullNote}` : fullNote;
+                          }
                           
                           onUpdate({ 
                             followUpAt: followUpData.dateTime,
@@ -2812,7 +2862,7 @@ function OutcomeButton({ label, value, current, onClick, variant = "default" }) 
   );
 }
 
-function FollowUpModal({ open, onClose, onSave }) {
+function FollowUpModal({ open, onClose, onSave, existingFollowUp = null }) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [followUpTypes, setFollowUpTypes] = useState({
@@ -2822,6 +2872,25 @@ function FollowUpModal({ open, onClose, onSave }) {
   });
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+
+  // Initialize form with existing data when modal opens
+  useEffect(() => {
+    if (existingFollowUp && open) {
+      const followUpDate = new Date(existingFollowUp.followUpAt);
+      setDate(followUpDate.toISOString().split('T')[0]);
+      setTime(followUpDate.toTimeString().slice(0, 5));
+      setFollowUpTypes(existingFollowUp.followUpTypes || { call: false, revisit: false, message: false });
+      setContactName(existingFollowUp.contactDetails?.name || "");
+      setContactPhone(existingFollowUp.contactDetails?.phone || "");
+    } else if (!existingFollowUp && open) {
+      // Reset form when creating new follow-up
+      setDate("");
+      setTime("");
+      setFollowUpTypes({ call: false, revisit: false, message: false });
+      setContactName("");
+      setContactPhone("");
+    }
+  }, [existingFollowUp, open]);
 
   const handleTypeChange = (type) => {
     setFollowUpTypes(prev => ({
@@ -2842,7 +2911,7 @@ function FollowUpModal({ open, onClose, onSave }) {
   const hasSelectedTypes = Object.values(followUpTypes).some(Boolean);
 
   return (
-    <Drawer open={open} onClose={onClose} title="Schedule follow‑up">
+    <Drawer open={open} onClose={onClose} title={existingFollowUp ? "Edit follow‑up" : "Schedule follow‑up"}>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -2955,7 +3024,7 @@ function FollowUpModal({ open, onClose, onSave }) {
           disabled={!date || !time}
           className="w-full px-3 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
         >
-          Save reminder
+          {existingFollowUp ? "Update reminder" : "Save reminder"}
         </button>
       </div>
     </Drawer>
@@ -5051,7 +5120,6 @@ function Reports({ campaigns }) {
                   }}
                   onClick={() => { 
                     console.log('Clicking follow-up due today:', r.campaignId, r.streetId, r.propertyId);
-                    console.log('Current state before change:', { activeCampaignId, activeStreetId, activePropertyId, view });
                     setActiveCampaignId(r.campaignId); 
                     setActiveStreetId(r.streetId); 
                     setActivePropertyId(r.propertyId); 
@@ -5108,7 +5176,6 @@ function Reports({ campaigns }) {
                   }}
                   onClick={() => { 
                     console.log('Clicking scheduled follow-up:', r.campaignId, r.streetId, r.propertyId);
-                    console.log('Current state before change:', { activeCampaignId, activeStreetId, activePropertyId, view });
                     setActiveCampaignId(r.campaignId); 
                     setActiveStreetId(r.streetId); 
                     setActivePropertyId(r.propertyId); 
