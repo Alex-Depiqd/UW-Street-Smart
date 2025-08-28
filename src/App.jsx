@@ -1567,6 +1567,8 @@ export default function App() {
             setActiveStreetId(streetId);
             setActivePropertyId(propertyId);
             setView('property');
+            // Scroll to top when navigating to property view
+            window.scrollTo({ top: 0, behavior: 'smooth' });
           }} />}
         </div>
       </div>
