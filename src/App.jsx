@@ -5384,7 +5384,7 @@ function Reports({ campaigns, onNavigateToProperty }) {
       
       {/* Follow-ups Due Today Section */}
       {(() => {
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA'); // Use local timezone (YYYY-MM-DD format)
         console.log('Today\'s date:', today);
         console.log('All follow-ups:', filteredAndSortedData.filter(r => r.followUpAt).map(r => ({ 
           property: r.property, 
@@ -5447,7 +5447,7 @@ function Reports({ campaigns, onNavigateToProperty }) {
       
       {/* Scheduled Follow-ups Section */}
       {(() => {
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date().toLocaleDateString('en-CA'); // Use local timezone (YYYY-MM-DD format)
         const scheduledFollowUps = filteredAndSortedData
           .filter(r => r.followUpAt && r.followUpAt.split('T')[0] !== today) // Exclude follow-ups due today
           .slice(0, 10); // Show first 10 follow-ups
