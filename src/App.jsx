@@ -2765,7 +2765,6 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                   
                   // Remove follow-up note from notes
                   if (property.notes) {
-                    console.log('Original notes:', property.notes);
                     // Split notes into lines to process more carefully
                     const noteLines = property.notes.split('\n');
                     const filteredLines = [];
@@ -2777,7 +2776,6 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                       // Check if this line starts a follow-up note (with or without emoji)
                       if (line.includes('Follow-up scheduled:') || line.includes('Follow-up scheduled for') || 
                           line.includes('📅 Follow-up scheduled:') || line.includes('📅 Follow-up scheduled for')) {
-                        console.log('Found follow-up note start at line', i, ':', line);
                         skipNextLines = true;
                         continue; // Skip this line
                       }
@@ -2786,16 +2784,14 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                       if (skipNextLines) {
                         // If we hit an empty line or a line that doesn't start with common follow-up patterns, stop skipping
                         if (line.trim() === '' || 
-                            (!line.includes('Type:') && 
-                             !line.includes('Contact:') && 
+                            (!line.startsWith('Type:') && 
+                             !line.startsWith('Contact:') && 
                              !line.startsWith('📞') && 
                              !line.startsWith('🏠') && 
                              !line.startsWith('💬'))) {
-                          console.log('Ending follow-up note skip at line', i, ':', line);
                           skipNextLines = false;
                           // Don't skip this line - it's the start of a new note
                         } else {
-                          console.log('Skipping follow-up note line', i, ':', line);
                           continue; // Skip this line (part of follow-up note)
                         }
                       }
@@ -2808,11 +2804,9 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                     
                     // Join lines back together and clean up extra whitespace
                     const updatedNotes = filteredLines.join('\n').replace(/\n\s*\n\s*\n/g, '\n\n').trim();
-                    console.log('Updated notes:', updatedNotes);
                     onUpdate({ notes: updatedNotes });
                     // Update local notes state to reflect the change in the UI
                     setNotes(updatedNotes);
-                    console.log('Local notes state updated to:', updatedNotes);
                   }
                 }}
                 className="absolute -top-1 -right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-sm"
@@ -3004,7 +2998,6 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                           }
                           
                           const fullNote = followUpNote + typeNote + contactNote;
-                          console.log('Created follow-up note:', fullNote);
                           
                           // Handle notes - if editing existing follow-up, replace the old note; otherwise add new note
                           let updatedNotes;
