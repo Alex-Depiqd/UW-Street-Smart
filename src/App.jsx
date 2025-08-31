@@ -5391,13 +5391,11 @@ function Reports({ campaigns, onNavigateToProperty }) {
           followUpAt: r.followUpAt, 
           datePart: r.followUpAt ? r.followUpAt.split('T')[0] : null 
         })));
-        
         const followUpsDueToday = filteredAndSortedData.filter(r => 
           r.followUpAt && r.followUpAt.split('T')[0] === today
         );
         
         console.log('Follow-ups due today:', followUpsDueToday);
-        
         return followUpsDueToday.length > 0 && (
           <SectionCard title="Follow-ups Due Today" icon={CalendarClock}>
             <div className="space-y-3">
@@ -5455,7 +5453,6 @@ function Reports({ campaigns, onNavigateToProperty }) {
           .slice(0, 10); // Show first 10 follow-ups
         
         console.log('Scheduled follow-ups (excluding today):', scheduledFollowUps);
-        
         return scheduledFollowUps.length > 0 && (
           <SectionCard title="Scheduled Follow-ups" icon={CalendarClock}>
             <div className="space-y-3">

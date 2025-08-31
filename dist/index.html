@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="UW Street Smart - Track and manage Neighbourhood Letters campaigns efficiently. Offline-first PWA for UW partners.">
+    <meta name="keywords" content="UW, Neighbourhood Letters, campaign tracking, door-to-door, PWA">
+    <meta name="author" content="UW Partners">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#7c3aed">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Street Smart">
+    <meta name="msapplication-TileColor" content="#7c3aed">
+    <meta name="msapplication-config" content="/browserconfig.xml">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://uw-street-smart.com/">
+    <meta property="og:title" content="UW Street Smart - NL Activity Tracker">
+    <meta property="og:description" content="Track and manage Neighbourhood Letters campaigns efficiently">
+    <meta property="og:image" content="/icons/icon-512x512.png">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://uw-street-smart.com/">
+    <meta property="twitter:title" content="UW Street Smart - NL Activity Tracker">
+    <meta property="twitter:description" content="Track and manage Neighbourhood Letters campaigns efficiently">
+    <meta property="twitter:image" content="/icons/icon-512x512.png">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- Preconnect to external domains -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <title>UW Street Smart - NL Activity Tracker</title>
+  <script type="module" crossorigin src="/assets/index-fddde96d.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/vendor-b1791c80.js">
+  <link rel="modulepreload" crossorigin href="/assets/ui-136ffc37.js">
+  <link rel="stylesheet" href="/assets/index-fad9876a.css">
+<link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+<body>
+    <div id="root">
+        <!-- Loading screen -->
+        <div class="loading-screen">
+            <div class="loading-content">
+                <div class="uw-logo">
+                    <div class="logo-circle">UW</div>
+                </div>
+                <h1>UW Street Smart</h1>
+                <p>NL Activity Tracker</p>
+                <div class="loading-spinner"></div>
+            </div>
+        </div>
+    </div>
+    
+    
+    
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered: ', registration);
+            })
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
+</body>
+</html> 
