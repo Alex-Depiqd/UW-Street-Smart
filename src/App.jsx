@@ -5369,33 +5369,13 @@ function Reports({ campaigns, onNavigateToProperty }) {
         </div>
       </SectionCard>
       
-      {/* Debug Section - Temporary */}
-      <SectionCard title="🔍 DEBUG INFO - CHECK THIS" icon={FileText}>
-        <div className="space-y-2 text-sm bg-yellow-100 dark:bg-yellow-900/20 p-3 rounded-lg border-2 border-yellow-400">
-          <div className="font-bold text-red-600">Today's date: {new Date().toISOString().split('T')[0]}</div>
-          <div className="font-bold text-blue-600">Total follow-ups: {filteredAndSortedData.filter(r => r.followUpAt).length}</div>
-          <div className="font-bold text-green-600">Follow-ups data: {JSON.stringify(filteredAndSortedData.filter(r => r.followUpAt).map(r => ({ 
-            property: r.property, 
-            followUpAt: r.followUpAt, 
-            datePart: r.followUpAt ? r.followUpAt.split('T')[0] : null 
-          })), null, 2)}</div>
-        </div>
-      </SectionCard>
-      
+
       {/* Follow-ups Due Today Section */}
       {(() => {
         const today = new Date().toLocaleDateString('en-CA'); // Use local timezone (YYYY-MM-DD format)
-        console.log('Today\'s date:', today);
-        console.log('All follow-ups:', filteredAndSortedData.filter(r => r.followUpAt).map(r => ({ 
-          property: r.property, 
-          followUpAt: r.followUpAt, 
-          datePart: r.followUpAt ? r.followUpAt.split('T')[0] : null 
-        })));
         const followUpsDueToday = filteredAndSortedData.filter(r => 
           r.followUpAt && r.followUpAt.split('T')[0] === today
         );
-        
-        console.log('Follow-ups due today:', followUpsDueToday);
         return followUpsDueToday.length > 0 && (
           <SectionCard title="Follow-ups Due Today" icon={CalendarClock}>
             <div className="space-y-3">
@@ -5452,7 +5432,7 @@ function Reports({ campaigns, onNavigateToProperty }) {
           .filter(r => r.followUpAt && r.followUpAt.split('T')[0] !== today) // Exclude follow-ups due today
           .slice(0, 10); // Show first 10 follow-ups
         
-        console.log('Scheduled follow-ups (excluding today):', scheduledFollowUps);
+
         return scheduledFollowUps.length > 0 && (
           <SectionCard title="Scheduled Follow-ups" icon={CalendarClock}>
             <div className="space-y-3">
