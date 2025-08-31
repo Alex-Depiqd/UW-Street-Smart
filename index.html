@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
     <meta name="description" content="UW Street Smart - Track and manage Neighbourhood Letters campaigns efficiently. Offline-first PWA for UW partners.">
     <meta name="keywords" content="UW, Neighbourhood Letters, campaign tracking, door-to-door, PWA">
     <meta name="author" content="UW Partners">
@@ -83,6 +83,35 @@
     </script>
     
     <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- Auto-restore viewport after input -->
+    <script>
+      // Function to restore viewport to normal
+      function restoreViewport() {
+        const viewport = document.querySelector('meta[name="viewport"]');
+        if (viewport) {
+          viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover');
+        }
+      }
+      
+      // Restore viewport when input loses focus
+      document.addEventListener('blur', function(e) {
+        if (e.target.matches('input, textarea, select')) {
+          // Small delay to ensure the input has finished
+          setTimeout(restoreViewport, 100);
+        }
+      }, true);
+      
+      // Also restore on page visibility change (when user switches back to app)
+      document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+          restoreViewport();
+        }
+      });
+      
+      // Restore on window focus (when user returns to the tab)
+      window.addEventListener('focus', restoreViewport);
+    </script>
     
     <!-- Service Worker Registration -->
     <script>
