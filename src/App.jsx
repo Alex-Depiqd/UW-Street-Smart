@@ -5425,14 +5425,17 @@ function Reports({ campaigns, onNavigateToProperty }) {
         );
       })()}
       
-      {/* All Scheduled Follow-ups Section */}
-      {totals.followups > 0 && (
-        <SectionCard title="All Scheduled Follow-ups" icon={CalendarClock}>
-          <div className="space-y-3">
-            {filteredAndSortedData
-              .filter(r => r.followUpAt)
-              .slice(0, 10) // Show first 10 follow-ups
-              .map((r, index) => (
+      {/* Scheduled Follow-ups Section */}
+      {(() => {
+        const today = new Date().toISOString().split('T')[0];
+        const scheduledFollowUps = filteredAndSortedData
+          .filter(r => r.followUpAt && r.followUpAt.split('T')[0] !== today) // Exclude follow-ups due today
+          .slice(0, 10); // Show first 10 follow-ups
+        
+        return scheduledFollowUps.length > 0 && (
+          <SectionCard title="Scheduled Follow-ups" icon={CalendarClock}>
+            <div className="space-y-3">
+              {scheduledFollowUps.map((r, index) => (
                 <div 
                   key={`${r.campaign}-${r.street}-${r.property}-${index}`} 
                   className="flex items-center justify-between p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
@@ -5468,14 +5471,15 @@ function Reports({ campaigns, onNavigateToProperty }) {
                   </div>
                 </div>
               ))}
-            {filteredAndSortedData.filter(r => r.followUpAt).length > 10 && (
+            {scheduledFollowUps.length > 10 && (
               <div className="text-center text-sm text-amber-600 dark:text-amber-400">
-                +{filteredAndSortedData.filter(r => r.followUpAt).length - 10} more follow-ups scheduled
+                +{scheduledFollowUps.length - 10} more follow-ups scheduled
               </div>
             )}
           </div>
         </SectionCard>
-      )}
+        );
+      })()}
       
       <SectionCard title="Activity log" icon={ListChecks}>
         {/* Search and Filter Controls */}
