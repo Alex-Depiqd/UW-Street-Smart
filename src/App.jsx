@@ -6,7 +6,7 @@ import {
   Clock, Phone, FileText, FolderOpen, Share2, UploadCloud, 
   Moon, Sun, Settings, Bell, Search, Filter, MoreVertical,
   User, LogOut, HelpCircle, Info, Shield, Database, BarChart3, Target,
-  Upload, Trash2, AlertTriangle, Camera, Globe
+  Upload, Trash2, AlertTriangle, Camera, Globe, File, ExternalLink, Eye, Maximize, Menu, Edit, Copy, Minus
 } from "lucide-react";
 import { config } from './config';
 
@@ -167,29 +167,42 @@ const Drawer = ({ open, onClose, title, children, size = "default" }) => {
     <AnimatePresence>
       {open && (
         <motion.div 
-          className="fixed inset-0 z-50" 
+          className="fixed inset-0 z-50 modal-overlay" 
           initial={{ opacity: 0 }} 
           animate={{ opacity: 1 }} 
           exit={{ opacity: 0 }}
         >
-          <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+          <div 
+            className="absolute inset-0 bg-black/40" 
+            onClick={onClose}
+            style={{ touchAction: 'none' }}
+          />
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 120, damping: 16 }}
-            className={`absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-900 rounded-t-3xl p-4 ${sizes[size]} overflow-y-auto`}
+            className={`absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-900 rounded-t-3xl p-4 ${sizes[size]} overflow-y-auto modal-content`}
+            style={{ touchAction: 'pan-y' }}
           >
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-base font-semibold">{title}</h3>
               <button 
                 className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
                 onClick={onClose}
+                style={{ 
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+                  position: 'relative',
+                  zIndex: 10
+                }}
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            {children}
+            <div className="modal-content">
+              {children}
+            </div>
           </motion.div>
         </motion.div>
       )}
@@ -224,8 +237,15 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showSuccessTips, setShowSuccessTips] = useState(false);
-  const [showUtilityLogos, setShowUtilityLogos] = useState(false);
+  const [showDocuments, setShowDocuments] = useState(false);
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [currentPdfUrl, setCurrentPdfUrl] = useState("");
+  const [currentPdfTitle, setCurrentPdfTitle] = useState("");
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState("");
+  const [currentImageTitle, setCurrentImageTitle] = useState("");
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [mobileNavCollapsed, setMobileNavCollapsed] = useState(false);
 
 
 
@@ -240,6 +260,7 @@ export default function App() {
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
   const [addressLookupStep, setAddressLookupStep] = useState("search"); // search, select, import
   const [searchTimeout, setSearchTimeout] = useState(null);
+  const mainContentRef = useRef(null);
 
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
   const activeStreet = useMemo(() => activeCampaign?.streets.find(s => s.id === activeStreetId), [activeCampaign, activeStreetId]);
@@ -247,9 +268,13 @@ export default function App() {
 
 
 
+
+
+
+
   // Derived stats for dashboard
   const stats = useMemo(() => {
-    let letters = 0, convos = 0, interested = 0, followups = 0;
+    let letters = 0, knocked = 0, convos = 0, interested = 0, followups = 0;
     let outcomes = {
       interested: 0,
       customer_signed: 0,
@@ -265,14 +290,18 @@ export default function App() {
       s.properties.forEach(p => {
         // Check if activity was logged today
         const droppedToday = p.dropped && p.droppedAt === today;
+        const knockedToday = p.knocked && p.knockedAt === today;
         const spokeToday = p.spoke && p.spokeAt === today;
         const resultToday = p.result && p.resultAt === today;
-        const followUpToday = p.followUpAt && p.followUpAt.startsWith(today);
+        
+        // Check if follow-up is due today (date part matches today)
+        const followUpDueToday = p.followUpAt && p.followUpAt.split('T')[0] === today;
         
         if (droppedToday) letters++;
+        if (knockedToday) knocked++;
         if (spokeToday) convos++;
         if (resultToday && (p.result === "customer_signed" || p.result === "appointment_booked" || p.result === "interested")) interested++;
-        if (followUpToday) followups++;
+        if (followUpDueToday) followups++;
         
         // Track today's outcomes
         if (resultToday && p.result !== 'none') {
@@ -280,7 +309,7 @@ export default function App() {
         }
       });
     });
-    return { letters, convos, interested, followups, outcomes };
+    return { letters, knocked, convos, interested, followups, outcomes };
   }, [activeCampaign]);
 
   const setProperty = (updates) => {
@@ -1344,32 +1373,55 @@ export default function App() {
         </div>
       </div>
 
-      {/* Mobile Navigation Bar */}
+      {/* Mobile Header - Simple */}
       <div className="lg:hidden sticky top-16 z-30 bg-white/80 dark:bg-gray-950/80 backdrop-blur border-b border-gray-200/50 dark:border-gray-800/50">
-        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2">
-          <div className="grid grid-cols-4 gap-1">
-            <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
-            <NavButton icon={<Target className="w-4 h-4 flex-shrink-0"/>} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
-            <NavButton icon={<MapPin className="w-4 h-4 flex-shrink-0"/>} label="Streets" active={view === "streets"} onClick={() => setView("streets")} />
-            <NavButton icon={<FileText className="w-4 h-4 flex-shrink-0"/>} label="Reports" active={view === "reports"} onClick={() => setView("reports")} />
-          </div>
-          {activeCampaign && (
-            <div className="mt-2 text-center px-2">
-              <div className="text-xs opacity-70 mb-1">Active Campaign</div>
-              <div className="text-sm font-medium truncate bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 px-2 py-1 rounded-lg">
-                {activeCampaign.name}
-              </div>
+        <div className="max-w-6xl mx-auto px-3 sm:px-4">
+          <div className="flex items-center justify-between py-2">
+            <div className="text-sm font-medium">
+              {view === "dashboard" && "Dashboard"}
+              {view === "campaigns" && "Campaigns"}
+              {view === "streets" && "Streets"}
+              {view === "reports" && "Reports"}
+              {view === "property" && "Property"}
             </div>
-          )}
+            <div className="flex items-center gap-3">
+              {/* Quick Stats Summary */}
+              {view === "dashboard" && activeCampaign && (
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-1">
+                    <UploadCloud className="w-3 h-3 text-green-600" />
+                    <span className="text-green-600 font-medium">{stats.letters}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Check className="w-3 h-3 text-indigo-600" />
+                    <span className="text-indigo-600 font-medium">{stats.knocked}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <MessageSquare className="w-3 h-3 text-blue-600" />
+                    <span className="text-blue-600 font-medium">{stats.convos}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3 text-primary-600" />
+                    <span className="text-primary-600 font-medium">{stats.interested}</span>
+                  </div>
+                </div>
+              )}
+              {activeCampaign && (
+                <div className="text-xs opacity-70 truncate max-w-24">
+                  {activeCampaign.name}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Content Area */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div ref={mainContentRef} className="max-w-7xl mx-auto px-3 sm:px-4 py-3 lg:py-6 pb-32 lg:pb-6 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
         {/* Sidebar - Hidden on mobile */}
         <div className="hidden lg:block lg:col-span-1 space-y-3">
           <SectionCard title="Navigate" icon={FolderOpen}>
-            <div className="grid grid-cols-2 gap-2 min-w-0">
+            <div className="grid grid-cols-2 gap-3 min-w-0 nav-grid-vertical-tablet">
               <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
               <NavButton icon={<Target className="w-4 h-4 flex-shrink-0"/>} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
               <NavButton icon={<MapPin className="w-4 h-4 flex-shrink-0"/>} label="Streets" active={view === "streets"} onClick={() => setView("streets")} />
@@ -1381,10 +1433,10 @@ export default function App() {
           </SectionCard>
 
           <SectionCard title="Quick Drawers" icon={Share2}>
-            <div className="grid grid-cols-3 gap-2 min-w-0">
+            <div className="grid grid-cols-2 gap-2 min-w-0 nav-grid-vertical-tablet">
               <NavButton icon={<MessageSquare className="w-4 h-4 flex-shrink-0"/>} label="Scripts" onClick={() => setShowScripts(true)} />
               <NavButton icon={<Link2 className="w-4 h-4 flex-shrink-0"/>} label="Links" onClick={() => setShowLinks(true)} />
-              <NavButton icon={<Globe className="w-4 h-4 flex-shrink-0"/>} label="Logos" onClick={() => setShowUtilityLogos(true)} />
+              <NavButton icon={<File className="w-4 h-4 flex-shrink-0"/>} label="Documents" onClick={() => setShowDocuments(true)} />
             </div>
             <div className="mt-3 text-xs opacity-70">
               Open while on a property to speed up calls and messages.
@@ -1394,6 +1446,7 @@ export default function App() {
           <SectionCard 
             title="Success Tips" 
             icon={Target}
+            className="success-tips-vertical-tablet"
             actions={
               <button 
                 onClick={() => setShowSuccessTips(true)}
@@ -1503,10 +1556,21 @@ export default function App() {
               onUpdate={setProperty}
               onShowScripts={()=>setShowScripts(true)}
               onShowLinks={()=>setShowLinks(true)}
+              onShowDocuments={()=>setShowDocuments(true)}
               onToggleStatus={togglePropertyStatus}
+              onViewImage={(url, title) => {
+                setCurrentImageUrl(url);
+                setCurrentImageTitle(title);
+                setShowImageViewer(true);
+              }}
             />
           )}
-          {view === "reports" && <Reports campaigns={campaigns} />}
+          {view === "reports" && <Reports campaigns={campaigns} onNavigateToProperty={(campaignId, streetId, propertyId) => {
+            setActiveCampaignId(campaignId);
+            setActiveStreetId(streetId);
+            setActivePropertyId(propertyId);
+            setView('property');
+          }} />}
         </div>
       </div>
 
@@ -1517,9 +1581,27 @@ export default function App() {
       <Drawer open={showLinks} onClose={()=>setShowLinks(false)} title="Quick Links">
         <LinksPanel links={activeCampaign?.links} />
       </Drawer>
-      <Drawer open={showUtilityLogos} onClose={()=>setShowUtilityLogos(false)} title="Utility Company Logos" size="large">
-        <UtilityLogosPanel />
+      <Drawer open={showDocuments} onClose={()=>setShowDocuments(false)} title="Documents & PDFs" size="large">
+        <DocumentsPanel 
+          onViewPdf={(url, title) => {
+            setCurrentPdfUrl(url);
+            setCurrentPdfTitle(title);
+            setShowPdfViewer(true);
+          }}
+          onViewImage={(url, title) => {
+            setCurrentImageUrl(url);
+            setCurrentImageTitle(title);
+            setShowImageViewer(true);
+          }}
+        />
       </Drawer>
+      <Drawer open={showPdfViewer} onClose={()=>setShowPdfViewer(false)} title={currentPdfTitle} size="full">
+        <PdfViewer url={currentPdfUrl} title={currentPdfTitle} />
+      </Drawer>
+      <Drawer open={showImageViewer} onClose={()=>setShowImageViewer(false)} title={currentImageTitle} size="large">
+        <ImageViewer url={currentImageUrl} title={currentImageTitle} onClose={()=>setShowImageViewer(false)} />
+      </Drawer>
+
       <Drawer open={showSettings} onClose={()=>setShowSettings(false)} title="Settings" size="small">
         <SettingsPanel 
           dark={dark} 
@@ -1655,10 +1737,67 @@ export default function App() {
 
 
 
+      {/* Mobile Bottom Tab Bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800">
+        <div className="flex items-center justify-around py-2">
+          <button
+            onClick={() => setView("dashboard")}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+              view === "dashboard"
+                ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+            }`}
+          >
+            <BarChart3 className="w-5 h-5" />
+            <span className="text-xs">Dashboard</span>
+          </button>
+          
+          <button
+            onClick={() => setView("campaigns")}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+              view === "campaigns"
+                ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+            }`}
+          >
+            <Target className="w-5 h-5" />
+            <span className="text-xs">Campaigns</span>
+          </button>
+          
+          <button
+            onClick={() => setView("streets")}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+              view === "streets"
+                ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+            }`}
+          >
+            <MapPin className="w-5 h-5" />
+            <span className="text-xs">Streets</span>
+          </button>
+          
+          <button
+            onClick={() => setView("reports")}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
+              view === "reports"
+                ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20"
+                : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span className="text-xs">Reports</span>
+          </button>
+        </div>
+      </div>
+
+
+
       {/* Footer Hint */}
-      <div className="max-w-6xl mx-auto px-4 pb-8 text-xs opacity-70">
+      <div className="max-w-6xl mx-auto px-4 pb-20 lg:pb-8 text-xs opacity-70">
         UW Street Smart - NL Activity Tracker v1.0.0 | Built for UW partners making a difference in their communities. | © 2025 Alex Cameron. All rights reserved.
       </div>
+      
+
     </div>
   );
 }
@@ -1668,7 +1807,7 @@ function NavButton({ icon, label, active, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-xl text-xs border transition-all min-w-0 lg:flex-row lg:gap-2 lg:px-3 lg:text-sm ${
+      className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-xl text-xs border transition-all min-w-0 lg:flex-row lg:gap-2 lg:px-3 lg:text-sm nav-button-vertical-tablet ${
         active 
           ? "bg-primary-600 text-white border-primary-600 shadow-md" 
           : "bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -1765,11 +1904,12 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
         }
       >
         {hasData ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-            <Stat icon={UploadCloud} label="Letters dropped today" value={stats.letters} />
-            <Stat icon={MessageSquare} label="Conversations today" value={stats.convos} />
-            <Stat icon={CheckCircle} label="Successes today" value={stats.interested} />
-            <Stat icon={CalendarClock} label="Follow‑ups scheduled today" value={stats.followups} />
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
+            <Stat icon={UploadCloud} label="Letters dropped" value={stats.letters} />
+            <Stat icon={Check} label="Knocked" value={stats.knocked} />
+            <Stat icon={MessageSquare} label="Conversations" value={stats.convos} />
+            <Stat icon={CheckCircle} label="Successes" value={stats.interested} />
+            <Stat icon={CalendarClock} label="Follow Ups Due" value={stats.followups} />
           </div>
         ) : (
           <div className="text-center py-6">
@@ -1791,6 +1931,10 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
             <div className="p-2 sm:p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500 dark:border-emerald-500">
               <div className="text-base sm:text-lg font-semibold text-emerald-800 dark:text-emerald-200">{stats.outcomes.appointment_booked}</div>
               <div className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300">Appointment Booked</div>
+            </div>
+            <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
+              <div className="text-base sm:text-lg font-semibold text-green-800 dark:text-green-200">{stats.outcomes.interested}</div>
+              <div className="text-xs sm:text-sm text-green-700 dark:text-green-300">Interested</div>
             </div>
             <div className="p-2 sm:p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-500 dark:border-amber-500">
               <div className="text-base sm:text-lg font-semibold text-amber-800 dark:text-amber-200">{stats.outcomes.no_for_now}</div>
@@ -2009,6 +2153,26 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("name");
   const [showFilters, setShowFilters] = useState(false);
+  const [showMobileKey, setShowMobileKey] = useState(false);
+  const [activeTooltip, setActiveTooltip] = useState(null);
+  const [tooltipTimeout, setTooltipTimeout] = useState(null);
+
+  // Helper function to show tooltip with timeout
+  const showTooltip = (text) => {
+    // Clear any existing timeout
+    if (tooltipTimeout) {
+      clearTimeout(tooltipTimeout);
+    }
+    
+    setActiveTooltip(text);
+    
+    // Set timeout to hide tooltip after 3 seconds
+    const timeout = setTimeout(() => {
+      setActiveTooltip(null);
+    }, 3000);
+    
+    setTooltipTimeout(timeout);
+  };
 
   // Filter and sort streets
   const filteredStreets = useMemo(() => {
@@ -2044,7 +2208,16 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
         title={`Streets in ${campaign.name}`} 
         icon={MapPin} 
         actions={
-          <div className="flex flex-wrap gap-2 min-w-0">
+          <div className="flex items-center gap-2">
+            {/* Mobile Key Button */}
+            <button 
+              onClick={() => setShowMobileKey(!showMobileKey)}
+              className="block lg:hidden px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+            >
+              {showMobileKey ? <X className="w-4 h-4"/> : <span className="text-sm font-bold">KEY</span>}
+            </button>
+            
+            {/* Add Street Button - Right aligned on mobile */}
             <button 
               onClick={onAddStreet}
               className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex-shrink-0"
@@ -2054,6 +2227,204 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
           </div>
         }
       >
+        
+        {/* Status Guide - Full Screen Only */}
+        <div className="hidden lg:block mb-4">
+          <div className="flex items-center gap-4 text-xs opacity-70">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">🎯 Outcomes:</span>
+              <div className="flex items-center gap-1">
+                <span 
+                  className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Customer Signed')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => showTooltip('Customer Signed')}
+                >
+                  CS
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Appointment Booked')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => showTooltip('Appointment Booked')}
+                >
+                  AB
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Interested')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => showTooltip('Interested')}
+                >
+                  I
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('No for Now')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => showTooltip('No for Now')}
+                >
+                  NN
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Already with UW')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => showTooltip('Already with UW')}
+                >
+                  UW
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Not Interested')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => showTooltip('Not Interested')}
+                >
+                  NI
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-slate-500 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('No Answer')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => setActiveTooltip(activeTooltip === 'No Answer' ? null : 'No Answer')}
+                >
+                  NA
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('No Cold Callers')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => showTooltip('No Cold Callers')}
+                >
+                  NC
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">📊 Progress:</span>
+              <div className="flex items-center gap-1">
+                <span 
+                  className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Dropped')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => showTooltip('Dropped')}
+                >
+                  D
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Knocked')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => showTooltip('Knocked')}
+                >
+                  K
+                </span>
+                <span 
+                  className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700 cursor-help" 
+                  onMouseEnter={() => setActiveTooltip('Spoke')}
+                  onMouseLeave={() => setActiveTooltip(null)}
+                  onClick={() => showTooltip('Spoke')}
+                >
+                  S
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Mobile Status Guide - Collapsible */}
+        {showMobileKey && (
+          <div className="lg:hidden mb-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-800">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium opacity-70">Status Guide</span>
+              <button 
+                onClick={() => setShowMobileKey(false)}
+                className="p-1 rounded-full bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">🎯 Outcomes:</span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
+                    onClick={() => showTooltip('Customer Signed')}
+                  >
+                    CS
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700 cursor-help" 
+                    onClick={() => showTooltip('Appointment Booked')}
+                  >
+                    AB
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
+                    onClick={() => showTooltip('Interested')}
+                  >
+                    I
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700 cursor-help" 
+                    onClick={() => showTooltip('No for Now')}
+                  >
+                    NN
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700 cursor-help" 
+                    onClick={() => showTooltip('Already with UW')}
+                  >
+                    UW
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700 cursor-help" 
+                    onClick={() => showTooltip('Not Interested')}
+                  >
+                    NI
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-slate-500 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-700 cursor-help" 
+                    onClick={() => showTooltip('No Answer')}
+                  >
+                    NA
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700 cursor-help" 
+                    onClick={() => showTooltip('No Cold Callers')}
+                  >
+                    NC
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">📊 Progress:</span>
+                <div className="flex items-center gap-1">
+                  <span 
+                    className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700 cursor-help" 
+                    onClick={() => showTooltip('Dropped')}
+                  >
+                    D
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700 cursor-help" 
+                    onClick={() => showTooltip('Knocked')}
+                  >
+                    K
+                  </span>
+                  <span 
+                    className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700 cursor-help" 
+                    onClick={() => showTooltip('Spoke')}
+                  >
+                    S
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <SectionCard 
           title="Search & Filter" 
           icon={Search}
@@ -2194,7 +2565,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                       >
                         {p.label}
                         {p.followUpAt && (
-                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border border-white dark:border-gray-900 flex items-center justify-center">
+                          <div className="absolute top-0 right-0 w-3 h-3 bg-amber-500 rounded-full border border-white dark:border-gray-900 flex items-center justify-center transform translate-x-1 -translate-y-1">
                             <CalendarClock className="w-2 h-2 text-white" />
                           </div>
                         )}
@@ -2257,6 +2628,13 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
           </div>
         )}
       </SectionCard>
+      
+      {/* Tooltip Display */}
+      {activeTooltip && (
+        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-3 rounded-xl text-base font-medium shadow-xl border border-gray-700">
+          {activeTooltip}
+        </div>
+      )}
     </div>
   );
 }
@@ -2277,11 +2655,23 @@ function ToggleRow({ label, value, onChange }) {
   );
 }
 
-function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onShowLinks, onToggleStatus }) {
+function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onShowLinks, onShowDocuments, onToggleStatus, onViewImage }) {
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
-  const [showUtilityLogos, setShowUtilityLogos] = useState(false);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(property.notes || "");
+
+  // Sync notes state when property changes
+  useEffect(() => {
+    setNotes(property.notes || "");
+  }, [property.notes]);
+
+
+
+  // Save notes when they change
+  const handleNotesChange = (newNotes) => {
+    setNotes(newNotes);
+    onUpdate({ notes: newNotes });
+  };
 
   return (
     <div className="space-y-4">
@@ -2338,55 +2728,135 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
         </div>
 
         <div className="mt-3 grid md:grid-cols-2 gap-3">
-          <button 
-            onClick={()=>setShowFollowUp(true)} 
-            className={`w-full px-3 py-2 rounded-xl flex items-center justify-center gap-2 text-sm transition-colors ${
-              property.followUpAt 
-                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700' 
-                : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            <CalendarClock className="w-4 h-4"/> 
-            {property.followUpAt ? (
-              <span>
-                Follow-up: {property.followUpAt}
-                {property.followUpTypes && (
-                  <span className="ml-1">
-                    {property.followUpTypes.call && '📞'}
-                    {property.followUpTypes.revisit && '🏠'}
-                    {property.followUpTypes.message && '💬'}
-                  </span>
-                )}
-              </span>
-            ) : 'Schedule follow‑up'}
-          </button>
-          <div className="flex gap-2">
+          <div className="relative">
+            <button 
+              onClick={()=>setShowFollowUp(true)} 
+              className={`w-full px-3 py-2 rounded-xl flex items-center justify-center gap-2 text-sm transition-colors ${
+                property.followUpAt 
+                  ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700' 
+                  : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <CalendarClock className="w-4 h-4"/> 
+              {property.followUpAt ? (
+                <span>
+                  Follow-up: {property.followUpAt}
+                  {property.followUpTypes && (
+                    <span className="ml-1">
+                      {property.followUpTypes.call && '📞'}
+                      {property.followUpTypes.revisit && '🏠'}
+                      {property.followUpTypes.message && '💬'}
+                    </span>
+                  )}
+                </span>
+              ) : 'Schedule follow‑up'}
+            </button>
+            
+            {/* Remove Follow-up Button - Only show when follow-up exists */}
+            {property.followUpAt && (
+              <button
+                onClick={() => {
+                  // Remove follow-up data
+                  onUpdate({ 
+                    followUpAt: null,
+                    followUpTypes: null,
+                    contactDetails: null
+                  });
+                  
+                  // Remove follow-up note from notes
+                  if (property.notes) {
+                    console.log('Original notes:', property.notes);
+                    // Split notes into lines to process more carefully
+                    const noteLines = property.notes.split('\n');
+                    const filteredLines = [];
+                    let skipNextLines = false;
+                    
+                    for (let i = 0; i < noteLines.length; i++) {
+                      const line = noteLines[i];
+                      
+                      // Check if this line starts a follow-up note (with or without emoji)
+                      if (line.includes('Follow-up scheduled:') || line.includes('Follow-up scheduled for') || 
+                          line.includes('📅 Follow-up scheduled:') || line.includes('📅 Follow-up scheduled for')) {
+                        console.log('Found follow-up note start at line', i, ':', line);
+                        skipNextLines = true;
+                        continue; // Skip this line
+                      }
+                      
+                      // If we're skipping lines, check if we've reached the end of the follow-up note
+                      if (skipNextLines) {
+                        // If we hit an empty line or a line that doesn't start with common follow-up patterns, stop skipping
+                        if (line.trim() === '' || 
+                            (!line.includes('Type:') && 
+                             !line.includes('Contact:') && 
+                             !line.startsWith('📞') && 
+                             !line.startsWith('🏠') && 
+                             !line.startsWith('💬'))) {
+                          console.log('Ending follow-up note skip at line', i, ':', line);
+                          skipNextLines = false;
+                          // Don't skip this line - it's the start of a new note
+                        } else {
+                          console.log('Skipping follow-up note line', i, ':', line);
+                          continue; // Skip this line (part of follow-up note)
+                        }
+                      }
+                      
+                      // Add this line if we're not skipping
+                      if (!skipNextLines) {
+                        filteredLines.push(line);
+                      }
+                    }
+                    
+                    // Join lines back together and clean up extra whitespace
+                    const updatedNotes = filteredLines.join('\n').replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+                    console.log('Updated notes:', updatedNotes);
+                    onUpdate({ notes: updatedNotes });
+                    // Update local notes state to reflect the change in the UI
+                    setNotes(updatedNotes);
+                    console.log('Local notes state updated to:', updatedNotes);
+                  }
+                }}
+                className="absolute -top-1 -right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-sm"
+                title="Remove follow-up"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+                    <div className="grid grid-cols-3 gap-2">
             <button 
               onClick={onShowScripts} 
-              className="flex-1 px-3 py-2 rounded-xl bg-primary-600 text-white text-sm flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors"
+              className="px-3 py-2 rounded-xl bg-primary-600 text-white text-sm flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors"
             >
               <MessageSquare className="w-4 h-4"/> Scripts
             </button>
             <button 
               onClick={onShowLinks} 
-              className="flex-1 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               <Link2 className="w-4 h-4"/> Links
             </button>
             <button 
-              onClick={() => setShowUtilityLogos(true)} 
-              className="flex-1 px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              onClick={onShowDocuments} 
+              className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
-              <Globe className="w-4 h-4"/> Logos
+              <File className="w-4 h-4"/> Documents
             </button>
           </div>
         </div>
 
         <div className="mt-4">
-          <label className="text-xs opacity-70">Notes (avoid personal data)</label>
+          <div className="flex items-center justify-between">
+            <label className="text-xs opacity-70">Notes (avoid personal data)</label>
+            {notes !== (property.notes || "") && (
+              <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                <Check className="w-3 h-3" />
+                Saved
+              </span>
+            )}
+          </div>
           <textarea 
             value={notes} 
-            onChange={e=>setNotes(e.target.value)} 
+            onChange={e => handleNotesChange(e.target.value)} 
             className="w-full mt-1 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors" 
             rows={3} 
             placeholder="e.g., 'best after 6pm', 'steep steps'"
@@ -2472,14 +2942,31 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
           {property.photo && (
             <div className="mt-3">
               <div className="relative">
-                <img 
-                  src={property.photo} 
-                  alt="Property photo" 
-                  className="w-full h-32 object-cover rounded-xl border border-gray-200 dark:border-gray-800"
-                />
+                <div
+                  onClick={() => onViewImage(property.photo, "Property Photo")}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => e.stopPropagation()}
+                  className="w-full block bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-colors overflow-hidden photo-viewer-button cursor-pointer"
+                  style={{ touchAction: 'manipulation' }}
+                >
+                  <div className="w-full h-48 flex items-center justify-center p-2">
+                    <img 
+                      src={property.photo} 
+                      alt="Property photo" 
+                      className="max-w-full max-h-full object-contain pointer-events-none"
+                      draggable="false"
+                    />
+                  </div>
+                </div>
                 <button 
-                  onClick={() => onUpdate({ photo: null })}
-                  className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdate({ photo: null });
+                  }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => e.stopPropagation()}
+                  className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-sm z-10"
+                  style={{ touchAction: 'manipulation' }}
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -2492,12 +2979,94 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                             <FollowUpModal
                         open={showFollowUp} 
                         onClose={()=>setShowFollowUp(false)} 
+                        existingFollowUp={property.followUpAt ? {
+                          followUpAt: property.followUpAt,
+                          followUpTypes: property.followUpTypes,
+                          contactDetails: property.contactDetails
+                        } : null}
                         onSave={(followUpData)=>{ 
+                          // Create follow-up note
+                          const followUpNote = `📅 Follow-up scheduled: ${new Date(followUpData.dateTime).toLocaleString('en-GB', {
+                            dateStyle: 'short',
+                            timeStyle: 'short'
+                          })}`;
+                          
+                          const typeEmojis = [];
+                          if (followUpData.types.call) typeEmojis.push('📞 Call');
+                          if (followUpData.types.revisit) typeEmojis.push('🏠 Revisit');
+                          if (followUpData.types.message) typeEmojis.push('💬 Message');
+                          
+                          const typeNote = typeEmojis.length > 0 ? `\nType: ${typeEmojis.join(', ')}` : '';
+                          
+                          let contactNote = '';
+                          if (followUpData.contactDetails) {
+                            contactNote = `\nContact: ${followUpData.contactDetails.name}${followUpData.contactDetails.phone ? ` (${followUpData.contactDetails.phone})` : ''}`;
+                          }
+                          
+                          const fullNote = followUpNote + typeNote + contactNote;
+                          console.log('Created follow-up note:', fullNote);
+                          
+                          // Handle notes - if editing existing follow-up, replace the old note; otherwise add new note
+                          let updatedNotes;
+                          if (property.followUpAt) {
+                            // Editing existing follow-up - remove old follow-up note and add new one
+                            if (property.notes) {
+                              const noteLines = property.notes.split('\n');
+                              const filteredLines = [];
+                              let skipNextLines = false;
+                              
+                              for (let i = 0; i < noteLines.length; i++) {
+                                const line = noteLines[i];
+                                
+                                // Check if this line starts a follow-up note (with or without emoji)
+                                if (line.includes('Follow-up scheduled:') || line.includes('Follow-up scheduled for') || 
+                                    line.includes('📅 Follow-up scheduled:') || line.includes('📅 Follow-up scheduled for')) {
+                                  skipNextLines = true;
+                                  continue; // Skip this line
+                                }
+                                
+                                // If we're skipping lines, check if we've reached the end of the follow-up note
+                                if (skipNextLines) {
+                                  // If we hit an empty line or a line that doesn't start with common follow-up patterns, stop skipping
+                                  if (line.trim() === '' || 
+                                      (!line.includes('Type:') && 
+                                       !line.includes('Contact:') && 
+                                       !line.startsWith('📞') && 
+                                       !line.startsWith('🏠') && 
+                                       !line.startsWith('💬'))) {
+                                    skipNextLines = false;
+                                    // Don't skip this line - it's the start of a new note
+                                  } else {
+                                    continue; // Skip this line (part of follow-up note)
+                                  }
+                                }
+                                
+                                // Add this line if we're not skipping
+                                if (!skipNextLines) {
+                                  filteredLines.push(line);
+                                }
+                              }
+                              
+                              // Join lines back together and add new follow-up note
+                              const cleanedNotes = filteredLines.join('\n').replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+                              updatedNotes = cleanedNotes ? `${cleanedNotes}\n\n${fullNote}` : fullNote;
+                            } else {
+                              updatedNotes = fullNote;
+                            }
+                          } else {
+                            // Creating new follow-up - add to existing notes
+                            updatedNotes = notes ? `${notes}\n\n${fullNote}` : fullNote;
+                          }
+                          
                           onUpdate({ 
                             followUpAt: followUpData.dateTime,
                             followUpTypes: followUpData.types,
-                            contactDetails: followUpData.contactDetails
+                            contactDetails: followUpData.contactDetails,
+                            notes: updatedNotes
                           }); 
+                          
+                          // Update local notes state
+                          setNotes(updatedNotes);
                           setShowFollowUp(false); 
                         }}
                       />
@@ -2508,9 +3077,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
         onSave={(photoData)=>{ onUpdate({ photo: photoData }); setShowPhotoModal(false); }} 
       />
       
-      <Drawer open={showUtilityLogos} onClose={()=>setShowUtilityLogos(false)} title="Utility Company Logos" size="full">
-        <UtilityLogosPanel />
-      </Drawer>
+
     </div>
   );
 }
@@ -2564,7 +3131,7 @@ function OutcomeButton({ label, value, current, onClick, variant = "default" }) 
   );
 }
 
-function FollowUpModal({ open, onClose, onSave }) {
+function FollowUpModal({ open, onClose, onSave, existingFollowUp = null }) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [followUpTypes, setFollowUpTypes] = useState({
@@ -2574,6 +3141,25 @@ function FollowUpModal({ open, onClose, onSave }) {
   });
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+
+  // Initialize form with existing data when modal opens
+  useEffect(() => {
+    if (existingFollowUp && open) {
+      const followUpDate = new Date(existingFollowUp.followUpAt);
+      setDate(followUpDate.toISOString().split('T')[0]);
+      setTime(followUpDate.toTimeString().slice(0, 5));
+      setFollowUpTypes(existingFollowUp.followUpTypes || { call: false, revisit: false, message: false });
+      setContactName(existingFollowUp.contactDetails?.name || "");
+      setContactPhone(existingFollowUp.contactDetails?.phone || "");
+    } else if (!existingFollowUp && open) {
+      // Reset form when creating new follow-up
+      setDate("");
+      setTime("");
+      setFollowUpTypes({ call: false, revisit: false, message: false });
+      setContactName("");
+      setContactPhone("");
+    }
+  }, [existingFollowUp, open]);
 
   const handleTypeChange = (type) => {
     setFollowUpTypes(prev => ({
@@ -2594,7 +3180,7 @@ function FollowUpModal({ open, onClose, onSave }) {
   const hasSelectedTypes = Object.values(followUpTypes).some(Boolean);
 
   return (
-    <Drawer open={open} onClose={onClose} title="Schedule follow‑up">
+    <Drawer open={open} onClose={onClose} title={existingFollowUp ? "Edit follow‑up" : "Schedule follow‑up"}>
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -2707,7 +3293,7 @@ function FollowUpModal({ open, onClose, onSave }) {
           disabled={!date || !time}
           className="w-full px-3 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors"
         >
-          Save reminder
+          {existingFollowUp ? "Update reminder" : "Save reminder"}
         </button>
       </div>
     </Drawer>
@@ -2716,8 +3302,8 @@ function FollowUpModal({ open, onClose, onSave }) {
 
 function PhotoModal({ open, onClose, onSave }) {
   const [capturedImage, setCapturedImage] = useState(null);
-  const [isCapturing, setIsCapturing] = useState(false);
-  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -2730,57 +3316,6 @@ function PhotoModal({ open, onClose, onSave }) {
     }
   };
 
-  const startCamera = async () => {
-    try {
-      setIsCapturing(true);
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment',
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        } 
-      });
-      
-      const video = document.createElement('video');
-      video.srcObject = stream;
-      video.autoplay = true;
-      video.style.width = '100%';
-      video.style.height = '300px';
-      video.style.objectFit = 'cover';
-      
-      const container = document.getElementById('camera-container');
-      if (container) {
-        container.innerHTML = '';
-        container.appendChild(video);
-      }
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      alert('Unable to access camera. Please use the gallery option instead.');
-      setIsCapturing(false);
-    }
-  };
-
-  const capturePhoto = () => {
-    const video = document.querySelector('#camera-container video');
-    if (video) {
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0);
-      
-      const photoData = canvas.toDataURL('image/jpeg', 0.8);
-      setCapturedImage(photoData);
-      
-      // Stop camera stream
-      const stream = video.srcObject;
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      setIsCapturing(false);
-    }
-  };
-
   const handleSave = () => {
     if (capturedImage) {
       onSave(capturedImage);
@@ -2790,19 +3325,13 @@ function PhotoModal({ open, onClose, onSave }) {
 
   const handleClose = () => {
     setCapturedImage(null);
-    setIsCapturing(false);
-    // Stop any active camera stream
-    const video = document.querySelector('#camera-container video');
-    if (video && video.srcObject) {
-      video.srcObject.getTracks().forEach(track => track.stop());
-    }
     onClose();
   };
 
   return (
     <Drawer open={open} onClose={handleClose} title="Add Property Photo">
       <div className="space-y-4">
-        {!capturedImage && !isCapturing && (
+        {!capturedImage && (
           <div className="space-y-3">
             <div className="text-sm text-gray-600 dark:text-gray-400">
               Take a photo or select from your gallery to document this property.
@@ -2810,7 +3339,7 @@ function PhotoModal({ open, onClose, onSave }) {
             
             <div className="grid grid-cols-2 gap-3">
               <button 
-                onClick={startCamera}
+                onClick={() => cameraInputRef.current?.click()}
                 className="px-4 py-3 rounded-xl bg-primary-600 text-white text-sm flex items-center justify-center gap-2 hover:bg-primary-700 transition-colors"
               >
                 <Camera className="w-4 h-4" />
@@ -2818,7 +3347,7 @@ function PhotoModal({ open, onClose, onSave }) {
               </button>
               
               <button 
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => galleryInputRef.current?.click()}
                 className="px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm flex items-center justify-center gap-2 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               >
                 <Upload className="w-4 h-4" />
@@ -2826,46 +3355,24 @@ function PhotoModal({ open, onClose, onSave }) {
               </button>
             </div>
             
+            {/* Camera input - opens native camera */}
             <input 
-              ref={fileInputRef}
+              ref={cameraInputRef}
               type="file" 
               accept="image/*" 
               capture="environment"
               onChange={handleFileSelect}
               className="hidden"
             />
-          </div>
-        )}
-
-        {isCapturing && (
-          <div className="space-y-3">
-            <div id="camera-container" className="w-full h-64 bg-black rounded-xl overflow-hidden flex items-center justify-center">
-              <div className="text-white text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-                <div>Starting camera...</div>
-              </div>
-            </div>
             
-            <div className="flex gap-2">
-              <button 
-                onClick={capturePhoto}
-                className="flex-1 px-4 py-3 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
-              >
-                📸 Capture Photo
-              </button>
-              <button 
-                onClick={() => {
-                  setIsCapturing(false);
-                  const video = document.querySelector('#camera-container video');
-                  if (video && video.srcObject) {
-                    video.srcObject.getTracks().forEach(track => track.stop());
-                  }
-                }}
-                className="px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
+            {/* Gallery input - opens camera roll/file picker */}
+            <input 
+              ref={galleryInputRef}
+              type="file" 
+              accept="image/*" 
+              onChange={handleFileSelect}
+              className="hidden"
+            />
           </div>
         )}
 
@@ -2875,7 +3382,7 @@ function PhotoModal({ open, onClose, onSave }) {
               <img 
                 src={capturedImage} 
                 alt="Captured photo" 
-                className="w-full h-64 object-cover rounded-xl border border-gray-200 dark:border-gray-800"
+                className="w-full h-64 object-contain rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800"
               />
               <button 
                 onClick={() => setCapturedImage(null)}
@@ -2902,6 +3409,8 @@ function PhotoModal({ open, onClose, onSave }) {
           </div>
         )}
       </div>
+      
+
     </Drawer>
   );
 }
@@ -2911,11 +3420,17 @@ function PhotoModal({ open, onClose, onSave }) {
 function ScriptsPanel() {
   const [tab, setTab] = useState("system");
   const [editingScript, setEditingScript] = useState(null);
-  const [customScripts, setCustomScripts] = useState({});
-  const [showCustomScripts, setShowCustomScripts] = useState(false);
-  const [scriptOrder, setScriptOrder] = useState({});
+  const [customScripts, setCustomScripts] = useState(() => {
+    const saved = localStorage.getItem('partner_scripts');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [showNewScriptModal, setShowNewScriptModal] = useState(false);
+  const [newScriptData, setNewScriptData] = useState({ title: '', content: '' });
+  const [scriptOrder, setScriptOrder] = useState(() => {
+    const saved = localStorage.getItem('partner_script_order');
+    return saved ? JSON.parse(saved) : {};
+  });
   const [isReordering, setIsReordering] = useState(false);
-  const [draggedItem, setDraggedItem] = useState(null);
   
   const tabs = [
     { key: "system", label: "Dan's System" },
@@ -2924,11 +3439,14 @@ function ScriptsPanel() {
     { key: "closer", label: "Closers" },
   ];
   
+  // Get partner name from localStorage
+  const partnerName = localStorage.getItem('partner_name') || 'Your Name';
+  
   const danCrooksSystem = [
     {
       id: "intro",
       title: "1. INTRODUCTION",
-      content: "Hi, I'm Dan I live locally. I posted this through a couple of days ago. If you're anything like me, you probably didn't get a chance to look at it and you put it in the recycling bin. Am I right?"
+      content: `Hi, I'm ${partnerName} I live locally. I posted this through a couple of days ago. If you're anything like me, you probably didn't get a chance to look at it and you put it in the recycling bin. Am I right?`
     },
     {
       id: "story",
@@ -2954,15 +3472,16 @@ function ScriptsPanel() {
   
   const items = tab === "system" ? danCrooksSystem : seedScripts[tab];
 
-  // Copy script to clipboard
-  const copyToClipboard = async (text) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      // You could add a toast notification here
-      console.log('Script copied to clipboard');
-    } catch (err) {
-      console.error('Failed to copy: ', err);
-    }
+  // Save custom scripts to localStorage
+  const saveCustomScripts = (scripts) => {
+    setCustomScripts(scripts);
+    localStorage.setItem('partner_scripts', JSON.stringify(scripts));
+  };
+
+  // Save script order to localStorage
+  const saveScriptOrder = (order) => {
+    setScriptOrder(order);
+    localStorage.setItem('partner_script_order', JSON.stringify(order));
   };
 
   // Handle edit script
@@ -2972,14 +3491,16 @@ function ScriptsPanel() {
 
   // Handle save edited script
   const handleSaveScript = (scriptId, newContent) => {
-    setCustomScripts(prev => ({
-      ...prev,
+    const updatedScripts = {
+      ...customScripts,
       [scriptId]: {
         ...editingScript,
         content: newContent,
-        isCustom: true
+        isCustom: true,
+        category: tab
       }
-    }));
+    };
+    saveCustomScripts(updatedScripts);
     setEditingScript(null);
   };
 
@@ -2989,15 +3510,51 @@ function ScriptsPanel() {
     const newScript = {
       ...originalScript,
       id: newId,
-      title: `${originalScript.title} (Custom)`,
-      isCustom: true
+      title: `${originalScript.title} (Copy)`,
+      isCustom: true,
+      category: tab
     };
     
-    setCustomScripts(prev => ({
-      ...prev,
+    const updatedScripts = {
+      ...customScripts,
       [newId]: newScript
-    }));
+    };
+    saveCustomScripts(updatedScripts);
   };
+
+  // Handle create new script
+  const handleCreateNewScript = () => {
+    if (!newScriptData.title.trim() || !newScriptData.content.trim()) return;
+    
+    const newId = `custom_${Date.now()}`;
+    const newScript = {
+      id: newId,
+      title: newScriptData.title,
+      content: newScriptData.content,
+      isCustom: true,
+      category: tab
+    };
+    
+    const updatedScripts = {
+      ...customScripts,
+      [newId]: newScript
+    };
+    saveCustomScripts(updatedScripts);
+    
+    setNewScriptData({ title: '', content: '' });
+    setShowNewScriptModal(false);
+  };
+
+  // Handle delete custom script
+  const handleDeleteScript = (scriptId) => {
+    if (confirm('Are you sure you want to delete this script? This action cannot be undone.')) {
+      const updatedScripts = { ...customScripts };
+      delete updatedScripts[scriptId];
+      saveCustomScripts(updatedScripts);
+    }
+  };
+
+
 
   // Get all scripts including custom ones
   const getAllScripts = () => {
@@ -3010,49 +3567,31 @@ function ScriptsPanel() {
 
   const displayItems = getAllScripts();
 
-  // Drag and drop functionality
-  const handleDragStart = (e, script) => {
-    // Protect Dan's System - no dragging allowed
-    if (tab === "system") {
-      e.preventDefault();
-      return;
-    }
-    
-    setDraggedItem(script);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleDrop = (e, targetScript) => {
-    e.preventDefault();
-    if (!draggedItem || draggedItem.id === targetScript.id) return;
-
+  // Move script up or down functionality
+  const moveScript = (scriptId, direction) => {
     // Protect Dan's System - no reordering allowed
-    if (tab === "system") {
-      setDraggedItem(null);
-      return;
+    if (tab === "system") return;
+
+    const items = [...getAllScripts()];
+    const currentIndex = items.findIndex(item => item.id === scriptId);
+    
+    if (direction === 'up' && currentIndex > 0) {
+      // Move up
+      [items[currentIndex], items[currentIndex - 1]] = [items[currentIndex - 1], items[currentIndex]];
+    } else if (direction === 'down' && currentIndex < items.length - 1) {
+      // Move down
+      [items[currentIndex], items[currentIndex + 1]] = [items[currentIndex + 1], items[currentIndex]];
+    } else {
+      return; // Can't move further
     }
-
-    const items = [...displayItems];
-    const draggedIndex = items.findIndex(item => item.id === draggedItem.id);
-    const targetIndex = items.findIndex(item => item.id === targetScript.id);
-
-    // Remove dragged item and insert at target position
-    items.splice(draggedIndex, 1);
-    items.splice(targetIndex, 0, draggedItem);
 
     // Save the new order
     const newOrder = items.map((item, index) => ({ id: item.id, order: index }));
-    setScriptOrder(prev => ({
-      ...prev,
+    const updatedOrder = {
+      ...scriptOrder,
       [tab]: newOrder
-    }));
-
-    setDraggedItem(null);
+    };
+    saveScriptOrder(updatedOrder);
   };
 
   // Get ordered scripts
@@ -3076,8 +3615,9 @@ function ScriptsPanel() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <div className="grid grid-cols-4 gap-2">
+      <div className="space-y-3 mb-4">
+        {/* Tab Navigation - Mobile Optimized */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
           {tabs.map(t => (
             <button 
               key={t.key} 
@@ -3093,36 +3633,39 @@ function ScriptsPanel() {
           ))}
         </div>
         
+        {/* Action Buttons - Mobile Optimized */}
         {tab !== "system" && (
-          <button
-            onClick={() => setIsReordering(!isReordering)}
-            className={`px-3 py-2 rounded-xl text-sm transition-colors ${
-              isReordering 
-                ? 'bg-green-600 text-white' 
-                : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
-            }`}
-          >
-            {isReordering ? 'Done' : 'Reorder'}
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              onClick={() => setShowNewScriptModal(true)}
+              className="px-3 py-2 rounded-xl bg-green-600 text-white text-sm hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              New Script
+            </button>
+            <button
+              onClick={() => setIsReordering(!isReordering)}
+              className={`px-3 py-2 rounded-xl text-sm transition-colors flex items-center justify-center gap-2 ${
+                isReordering 
+                  ? 'bg-amber-600 text-white' 
+                  : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              {isReordering ? <Check className="w-4 h-4" /> : <Settings className="w-4 h-4" />}
+              {isReordering ? 'Done Reordering' : 'Reorder'}
+            </button>
+          </div>
         )}
       </div>
       <div className="space-y-3">
-        {finalDisplayItems.map(s => (
+        {finalDisplayItems.map((s, index) => (
           <div 
             key={s.id} 
             className={`p-3 rounded-2xl border transition-all duration-200 ${
               s.isCustom 
                 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
                 : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800'
-            } ${
-              isReordering && tab !== "system" ? 'cursor-move hover:shadow-lg' : ''
-            } ${
-              draggedItem?.id === s.id ? 'opacity-50 scale-95' : ''
             }`}
-            draggable={isReordering && tab !== "system"}
-            onDragStart={(e) => isReordering && handleDragStart(e, s)}
-            onDragOver={isReordering ? handleDragOver : undefined}
-            onDrop={isReordering ? (e) => handleDrop(e, s) : undefined}
           >
             <div className="text-sm font-medium mb-1 flex items-center gap-2">
               {s.title}
@@ -3159,33 +3702,52 @@ function ScriptsPanel() {
             ) : (
               <>
                 <div className="text-sm opacity-90 whitespace-pre-line">{s.content}</div>
-                <div className="mt-2 flex gap-2">
-                  <button 
-                    onClick={() => copyToClipboard(s.content)}
-                    className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    Copy
-                  </button>
+                <div className="mt-3 flex flex-col sm:flex-row gap-2">
                   {tab !== "system" && !isReordering && (
                     <>
                       <button 
                         onClick={() => handleEditScript(s)}
-                        className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        className="px-3 py-2 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                       >
+                        <Edit className="w-4 h-4" />
                         Edit
                       </button>
                       <button 
                         onClick={() => handleSaveAsNew(s)}
-                        className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        className="px-3 py-2 rounded-xl bg-green-600 text-white text-sm hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
                       >
-                        Save as new
+                        <Copy className="w-4 h-4" />
+                        Save as New
                       </button>
+                      {s.isCustom && (
+                        <button 
+                          onClick={() => handleDeleteScript(s.id)}
+                          className="px-3 py-2 rounded-xl bg-red-600 text-white text-sm hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </button>
+                      )}
                     </>
                   )}
                   {isReordering && tab !== "system" && (
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <div className="w-4 h-4 border-2 border-gray-300 dark:border-gray-600 rounded"></div>
-                      Drag to reorder
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => moveScript(s.id, 'up')}
+                        disabled={index === 0}
+                        className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Move Up"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => moveScript(s.id, 'down')}
+                        disabled={index === finalDisplayItems.length - 1}
+                        className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Move Down"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
                     </div>
                   )}
                   {isReordering && tab === "system" && (
@@ -3200,70 +3762,70 @@ function ScriptsPanel() {
           </div>
         ))}
       </div>
-    </div>
-  );
-}
 
-function UtilityLogosPanel() {
-  const [orientation, setOrientation] = useState('portrait');
-
-  useEffect(() => {
-    const handleOrientationChange = () => {
-      setOrientation(window.innerHeight > window.innerWidth ? 'portrait' : 'landscape');
-    };
-
-    // Set initial orientation
-    handleOrientationChange();
-
-    // Listen for orientation changes
-    window.addEventListener('orientationchange', handleOrientationChange);
-    window.addEventListener('resize', handleOrientationChange);
-
-    return () => {
-      window.removeEventListener('orientationchange', handleOrientationChange);
-      window.removeEventListener('resize', handleOrientationChange);
-    };
-  }, []);
-
-  return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className={`max-w-full max-h-full ${
-          orientation === 'landscape' ? 'w-full h-full' : 'w-full'
-        }`}>
-          <img 
-            src="/utility-logos.png" 
-            alt="UK Utility Company Logos" 
-            className={`rounded-lg transition-all duration-300 ${
-              orientation === 'landscape' 
-                ? 'w-full h-full object-contain' 
-                : 'w-full h-auto max-h-[80vh] object-contain'
-            }`}
-            onError={(e) => {
-              e.target.style.display = 'none';
-              e.target.nextSibling.style.display = 'block';
-            }}
-          />
-          <div className="hidden text-center text-white text-sm py-8">
-            <div className="mb-2">Image not found</div>
-            <div>Please add utility-logos.png to the public folder</div>
+      {/* New Script Modal */}
+      {showNewScriptModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Create New Script</h3>
+              <button
+                onClick={() => setShowNewScriptModal(false)}
+                className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Script Title</label>
+                <input
+                  type="text"
+                  value={newScriptData.title}
+                  onChange={(e) => setNewScriptData({...newScriptData, title: e.target.value})}
+                  placeholder="e.g., My Custom Opener"
+                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Script Content</label>
+                <textarea
+                  value={newScriptData.content}
+                  onChange={(e) => setNewScriptData({...newScriptData, content: e.target.value})}
+                  placeholder="Type or paste your script here..."
+                  rows={6}
+                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                />
+              </div>
+              
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleCreateNewScript}
+                  disabled={!newScriptData.title.trim() || !newScriptData.content.trim()}
+                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Create Script
+                </button>
+                <button
+                  onClick={() => setShowNewScriptModal(false)}
+                  className="px-4 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-      
-      <div className={`p-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-800 ${
-        orientation === 'landscape' ? 'flex-shrink-0' : ''
-      }`}>
-        <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-          Reference logos for major UK utility and telecommunications companies. Useful for identifying current providers during doorstep conversations.
-        </div>
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          <strong>Companies shown:</strong> OVO, ScottishPower, Octopus Energy, EE, EDF, Vodafone, Virgin Media, O2, Sky, Plusnet, BT, British Gas, E.ON
-        </div>
-      </div>
+      )}
+
+
     </div>
   );
 }
+
+
 
 function LinksPanel({ links }) {
   const linkRows = [
@@ -3296,9 +3858,576 @@ function LinksPanel({ links }) {
   );
 }
 
+function DocumentsPanel({ onViewPdf, onViewImage }) {
+  const [documents, setDocuments] = useState(() => {
+    // Load partner's custom documents from localStorage
+    const savedDocs = localStorage.getItem('partner_documents');
+    return savedDocs ? JSON.parse(savedDocs) : [];
+  });
+
+  const [showAddDocument, setShowAddDocument] = useState(false);
+  const [showManageDocuments, setShowManageDocuments] = useState(false);
+
+  // Default UW documents (shared across all users)
+  const defaultDocuments = [
+    {
+      id: "presenter-sheet",
+      title: "£20k Giveaway Presenter",
+      description: "Laminated presenter sheet for doorstep conversations",
+      type: "link",
+      url: "https://uw.co.uk/partner/portal/incentives/the-20k-giveaway/form",
+      icon: FileText,
+      category: "Sales Materials",
+      isDefault: true
+    },
+
+    {
+      id: "uw-presenter",
+      title: "UW Presenter",
+      description: "Official UW presenter document for doorstep conversations",
+      type: "link",
+      url: "https://assets.ctfassets.net/ihl5uj459rzx/6UbKQzbKP2sHmMz3fEn648/93f3b2fb3b047f63d0005181c62535dc/UW_Presenter.pdf",
+      icon: FileText,
+      category: "Tools",
+      isDefault: true
+    },
+    {
+      id: "utility-logos",
+      title: "Utility Company Logos",
+      description: "Reference logos for major UK utility and telecommunications companies",
+      type: "image",
+      url: "/utility-logos.png",
+      icon: Globe,
+      category: "Tools",
+      isDefault: true
+    },
+  ];
+
+  // Combine default and custom documents
+  const allDocuments = [...defaultDocuments, ...documents];
+
+  const saveDocuments = (newDocs) => {
+    setDocuments(newDocs);
+    localStorage.setItem('partner_documents', JSON.stringify(newDocs));
+  };
+
+  const addDocument = (newDoc) => {
+    const docWithId = {
+      ...newDoc,
+      id: `custom_${Date.now()}`,
+      isDefault: false
+    };
+    const updatedDocs = [...documents, docWithId];
+    saveDocuments(updatedDocs);
+    setShowAddDocument(false);
+  };
+
+  const removeDocument = (docId) => {
+    const updatedDocs = documents.filter(doc => doc.id !== docId);
+    saveDocuments(updatedDocs);
+  };
+
+  const categories = [...new Set(allDocuments.map(doc => doc.category))];
+  const [selectedCategory, setSelectedCategory] = useState("All");
+
+  const filteredDocuments = selectedCategory === "All" 
+    ? allDocuments 
+    : allDocuments.filter(doc => doc.category === selectedCategory);
+
+  return (
+    <div className="space-y-4">
+      {/* Header with Add/Manage buttons */}
+      <div className="flex items-center justify-between">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedCategory("All")}
+            className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${
+              selectedCategory === "All"
+                ? "bg-primary-600 text-white"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+            }`}
+          >
+            All
+          </button>
+          {categories.map(category => (
+            <button
+              key={category}
+              onClick={() => setSelectedCategory(category)}
+              className={`px-3 py-1.5 rounded-xl text-sm transition-colors ${
+                selectedCategory === category
+                  ? "bg-primary-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowAddDocument(true)}
+            className="px-3 py-1.5 rounded-xl bg-green-600 text-white text-sm hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add Document
+          </button>
+          {documents.length > 0 && (
+            <button
+              onClick={() => setShowManageDocuments(true)}
+              className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+            >
+              <Settings className="w-4 h-4" />
+              Manage
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Documents List */}
+      <div className="space-y-2">
+        {filteredDocuments.map((doc) => (
+          <div
+            key={doc.id}
+            className={`flex items-center justify-between p-3 rounded-2xl border transition-colors ${
+              doc.isDefault 
+                ? "bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+                : "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:border-green-400 hover:bg-green-100 dark:hover:bg-green-900/30"
+            }`}
+          >
+            <div className="flex items-center gap-3 flex-1">
+              <div className={`p-2 rounded-xl ${
+                doc.isDefault 
+                  ? "bg-blue-50 dark:bg-blue-900/20" 
+                  : "bg-green-100 dark:bg-green-900/30"
+              }`}>
+                <doc.icon className={`w-5 h-5 ${
+                  doc.isDefault 
+                    ? "text-blue-600 dark:text-blue-400" 
+                    : "text-green-600 dark:text-green-400"
+                }`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm flex items-center gap-2">
+                  {doc.title}
+                  {!doc.isDefault && (
+                    <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full">
+                      Custom
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">{doc.description}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">{doc.category}</div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {/* Only show View Document button for images and PDFs, not for links */}
+              {(doc.type === 'image' || doc.type === 'pdf') && (
+                <button
+                  onClick={() => {
+                    if (doc.type === 'image') {
+                      // For images, use the image viewer
+                      onViewImage(doc.url, doc.title);
+                    } else {
+                      // For PDFs and HTML, use the PDF viewer
+                      onViewPdf(doc.url, doc.title);
+                    }
+                  }}
+                  className="p-2 rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
+                  title={doc.type === 'image' ? "View Image" : "View Document"}
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+              )}
+              {/* Show Open in new tab button for all types except images */}
+              {doc.type !== 'image' && (
+                <a
+                  href={doc.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  title="Open in new tab"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              )}
+              {!doc.isDefault && (
+                <button
+                  onClick={() => removeDocument(doc.id)}
+                  className="p-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                  title="Remove document"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="text-xs opacity-70 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+        <div className="font-medium text-blue-800 dark:text-blue-200 mb-1">💡 How to use:</div>
+        <div className="text-blue-700 dark:text-blue-300 space-y-1">
+          <div>• <strong>View Document:</strong> Opens document inline for quick reference</div>
+          <div>• <strong>Open in new tab:</strong> Available for PDFs and links (not images)</div>
+          <div>• <strong>Show to customer:</strong> Use "View Document" to display on your device</div>
+          <div>• <strong>Add your own:</strong> Use "Add Document" to include your custom materials</div>
+        </div>
+      </div>
+
+      {/* Add Document Modal */}
+      {showAddDocument && (
+        <AddDocumentModal 
+          onAdd={addDocument} 
+          onClose={() => setShowAddDocument(false)} 
+        />
+      )}
+
+      {/* Manage Documents Modal */}
+      {showManageDocuments && (
+        <ManageDocumentsModal 
+          documents={documents}
+          onRemove={removeDocument}
+          onClose={() => setShowManageDocuments(false)} 
+        />
+      )}
+    </div>
+  );
+}
+
+function AddDocumentModal({ onAdd, onClose }) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [url, setUrl] = useState("");
+  const [category, setCategory] = useState("Templates");
+  const [type, setType] = useState("pdf");
+
+  const categories = ["Templates", "Sales Materials", "Marketing", "Tools", "Support", "Training"];
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title || !url) return;
+
+    onAdd({
+      title,
+      description,
+      url,
+      category,
+      type,
+      icon: FileText
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold mb-4">Add Custom Document</h3>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Document Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20"
+              placeholder="e.g., My Custom Brochure"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20"
+              placeholder="Brief description of the document"
+              rows={2}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Document URL</label>
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="w-full p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20"
+              placeholder="https://example.com/document.pdf"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Category</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20"
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Type</label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="w-full p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20"
+              >
+                <option value="pdf">PDF</option>
+                <option value="html">HTML</option>
+                <option value="link">External Link</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-3 rounded-xl bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+            >
+              Add Document
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ManageDocumentsModal({ documents, onRemove, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto">
+        <h3 className="text-lg font-semibold mb-4">Manage Custom Documents</h3>
+        
+        {documents.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="text-gray-500 dark:text-gray-400 mb-2">No custom documents yet</div>
+            <div className="text-sm text-gray-400 dark:text-gray-500">Add documents using the "Add Document" button</div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {documents.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-900/20"
+              >
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{doc.title}</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">{doc.description}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-500">{doc.category}</div>
+                </div>
+                <button
+                  onClick={() => onRemove(doc.id)}
+                  className="p-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                  title="Remove document"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-end pt-4">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ImageViewer({ url, title, onClose }) {
+  return (
+    <div className="h-full flex flex-col">
+      {/* Image Display */}
+      <div className="flex-1 flex items-center justify-center p-4 bg-gray-100 dark:bg-gray-900">
+        <img
+          src={url}
+          alt={title}
+          className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+        />
+      </div>
+    </div>
+  );
+}
+
+function PdfViewer({ url, title }) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [useFallback, setUseFallback] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(100);
+
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+    setUseFallback(false);
+  }, [url]);
+
+  const handleLoad = () => {
+    setIsLoading(false);
+  };
+
+  const handleError = () => {
+    setIsLoading(false);
+    // Check if this is a PDF and we have a fallback HTML version
+    if (url.endsWith('.pdf') && !useFallback) {
+      const fallbackUrl = url.replace('.pdf', '.html');
+      setUseFallback(true);
+      // Try the fallback URL
+      const iframe = document.querySelector('iframe');
+      if (iframe) {
+        iframe.src = fallbackUrl;
+        setIsLoading(true);
+      }
+    } else {
+      setError("Failed to load document. Please try opening in a new tab instead.");
+    }
+  };
+
+  const isHtml = url.endsWith('.html');
+  const displayUrl = useFallback ? url.replace('.pdf', '.html') : url;
+  const isPdf = url.endsWith('.pdf');
+  
+  // Enhanced PDF parameters for better viewing
+  const getPdfUrl = () => {
+    if (!isPdf) return displayUrl;
+    const baseParams = 'toolbar=1&navpanes=1&scrollbar=1&view=FitH&pagemode=thumbs&statusbar=1';
+    const zoomParam = `&zoom=${zoomLevel}`;
+    return `${displayUrl}#${baseParams}${zoomParam}`;
+  };
+
+  return (
+    <div className={`${isFullScreen ? 'fixed inset-0 z-50 bg-white dark:bg-gray-900' : 'h-full'} flex flex-col`}>
+      {/* Document Controls - Mobile Optimized */}
+      <div className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
+        <div className="text-xs sm:text-sm font-medium truncate flex-1 mr-2">{title}</div>
+        <div className="flex gap-1 sm:gap-2 flex-shrink-0">
+          {isPdf && (
+            <>
+              <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl px-1 sm:px-2">
+                <button
+                  onClick={() => setZoomLevel(Math.max(50, zoomLevel - 25))}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                  title="Zoom Out"
+                >
+                  <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
+                </button>
+                <span className="text-xs font-medium min-w-[2rem] sm:min-w-[3rem] text-center">{zoomLevel}%</span>
+                <button
+                  onClick={() => setZoomLevel(Math.min(200, zoomLevel + 25))}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                  title="Zoom In"
+                >
+                  <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                </button>
+              </div>
+              <button
+                onClick={() => setIsFullScreen(!isFullScreen)}
+                className="px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-blue-600 text-white text-xs sm:text-sm hover:bg-blue-700 transition-colors flex items-center gap-1 sm:gap-2"
+              >
+                {isFullScreen ? <X className="w-3 h-3 sm:w-4 sm:h-4" /> : <Maximize className="w-3 h-3 sm:w-4 sm:h-4" />}
+                <span className="hidden sm:inline">{isFullScreen ? 'Exit Full Screen' : 'Full Screen'}</span>
+              </button>
+            </>
+          )}
+          <a
+            href={displayUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-primary-600 text-white text-xs sm:text-sm hover:bg-primary-700 transition-colors flex items-center gap-1 sm:gap-2"
+          >
+            <ExternalLink className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Open in new tab</span>
+          </a>
+          {!isHtml && (
+            <a
+              href={displayUrl}
+              download
+              className="px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1 sm:gap-2"
+            >
+              <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Download</span>
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Document Viewer */}
+      <div className="flex-1 relative">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-2"></div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                {isHtml ? "Loading document..." : "Loading PDF..."}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+            <div className="text-center p-4">
+              <div className="text-red-600 dark:text-red-400 mb-2">⚠️ {error}</div>
+              <a
+                href={displayUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+              >
+                Open in new tab
+              </a>
+            </div>
+          </div>
+        )}
+
+        <iframe
+          src={getPdfUrl()}
+          className="w-full h-full border-0"
+          onLoad={handleLoad}
+          onError={handleError}
+          title={title}
+          allowFullScreen={true}
+          style={{
+            minHeight: '100%',
+            height: '100%'
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [apiKey, setApiKey] = useState(localStorage.getItem('google_places_api_key') || '');
+  const [partnerName, setPartnerName] = useState(() => {
+    const saved = localStorage.getItem('partner_name');
+    return saved || 'Your Name';
+  });
+  const [showNameModal, setShowNameModal] = useState(false);
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -3312,6 +4441,16 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
   return (
     <div className="space-y-4">
 
+      <div className="space-y-2">
+        <h4 className="font-medium">Personalization</h4>
+        <button 
+          onClick={() => setShowNameModal(true)}
+          className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+        >
+          <User className="w-4 h-4" />
+          Set Your Name ({partnerName})
+        </button>
+      </div>
       
       <div className="space-y-2">
         <h4 className="font-medium">Appearance</h4>
@@ -3400,6 +4539,60 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
           Sign out
         </button>
       </div>
+
+      {/* Set Name Modal */}
+      {showNameModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Set Your Name</h3>
+              <button
+                onClick={() => setShowNameModal(false)}
+                className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Your Name</label>
+                <input
+                  type="text"
+                  value={partnerName}
+                  onChange={(e) => setPartnerName(e.target.value)}
+                  placeholder="e.g., John Smith"
+                  className="w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  This will be used throughout the app, including in scripts
+                </div>
+              </div>
+              
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    if (partnerName.trim()) {
+                      localStorage.setItem('partner_name', partnerName.trim());
+                      setShowNameModal(false);
+                    }
+                  }}
+                  disabled={!partnerName.trim()}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save Name
+                </button>
+                <button
+                  onClick={() => setShowNameModal(false)}
+                  className="px-4 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3752,179 +4945,189 @@ function AboutPanel() {
 function SuccessTipsPanel() {
   return (
     <div className="space-y-6">
-      {/* Timing & Strategy */}
+      {/* Strategy & Mindset */}
       <div className="space-y-3">
         <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Clock className="w-5 h-5" />
-          Timing & Strategy
+          <Target className="w-5 h-5" />
+          Strategy & Mindset
         </h3>
         <div className="grid md:grid-cols-2 gap-3">
           <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
-            <div className="font-medium text-green-800 dark:text-green-200 mb-2">🎯 Best Drop Times</div>
+            <div className="font-medium text-green-800 dark:text-green-200 mb-2">🎯 It's a Numbers Game</div>
             <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
-              <div>• <strong>Evenings:</strong> 6-8pm (people home from work)</div>
-              <div>• <strong>Weekends:</strong> 10am-2pm (avoid meal times)</div>
-              <div>• <strong>Avoid:</strong> Monday mornings, Friday evenings</div>
+              <div>• Don't expect every door to say "yes"</div>
+              <div>• Consistency and persistence pay off</div>
+              <div>• Track your numbers to see progress</div>
+              <div>• Each "no" brings you closer to a "yes"</div>
             </div>
           </div>
           
           <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-            <div className="font-medium text-blue-800 dark:text-blue-200 mb-2">📝 Follow Up Timing</div>
+            <div className="font-medium text-blue-800 dark:text-blue-200 mb-2">💡 The Fortune is in the Follow-up</div>
             <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-              <div>• <strong>Return:</strong> 2-3 days after dropping letters</div>
-              <div>• <strong>Best times:</strong> Same as drop times</div>
-              <div>• <strong>Multiple attempts:</strong> Try 3-4 times before marking as "No Answer"</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Conversation Techniques */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <MessageSquare className="w-5 h-5" />
-          Conversation Techniques
-        </h3>
-        <div className="space-y-3">
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
-            <div className="font-medium text-purple-800 dark:text-purple-200 mb-2">💡 Opening Lines</div>
-            <div className="text-sm text-purple-700 dark:text-purple-300 space-y-2">
-              <div><strong>Standard:</strong> "Hi! I'm [Name] and I'm local. I've been helping neighbours in this area save money on their household bills. I dropped a letter through earlier - have you had a chance to look at it?"</div>
-              <div><strong>Direct:</strong> "Hi! I'm helping families in [Area] save money on their bills. I left a letter earlier - would you like me to check if you could save money too?"</div>
-              <div><strong>Community:</strong> "Hi! I'm from UW and I've been working with families in this neighbourhood to reduce their bills. Have you seen the letter I dropped through?"</div>
-            </div>
-          </div>
-          
-          <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
-            <div className="font-medium text-amber-800 dark:text-amber-200 mb-2">🎭 Handling Objections</div>
-            <div className="text-sm text-amber-700 dark:text-amber-300 space-y-2">
-              <div><strong>"Not interested":</strong> "Totally fine! If things change, the letter has a QR code for a quick checker. No sales calls, just the numbers. Have a great day!"</div>
-              <div><strong>"Already with UW":</strong> "That's great! You might be eligible for additional savings or better bundles. Would you like me to check your current setup?"</div>
-              <div><strong>"Too busy":</strong> "I understand! It literally takes 2 minutes to check. If you're not saving money, you're not interested. If you are, we can book a proper time."</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Success Metrics */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <BarChart3 className="w-5 h-5" />
-          Success Metrics & Goals
-        </h3>
-        <div className="grid md:grid-cols-2 gap-3">
-          <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800">
-            <div className="font-medium text-indigo-800 dark:text-indigo-200 mb-2">📊 Realistic Targets</div>
-            <div className="text-sm text-indigo-700 dark:text-indigo-300 space-y-1">
-              <div>• <strong>Drop rate:</strong> 50-100 letters per session</div>
-              <div>• <strong>Conversation rate:</strong> 15-25% of drops</div>
-              <div>• <strong>Interest rate:</strong> 5-10% of conversations</div>
-              <div>• <strong>Success rate:</strong> 2-5% of conversations</div>
-            </div>
-          </div>
-          
-          <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800">
-            <div className="font-medium text-emerald-800 dark:text-emerald-200 mb-2">🎯 Daily Goals</div>
-            <div className="text-sm text-emerald-700 dark:text-emerald-300 space-y-1">
-              <div>• <strong>Drop:</strong> 50+ letters</div>
-              <div>• <strong>Follow up:</strong> 20+ properties</div>
-              <div>• <strong>Conversations:</strong> 5+ meaningful chats</div>
-              <div>• <strong>Interested leads:</strong> 1+ per day</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Dan Crooks' Expert Tips */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Target className="w-5 h-5" />
-          Dan Crooks' Expert Tips (700+ Club)
-        </h3>
-        <div className="grid md:grid-cols-2 gap-3">
-          <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-xl border border-teal-200 dark:border-teal-800">
-            <div className="font-medium text-teal-800 dark:text-teal-200 mb-2">👁️ The SEE Method</div>
-            <div className="text-sm text-teal-700 dark:text-teal-300 space-y-1">
-              <div>• <strong>S</strong> - Smile</div>
-              <div>• <strong>E</strong> - Eye Contact</div>
-              <div>• <strong>E</strong> - Excitable</div>
-            </div>
-          </div>
-          
-          <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
-            <div className="font-medium text-orange-800 dark:text-orange-200 mb-2">📋 What You Need</div>
-            <div className="text-sm text-orange-700 dark:text-orange-300 space-y-1">
-              <div>• Laminated Presenter Sheet</div>
-              <div>• Tablet</div>
-              <div>• Flyers and magazines</div>
-              <div>• A tracker (you're looking at it! 😉)</div>
-              <div>• Your diary</div>
+              <div>• Posting alone won't get results</div>
+              <div>• Real success comes from knocking back</div>
+              <div>• Don't overwhelm yourself with too many letters</div>
+              <div>• Post manageable numbers you can confidently follow up</div>
             </div>
           </div>
         </div>
         
         <div className="grid md:grid-cols-2 gap-3">
           <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
-            <div className="font-medium text-purple-800 dark:text-purple-200 mb-2">📅 Plan Ahead</div>
+            <div className="font-medium text-purple-800 dark:text-purple-200 mb-2">😊 Smile & Stay Positive</div>
             <div className="text-sm text-purple-700 dark:text-purple-300 space-y-1">
-              <div>• 30-40 a week</div>
-              <div>• Revisit 3-4 times</div>
-              <div>• Choose your area</div>
-              <div>• Focus on the right thing - Activity</div>
-              <div>• Be organised</div>
-              <div>• Prepare for the Nos</div>
+              <div>• Your body language and tone matter</div>
+              <div>• Positivity makes people more receptive</div>
+              <div>• Remember - you're offering help, not selling</div>
+              <div>• You're giving neighbours a chance to save money</div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+            <div className="font-medium text-amber-800 dark:text-amber-200 mb-2">🎭 Confidence Boosters</div>
+            <div className="text-sm text-amber-700 dark:text-amber-300 space-y-1">
+              <div>• Practice scripts until they feel natural</div>
+              <div>• Don't read robotically - make it yours</div>
+              <div>• Dress smart but approachable</div>
+              <div>• Think "friendly neighbour," not "salesperson"</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Following Up */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <Clock className="w-5 h-5" />
+          Following Up
+        </h3>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800">
+            <div className="font-medium text-indigo-800 dark:text-indigo-200 mb-2">⚡ Act Quickly</div>
+            <div className="text-sm text-indigo-700 dark:text-indigo-300 space-y-1">
+              <div>• Follow up within 2-3 days of dropping letters</div>
+              <div>• While people still remember it</div>
+              <div>• Best times: Evenings 6-8pm, weekends 10am-2pm</div>
+              <div>• Try 3-4 times before marking as "No Answer"</div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800">
+            <div className="font-medium text-emerald-800 dark:text-emerald-200 mb-2">🗣️ Simple Opener</div>
+            <div className="text-sm text-emerald-700 dark:text-emerald-300 space-y-2">
+              <div><strong>Start with:</strong> "Hi, I'm [Name], I live locally in [area]. I popped this letter through your door a couple of days ago — did you see it?"</div>
+              <div><strong>If yes:</strong> Move straight into: "I've been helping neighbours save money on all their utility bills. Would saving money help you?"</div>
+              <div><strong>If no:</strong> Hand them a spare letter or card and use the same line</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-xl border border-teal-200 dark:border-teal-800">
+            <div className="font-medium text-teal-800 dark:text-teal-200 mb-2">📅 Booking Appointments</div>
+            <div className="text-sm text-teal-700 dark:text-teal-300 space-y-1">
+              <div>• Don't just ask if they want one</div>
+              <div>• Use an alternative close:</div>
+              <div>• "When's good for you — daytime, evenings, or weekends?"</div>
+              <div>• Always carry your diary (or My Planner)</div>
             </div>
           </div>
           
           <div className="p-4 bg-pink-50 dark:bg-pink-900/20 rounded-xl border border-pink-200 dark:border-pink-800">
-            <div className="font-medium text-pink-800 dark:text-pink-200 mb-2">✍️ Get Ready to Sign</div>
-            <div className="text-sm text-pink-700 dark:text-pink-300 space-y-1">
-              <div>• Ask if you can sit down if they don't offer</div>
-              <div>• Build rapport – Even more important</div>
-              <div>• Do the Bill Review FIRST</div>
-              <div>• Sign them up – then talk partnership</div>
-              <div>• Show the ben video and explain more</div>
+            <div className="font-medium text-pink-800 dark:text-pink-200 mb-2">📞 Building Rapport & Courtesy</div>
+            <div className="text-sm text-pink-700 dark:text-pink-300 space-y-2">
+              <div>Some people won't be ready for an appointment. That's fine.</div>
+              <div><strong>Courtesy call script:</strong> "I come around here quite often — would you prefer I give you a quick courtesy call next time rather than just pop by?"</div>
+              <div>Don't ask directly for their number — pause after that line, and most people will naturally offer it.</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Best Practices */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Check className="w-5 h-5" />
-          Best Practices
-        </h3>
-        <div className="space-y-2">
-          <div className="p-3 bg-gray-50 dark:bg-gray-900/20 rounded-xl border border-gray-200 dark:border-gray-800">
-            <div className="text-sm space-y-1">
-              <div>• <strong>Dress appropriately:</strong> Smart casual, UW branded if possible</div>
-              <div>• <strong>Be confident:</strong> You're offering genuine value, not selling</div>
-              <div>• <strong>Listen actively:</strong> Understand their situation before suggesting solutions</div>
-              <div>• <strong>Follow up promptly:</strong> Use the app to track and schedule follow-ups</div>
-              <div>• <strong>Stay positive:</strong> Every "no" gets you closer to a "yes"</div>
-              <div>• <strong>Use the app:</strong> Track everything to improve your approach</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Common Mistakes */}
+      {/* Handling Rejection */}
       <div className="space-y-3">
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <AlertTriangle className="w-5 h-5" />
-          Common Mistakes to Avoid
+          Handling Rejection
         </h3>
-        <div className="space-y-2">
-          <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
-            <div className="text-sm space-y-1">
-              <div>• <strong>Rushing conversations:</strong> Take time to build rapport</div>
-              <div>• <strong>Not following up:</strong> Most success comes from follow-up visits</div>
-              <div>• <strong>Poor timing:</strong> Avoid meal times and early mornings</div>
-              <div>• <strong>Being pushy:</strong> Respect "no" and move on gracefully</div>
-              <div>• <strong>Not tracking activity:</strong> Use the app to learn what works</div>
-              <div>• <strong>Giving up too early:</strong> Try multiple times before marking as "No Answer"</div>
+        <div className="space-y-3">
+          <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
+            <div className="font-medium text-red-800 dark:text-red-200 mb-2">🛡️ The Disarming Line</div>
+            <div className="text-sm text-red-700 dark:text-red-300 space-y-2">
+              <div>If you get a frosty or blunt "No", don't take it personally.</div>
+              <div><strong>Use the disarming line:</strong> "Can I take your name off the list?"</div>
+              <div>They'll usually say "yes, please" or "thank you" — leaving you with a polite exit instead of rejection.</div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* What to Wear & Present */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <User className="w-5 h-5" />
+          What to Wear & How to Present
+        </h3>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
+            <div className="font-medium text-orange-800 dark:text-orange-200 mb-2">👔 Dress Smart but Approachable</div>
+            <div className="text-sm text-orange-700 dark:text-orange-300 space-y-1">
+              <div>• Think "friendly neighbour," not "salesperson"</div>
+              <div>• Comfortable shoes are essential</div>
+              <div>• You'll be walking a lot</div>
+              <div>• UW branded if possible</div>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-cyan-50 dark:bg-cyan-900/20 rounded-xl border border-cyan-200 dark:border-cyan-800">
+            <div className="font-medium text-cyan-800 dark:text-cyan-200 mb-2">📋 What to Carry</div>
+            <div className="text-sm text-cyan-700 dark:text-cyan-300 space-y-1">
+              <div>• Your diary (or My Planner)</div>
+              <div>• Backup materials (Neighbour Letter, £20k Giveaway Presenter)</div>
+              <div>• Have one clear outcome in mind: booking a short appointment</div>
+              <div>• Keep it short, simple, and neighbourly</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* What to Say */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <MessageSquare className="w-5 h-5" />
+          What to Say
+        </h3>
+        <div className="space-y-3">
+          <div className="p-4 bg-gray-50 dark:bg-gray-900/20 rounded-xl border border-gray-200 dark:border-gray-800">
+            <div className="font-medium text-gray-800 dark:text-gray-200 mb-2">💬 Keep It Simple</div>
+            <div className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+              <div>• Keep it short, simple, and neighbourly</div>
+              <div>• Avoid jargon or long explanations</div>
+              <div>• Always bring backup materials in case someone wants more info</div>
+              <div>• Have one clear outcome in mind: booking a short appointment</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Success Summary */}
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
+          <CheckCircle className="w-5 h-5" />
+          Success Summary
+        </h3>
+        <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-xl border border-green-200 dark:border-green-800">
+          <div className="font-medium text-green-800 dark:text-green-200 mb-2">✅ In Short:</div>
+          <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
+            <div>Succeeding with Neighbour Letters comes down to:</div>
+            <div>• <strong>Posting consistently</strong></div>
+            <div>• <strong>Following up quickly</strong></div>
+            <div>• <strong>Keeping it friendly and simple</strong></div>
+            <div>• <strong>Handling rejection gracefully</strong></div>
+            <div>• <strong>Booking appointments using alternative closes</strong></div>
+            <div>• <strong>Thinking like a helpful neighbour, not a salesperson</strong></div>
+            <div>— and you'll win trust and results.</div>
           </div>
         </div>
       </div>
@@ -3932,7 +5135,7 @@ function SuccessTipsPanel() {
   );
 }
 
-function Reports({ campaigns }) {
+function Reports({ campaigns, onNavigateToProperty }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortColumn, setSortColumn] = useState("date");
@@ -3968,6 +5171,10 @@ function Reports({ campaigns }) {
       spoke: p.spoke, 
       result: p.result || 'none', 
       followUpAt: p.followUpAt || '',
+      followUpTypes: p.followUpTypes || {},
+      campaignId: c.id,
+      streetId: s.id,
+      propertyId: p.id,
       droppedAt: p.droppedAt || '',
       knockedAt: p.knockedAt || '',
       spokeAt: p.spokeAt || '',
@@ -4082,6 +5289,7 @@ function Reports({ campaigns }) {
       spoke: 0, 
       interested: 0, 
       followups: 0,
+      successes: 0,
       outcomes: {
         interested: 0,
         customer_signed: 0,
@@ -4098,6 +5306,11 @@ function Reports({ campaigns }) {
       if (r.result === 'interested' || r.result === 'customer_signed' || r.result === 'appointment_booked') t.interested++;
       if (r.followUpAt) t.followups++;
       
+      // Track successes (customers signed + appointments booked + interested)
+      if (r.result === 'customer_signed' || r.result === 'appointment_booked' || r.result === 'interested') {
+        t.successes++;
+      }
+      
       // Track all outcomes
       if (r.result && r.result !== 'none') {
         t.outcomes[r.result] = (t.outcomes[r.result] || 0) + 1;
@@ -4109,12 +5322,12 @@ function Reports({ campaigns }) {
   return (
     <div className="space-y-4">
       <SectionCard title="Overview" icon={FileText}>
-        <div className="grid md:grid-cols-5 gap-3">
+        <div className="grid md:grid-cols-6 gap-3">
           <Stat icon={UploadCloud} label="Letters" value={totals.letters} />
           <Stat icon={Check} label="Knocked" value={totals.knocked} />
           <Stat icon={MessageSquare} label="Spoke" value={totals.spoke} />
-          <Stat icon={CheckCircle} label="Interested" value={totals.interested} />
-          <Stat icon={CalendarClock} label="Follow‑ups" value={totals.followups} />
+          <Stat icon={CheckCircle} label="Successes" value={totals.successes} />
+          <Stat icon={CalendarClock} label="Total Follow‑ups" value={totals.followups} />
         </div>
       </SectionCard>
       
@@ -4156,15 +5369,112 @@ function Reports({ campaigns }) {
         </div>
       </SectionCard>
       
-      {/* Follow-ups Section */}
-      {totals.followups > 0 && (
-        <SectionCard title="Scheduled Follow-ups" icon={CalendarClock}>
-          <div className="space-y-3">
-            {filteredAndSortedData
-              .filter(r => r.followUpAt)
-              .slice(0, 10) // Show first 10 follow-ups
-              .map((r, index) => (
-                <div key={`${r.campaign}-${r.street}-${r.property}-${index}`} className="flex items-center justify-between p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+      {/* Debug Section - Temporary */}
+      <SectionCard title="🔍 DEBUG INFO - CHECK THIS" icon={FileText}>
+        <div className="space-y-2 text-sm bg-yellow-100 dark:bg-yellow-900/20 p-3 rounded-lg border-2 border-yellow-400">
+          <div className="font-bold text-red-600">Today's date: {new Date().toISOString().split('T')[0]}</div>
+          <div className="font-bold text-blue-600">Total follow-ups: {filteredAndSortedData.filter(r => r.followUpAt).length}</div>
+          <div className="font-bold text-green-600">Follow-ups data: {JSON.stringify(filteredAndSortedData.filter(r => r.followUpAt).map(r => ({ 
+            property: r.property, 
+            followUpAt: r.followUpAt, 
+            datePart: r.followUpAt ? r.followUpAt.split('T')[0] : null 
+          })), null, 2)}</div>
+        </div>
+      </SectionCard>
+      
+      {/* Follow-ups Due Today Section */}
+      {(() => {
+        const today = new Date().toISOString().split('T')[0];
+        console.log('Today\'s date:', today);
+        console.log('All follow-ups:', filteredAndSortedData.filter(r => r.followUpAt).map(r => ({ 
+          property: r.property, 
+          followUpAt: r.followUpAt, 
+          datePart: r.followUpAt ? r.followUpAt.split('T')[0] : null 
+        })));
+        
+        const followUpsDueToday = filteredAndSortedData.filter(r => 
+          r.followUpAt && r.followUpAt.split('T')[0] === today
+        );
+        
+        console.log('Follow-ups due today:', followUpsDueToday);
+        
+        return followUpsDueToday.length > 0 && (
+          <SectionCard title="Follow-ups Due Today" icon={CalendarClock}>
+            <div className="space-y-3">
+              {followUpsDueToday.map((r, index) => (
+                <div 
+                  key={`${r.campaign}-${r.street}-${r.property}-${index}`} 
+                  className="flex items-center justify-between p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                  style={{ 
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'rgba(239, 68, 68, 0.2)',
+                    position: 'relative',
+                    zIndex: 10
+                  }}
+                  onClick={() => { 
+                    console.log('Clicking follow-up due today:', r.campaignId, r.streetId, r.propertyId);
+                    onNavigateToProperty(r.campaignId, r.streetId, r.propertyId);
+                    console.log('State change triggered');
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-800 flex items-center justify-center">
+                      <CalendarClock className="w-4 h-4 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                      <div className="font-medium text-sm">{r.property}, {r.street}</div>
+                      <div className="text-xs text-red-700 dark:text-red-300">{r.campaign}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-medium text-sm text-red-800 dark:text-red-200">
+                      {new Date(r.followUpAt).toLocaleTimeString('en-GB', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </div>
+                    <div className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                      {r.followUpTypes?.call && <span title="Call">📞</span>}
+                      {r.followUpTypes?.revisit && <span title="Revisit">🏠</span>}
+                      {r.followUpTypes?.message && <span title="Message">💬</span>}
+                      {!r.followUpTypes || (!r.followUpTypes.call && !r.followUpTypes.revisit && !r.followUpTypes.message) ? 'Follow-up' : ''}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        );
+      })()}
+      
+      {/* Scheduled Follow-ups Section */}
+      {(() => {
+        const today = new Date().toISOString().split('T')[0];
+        const scheduledFollowUps = filteredAndSortedData
+          .filter(r => r.followUpAt && r.followUpAt.split('T')[0] !== today) // Exclude follow-ups due today
+          .slice(0, 10); // Show first 10 follow-ups
+        
+        console.log('Scheduled follow-ups (excluding today):', scheduledFollowUps);
+        
+        return scheduledFollowUps.length > 0 && (
+          <SectionCard title="Scheduled Follow-ups" icon={CalendarClock}>
+            <div className="space-y-3">
+              {scheduledFollowUps.map((r, index) => (
+                <div 
+                  key={`${r.campaign}-${r.street}-${r.property}-${index}`} 
+                  className="flex items-center justify-between p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                  style={{ 
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'rgba(245, 158, 11, 0.2)',
+                    position: 'relative',
+                    zIndex: 10
+                  }}
+                  onClick={() => { 
+                    console.log('Clicking scheduled follow-up:', r.campaignId, r.streetId, r.propertyId);
+                    onNavigateToProperty(r.campaignId, r.streetId, r.propertyId);
+                    console.log('State change triggered');
+                  }}
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-800 flex items-center justify-center">
                       <CalendarClock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -4176,20 +5486,24 @@ function Reports({ campaigns }) {
                   </div>
                   <div className="text-right">
                     <div className="font-medium text-sm text-amber-800 dark:text-amber-200">{r.followUpAt}</div>
-                    <div className="text-xs text-amber-600 dark:text-amber-400">
-                      {r.spoke ? 'Spoke' : r.knocked ? 'Knocked' : r.dropped ? 'Dropped' : 'No activity'}
+                    <div className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      {r.followUpTypes?.call && <span title="Call">📞</span>}
+                      {r.followUpTypes?.revisit && <span title="Revisit">🏠</span>}
+                      {r.followUpTypes?.message && <span title="Message">💬</span>}
+                      {!r.followUpTypes || (!r.followUpTypes.call && !r.followUpTypes.revisit && !r.followUpTypes.message) ? 'Follow-up' : ''}
                     </div>
                   </div>
                 </div>
               ))}
-            {filteredAndSortedData.filter(r => r.followUpAt).length > 10 && (
+            {scheduledFollowUps.length > 10 && (
               <div className="text-center text-sm text-amber-600 dark:text-amber-400">
-                +{filteredAndSortedData.filter(r => r.followUpAt).length - 10} more follow-ups scheduled
+                +{scheduledFollowUps.length - 10} more follow-ups scheduled
               </div>
             )}
           </div>
         </SectionCard>
-      )}
+        );
+      })()}
       
       <SectionCard title="Activity log" icon={ListChecks}>
         {/* Search and Filter Controls */}
@@ -4630,6 +5944,12 @@ function NewCampaignForm({
         <button 
           type="submit"
           className="flex-1 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+            position: 'relative',
+            zIndex: 10
+          }}
         >
           Create Campaign
         </button>
@@ -4637,6 +5957,12 @@ function NewCampaignForm({
           type="button"
           onClick={onCancel}
           className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+            position: 'relative',
+            zIndex: 10
+          }}
         >
           Cancel
         </button>
@@ -5619,6 +6945,12 @@ function NewStreetForm({ onSubmit, onCancel }) {
           <button 
             type="submit"
             className="flex-1 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+            style={{ 
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+              position: 'relative',
+              zIndex: 10
+            }}
           >
             Add Street
           </button>
@@ -5626,6 +6958,12 @@ function NewStreetForm({ onSubmit, onCancel }) {
             type="button"
             onClick={onCancel}
             className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            style={{ 
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+              position: 'relative',
+              zIndex: 10
+            }}
           >
             Cancel
           </button>
@@ -5803,6 +7141,12 @@ function EditCampaignForm({ campaign, onSubmit, onCancel }) {
         <button 
           type="submit"
           className="flex-1 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+            position: 'relative',
+            zIndex: 10
+          }}
         >
           Update Campaign
         </button>
@@ -5810,6 +7154,12 @@ function EditCampaignForm({ campaign, onSubmit, onCancel }) {
           type="button"
           onClick={onCancel}
           className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+            position: 'relative',
+            zIndex: 10
+          }}
         >
           Cancel
         </button>
@@ -5863,6 +7213,12 @@ function EditStreetForm({ street, onSubmit, onCancel }) {
         <button 
           type="submit"
           className="flex-1 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+            position: 'relative',
+            zIndex: 10
+          }}
         >
           Update Street
         </button>
@@ -5870,6 +7226,12 @@ function EditStreetForm({ street, onSubmit, onCancel }) {
           type="button"
           onClick={onCancel}
           className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'rgba(124, 58, 237, 0.2)',
+            position: 'relative',
+            zIndex: 10
+          }}
         >
           Cancel
         </button>
