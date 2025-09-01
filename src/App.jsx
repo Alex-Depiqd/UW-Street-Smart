@@ -356,7 +356,10 @@ export default function App() {
                     followUpNote += `\n👤 Contact: ${updates.contactDetails.name} (${updates.contactDetails.phone})`;
                   }
                   
-                  newUpdates.notes = p.notes ? `${p.notes}\n\n${followUpNote}` : followUpNote;
+                  // Only add follow-up note if we don't already have notes in the updates
+                  if (!updates.notes) {
+                    newUpdates.notes = p.notes ? `${p.notes}\n\n${followUpNote}` : followUpNote;
+                  }
                   
                   // Store follow-up types and contact details
                   if (updates.followUpTypes) {
