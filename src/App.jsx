@@ -2765,44 +2765,26 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                   
                   // Remove follow-up note from notes
                   if (property.notes) {
-                    // Split notes into lines to process more carefully
-                    const noteLines = property.notes.split('\n');
-                    const filteredLines = [];
-                    let skipNextLines = false;
+                    // Split notes into sections by double newlines and filter out follow-up sections
+                    const sections = property.notes.split(/\n\s*\n/);
+                    const filteredSections = [];
                     
-                    for (let i = 0; i < noteLines.length; i++) {
-                      const line = noteLines[i];
+                    for (const section of sections) {
+                      const lines = section.split('\n');
+                      const firstLine = lines[0].trim();
                       
-                      // Check if this line starts a follow-up note (with or without emoji)
-                      if (line.includes('📅 Follow-up scheduled') || line.includes('Follow-up scheduled')) {
-                        skipNextLines = true;
-                        continue; // Skip this line
+                      // Check if this section is a follow-up note
+                      if (firstLine.includes('📅 Follow-up scheduled') || firstLine.includes('Follow-up scheduled')) {
+                        // Skip this entire section
+                        continue;
                       }
                       
-                      // If we're skipping lines, check if we've reached the end of the follow-up note
-                      if (skipNextLines) {
-                        // If we hit an empty line or a line that doesn't start with common follow-up patterns, stop skipping
-                        if (line.trim() === '' || 
-                            (!line.startsWith('Type:') && 
-                             !line.startsWith('Contact:') && 
-                             !line.startsWith('📞') && 
-                             !line.startsWith('🏠') && 
-                             !line.startsWith('💬'))) {
-                          skipNextLines = false;
-                          // Don't skip this line - it's the start of a new note
-                        } else {
-                          continue; // Skip this line (part of follow-up note)
-                        }
-                      }
-                      
-                      // Add this line if we're not skipping
-                      if (!skipNextLines) {
-                        filteredLines.push(line);
-                      }
+                      // Keep this section (not a follow-up note)
+                      filteredSections.push(section);
                     }
                     
-                    // Join lines back together and clean up extra whitespace
-                    const updatedNotes = filteredLines.join('\n').replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+                    // Join sections back together and clean up
+                    const updatedNotes = filteredSections.join('\n\n').trim();
                     onUpdate({ notes: updatedNotes });
                     // Update local notes state to reflect the change in the UI
                     setNotes(updatedNotes);
@@ -3003,44 +2985,27 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                           if (property.followUpAt) {
                             // Editing existing follow-up - remove old follow-up note and add new one
                             if (property.notes) {
-                              const noteLines = property.notes.split('\n');
-                              const filteredLines = [];
-                              let skipNextLines = false;
+                              // Split notes into sections by double newlines and filter out follow-up sections
+                              const sections = property.notes.split(/\n\s*\n/);
+                              const filteredSections = [];
                               
-                              for (let i = 0; i < noteLines.length; i++) {
-                                const line = noteLines[i];
+                              for (const section of sections) {
+                                const lines = section.split('\n');
+                                const firstLine = lines[0].trim();
                                 
-                                // Check if this line starts a follow-up note (with or without emoji)
-                                if (line.includes('📅 Follow-up scheduled') || line.includes('Follow-up scheduled')) {
-                                  skipNextLines = true;
-                                  continue; // Skip this line
+                                // Check if this section is a follow-up note
+                                if (firstLine.includes('📅 Follow-up scheduled') || firstLine.includes('Follow-up scheduled')) {
+                                  // Skip this entire section
+                                  continue;
                                 }
                                 
-                                // If we're skipping lines, check if we've reached the end of the follow-up note
-                                if (skipNextLines) {
-                                  // If we hit an empty line or a line that doesn't start with common follow-up patterns, stop skipping
-                                  if (line.trim() === '' || 
-                                      (!line.includes('Type:') && 
-                                       !line.includes('Contact:') && 
-                                       !line.startsWith('📞') && 
-                                       !line.startsWith('🏠') && 
-                                       !line.startsWith('💬'))) {
-                                    skipNextLines = false;
-                                    // Don't skip this line - it's the start of a new note
-                                  } else {
-                                    continue; // Skip this line (part of follow-up note)
-                                  }
-                                }
-                                
-                                // Add this line if we're not skipping
-                                if (!skipNextLines) {
-                                  filteredLines.push(line);
-                                }
+                                // Keep this section (not a follow-up note)
+                                filteredSections.push(section);
                               }
                               
-                              // Join lines back together and add new follow-up note
-                              const cleanedNotes = filteredLines.join('\n').replace(/\n\s*\n\s*\n/g, '\n\n').trim();
-                              updatedNotes = cleanedNotes ? `${cleanedNotes}\n\n${fullNote}` : fullNote;
+                              // Join sections back together and add new follow-up note
+                              const notesWithoutFollowUp = filteredSections.join('\n\n').trim();
+                              updatedNotes = notesWithoutFollowUp ? `${notesWithoutFollowUp}\n\n${fullNote}` : fullNote;
                             } else {
                               updatedNotes = fullNote;
                             }
