@@ -2988,40 +2988,27 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                           if (property.followUpAt) {
                             // Editing existing follow-up - remove old follow-up note and add new one
                             if (property.notes) {
-                              console.log('Original notes:', property.notes);
-                              console.log('Notes length:', property.notes.length);
-                              
                               // Split notes into sections by double newlines and filter out follow-up sections
                               const sections = property.notes.split(/\n\s*\n/);
-                              console.log('Split into sections:', sections);
-                              console.log('Number of sections:', sections.length);
-                              
                               const filteredSections = [];
                               
                               for (const section of sections) {
                                 const lines = section.split('\n');
                                 const firstLine = lines[0].trim();
-                                console.log('Section first line:', firstLine);
                                 
                                 // Check if this section is a follow-up note
                                 if (firstLine.includes('📅 Follow-up scheduled') || firstLine.includes('Follow-up scheduled')) {
-                                  console.log('Skipping follow-up section:', firstLine);
                                   // Skip this entire section
                                   continue;
                                 }
                                 
-                                console.log('Keeping section:', firstLine);
                                 // Keep this section (not a follow-up note)
                                 filteredSections.push(section);
                               }
                               
-                              console.log('Filtered sections:', filteredSections);
-                              
                               // Join sections back together and add new follow-up note
                               const notesWithoutFollowUp = filteredSections.join('\n\n').trim();
-                              console.log('Notes without follow-up:', notesWithoutFollowUp);
                               updatedNotes = notesWithoutFollowUp ? `${notesWithoutFollowUp}\n\n${fullNote}` : fullNote;
-                              console.log('Final updated notes:', updatedNotes);
                             } else {
                               updatedNotes = fullNote;
                             }
