@@ -1916,13 +1916,21 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
               <Target className="w-8 h-8 text-gray-400" />
             </div>
             <h3 className="text-lg font-medium mb-2">No active campaign</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">Get started by creating your first neighbourhood campaign</p>
-            <button 
-              onClick={onGoStreets} 
-              className="px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
-            >
-              Create First Campaign
-            </button>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">Select a campaign from the Campaigns tab or create a new one</p>
+            <div className="flex gap-2 justify-center">
+              <button 
+                onClick={() => setView("campaigns")} 
+                className="px-4 py-2 rounded-xl bg-gray-600 text-white text-sm hover:bg-gray-700 transition-colors"
+              >
+                Go to Campaigns
+              </button>
+              <button 
+                onClick={onGoStreets} 
+                className="px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+              >
+                Create Campaign
+              </button>
+            </div>
           </div>
         )}
       </SectionCard>
@@ -1940,10 +1948,10 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
             </button>
           ) : (
             <button 
-              onClick={onGoStreets} 
-              className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm flex items-center gap-2 hover:bg-primary-700 transition-colors"
+              onClick={() => setView("campaigns")} 
+              className="px-3 py-1.5 rounded-xl bg-gray-600 text-white text-sm flex items-center gap-2 hover:bg-gray-700 transition-colors"
             >
-              Create Campaign <ChevronRight className="w-4 h-4"/>
+              Go to Campaigns <ChevronRight className="w-4 h-4"/>
             </button>
           )
         }
