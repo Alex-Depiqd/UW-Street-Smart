@@ -1520,7 +1520,7 @@ export default function App() {
 
         {/* Main Panel */}
         <div className="col-span-1 lg:col-span-3 space-y-3 lg:space-y-4">
-          {view === "dashboard" && <Dashboard stats={stats} activeCampaign={activeCampaign} onGoStreets={() => setView("streets")} />}
+          {view === "dashboard" && <Dashboard stats={stats} activeCampaign={activeCampaign} onGoStreets={() => setView("streets")} onGoToCampaigns={() => setView("campaigns")} onCreateCampaign={() => setShowNewCampaignModal(true)} />}
           {view === "campaigns" && (
             <Campaigns 
               campaigns={campaigns} 
@@ -1879,7 +1879,7 @@ function Stat({ icon: Icon, label, value, sub }) {
   );
 }
 
-function Dashboard({ stats, activeCampaign, onGoStreets }) {
+function Dashboard({ stats, activeCampaign, onGoStreets, onGoToCampaigns, onCreateCampaign }) {
   const hasData = activeCampaign && activeCampaign.streets.length > 0;
   
   return (
@@ -1919,13 +1919,13 @@ function Dashboard({ stats, activeCampaign, onGoStreets }) {
             <p className="text-gray-600 dark:text-gray-400 mb-4">Select a campaign from the Campaigns tab or create a new one</p>
             <div className="flex gap-2 justify-center">
               <button 
-                onClick={() => setView("campaigns")} 
+                onClick={onGoToCampaigns} 
                 className="px-4 py-2 rounded-xl bg-gray-600 text-white text-sm hover:bg-gray-700 transition-colors"
               >
                 Go to Campaigns
               </button>
               <button 
-                onClick={() => setShowNewCampaignModal(true)} 
+                onClick={onCreateCampaign} 
                 className="px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
               >
                 Create Campaign
