@@ -9,7 +9,7 @@ import {
   Upload, Trash2, AlertTriangle, Camera, Globe, File, ExternalLink, Eye, Maximize, Menu, Edit, Copy, Minus
 } from "lucide-react";
 import { config } from './config';
-import { getStorageInfo, clearAllAppData } from './utils/storage.js';
+
 
 
 
@@ -4470,32 +4470,7 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
         />
       </div>
       
-      <div className="space-y-2">
-        <h4 className="font-medium">Storage Debug (Android Users)</h4>
-        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-          If you're losing data on Android, check this section
-        </div>
-        <button 
-          onClick={() => {
-            const info = getStorageInfo();
-            alert(`Storage Info:\nTotal: ${info.totalKB} KB\nKeys: ${info.keys.length}\n\nIf you see 0 KB, your data isn't being saved.`);
-          }}
-          className="w-full text-left px-3 py-2 rounded-xl bg-yellow-100 dark:bg-yellow-900/20 text-sm hover:bg-yellow-200 dark:hover:bg-yellow-700 transition-colors flex items-center gap-2"
-        >
-          🔍 Check Storage Status
-        </button>
-        <button 
-          onClick={() => {
-            if (confirm('This will clear all your data and reset to defaults. Continue?')) {
-              clearAllAppData();
-              window.location.reload();
-            }
-          }}
-          className="w-full text-left px-3 py-2 rounded-xl bg-red-100 dark:bg-red-900/20 text-sm hover:bg-red-200 dark:hover:bg-red-700 transition-colors flex items-center gap-2"
-        >
-          🗑️ Reset All Data
-        </button>
-      </div>
+
       
       <div className="space-y-2">
         <h4 className="font-medium">Data & Privacy</h4>
