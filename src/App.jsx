@@ -9,6 +9,7 @@ import {
   Upload, Trash2, AlertTriangle, Camera, Globe, File, ExternalLink, Eye, Maximize, Menu, Edit, Copy, Minus
 } from "lucide-react";
 import { config } from './config';
+import { getStorageInfo, clearAllAppData } from './utils/storage.js';
 
 
 
@@ -215,9 +216,33 @@ export default function App() {
   // API functionality disabled - manual entry only
   const GOOGLE_PLACES_API_KEY = '';
   
-  const [dark, setDark] = useState(true);
+  const [dark, setDark] = useState(() => {
+    const saved = localStorage.getItem('uw_streetsmart_dark');
+    return saved ? JSON.parse(saved) : true;
+  });
+  
   const [view, setView] = useState("dashboard");
-  const [campaigns, setCampaigns] = useState(seedCampaigns);
+  
+  // Load campaigns from localStorage or use seed data only on first run
+  const [campaigns, setCampaigns] = useState(() => {
+    const saved = localStorage.getItem('uw_streetsmart_campaigns');
+    return saved ? JSON.parse(saved) : seedCampaigns;
+  });
+
+  // Wrapper function to save campaigns to localStorage whenever they change
+  const updateCampaigns = (updater) => {
+    setCampaigns(prev => {
+      const newCampaigns = typeof updater === 'function' ? updater(prev) : updater;
+      // Save to localStorage
+      try {
+        localStorage.setItem('uw_streetsmart_campaigns', JSON.stringify(newCampaigns));
+      } catch (e) {
+        console.error('Failed to save campaigns to localStorage:', e);
+      }
+      return newCampaigns;
+    });
+  };
+  
   const [activeCampaignId, setActiveCampaignId] = useState("c1");
   const [activeStreetId, setActiveStreetId] = useState("s1");
   const [activePropertyId, setActivePropertyId] = useState("p2");
@@ -1305,7 +1330,24 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    // Save dark mode preference to localStorage
+    try {
+      localStorage.setItem('uw_streetsmart_dark', JSON.stringify(dark));
+    } catch (e) {
+      console.error('Failed to save dark mode preference:', e);
+    }
   }, [dark]);
+
+  // Request persistent storage for Android devices (reduces OS eviction)
+  useEffect(() => {
+    if (navigator.storage?.persist) {
+      navigator.storage.persist().then(granted => {
+        console.log('Persistent storage granted:', granted);
+      }).catch(e => {
+        console.error('Failed to request persistent storage:', e);
+      });
+    }
+  }, []);
 
   // Debug logging for API key
   useEffect(() => {
@@ -4418,6 +4460,33 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
           value={dark} 
           onChange={onToggleDark} 
         />
+      </div>
+      
+      <div className="space-y-2">
+        <h4 className="font-medium">Storage Debug (Android Users)</h4>
+        <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+          If you're losing data on Android, check this section
+        </div>
+        <button 
+          onClick={() => {
+            const info = getStorageInfo();
+            alert(`Storage Info:\nTotal: ${info.totalKB} KB\nKeys: ${info.keys.length}\n\nIf you see 0 KB, your data isn't being saved.`);
+          }}
+          className="w-full text-left px-3 py-2 rounded-xl bg-yellow-100 dark:bg-yellow-900/20 text-sm hover:bg-yellow-200 dark:hover:bg-yellow-700 transition-colors flex items-center gap-2"
+        >
+          🔍 Check Storage Status
+        </button>
+        <button 
+          onClick={() => {
+            if (confirm('This will clear all your data and reset to defaults. Continue?')) {
+              clearAllAppData();
+              window.location.reload();
+            }
+          }}
+          className="w-full text-left px-3 py-2 rounded-xl bg-red-100 dark:bg-red-900/20 text-sm hover:bg-red-200 dark:hover:bg-red-700 transition-colors flex items-center gap-2"
+        >
+          🗑️ Reset All Data
+        </button>
       </div>
       
       <div className="space-y-2">

@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "UW Street Smart - NL Activity Tracker",
   "short_name": "Street Smart",
   "description": "Track and manage Neighbourhood Letters campaigns efficiently. Offline-first PWA for UW partners.",
