@@ -340,7 +340,7 @@ export default function App() {
   const setProperty = (updates) => {
     const today = new Date().toISOString().split('T')[0];
     
-    setCampaigns(prev => prev.map(c => {
+    updateCampaigns(prev => prev.map(c => {
       if (c.id !== activeCampaignId) return c;
       
       // Update the campaign's streets and properties
@@ -503,7 +503,7 @@ export default function App() {
       try {
         const data = JSON.parse(e.target.result);
         if (data.campaigns && Array.isArray(data.campaigns)) {
-          setCampaigns(data.campaigns);
+          updateCampaigns(data.campaigns);
           if (data.settings?.dark !== undefined) {
             setDark(data.settings.dark);
           }
@@ -542,7 +542,7 @@ export default function App() {
       }
     ];
     
-    setCampaigns(emptyCampaigns);
+    updateCampaigns(emptyCampaigns);
     setActiveCampaignId("new-campaign");
     setActiveStreetId("");
     setActivePropertyId("");
@@ -567,7 +567,7 @@ export default function App() {
       streets: [],
     };
     
-    setCampaigns(prev => [...prev, newCampaign]);
+    updateCampaigns(prev => [...prev, newCampaign]);
     setActiveCampaignId(newCampaign.id);
     setShowNewCampaignModal(false);
     alert('New campaign created successfully!');
@@ -589,7 +589,7 @@ export default function App() {
       }))
     };
     
-    setCampaigns(prev => prev.map(c => {
+    updateCampaigns(prev => prev.map(c => {
       if (c.id === activeCampaignId) {
         const updatedCampaign = {
           ...c,
@@ -611,7 +611,7 @@ export default function App() {
 
   // Edit campaign function
   const editCampaign = (campaignData) => {
-    setCampaigns(prev => prev.map(c => {
+    updateCampaigns(prev => prev.map(c => {
       if (c.id === editingCampaign.id) {
         return {
           ...c,
@@ -635,7 +635,7 @@ export default function App() {
   // Delete campaign function
   const deleteCampaign = (campaignId) => {
     if (confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
-      setCampaigns(prev => prev.filter(c => c.id !== campaignId));
+      updateCampaigns(prev => prev.filter(c => c.id !== campaignId));
       if (activeCampaignId === campaignId) {
         const remainingCampaigns = campaigns.filter(c => c.id !== campaignId);
         if (remainingCampaigns.length > 0) {
@@ -650,7 +650,7 @@ export default function App() {
 
   // Edit street function
   const editStreet = (streetData) => {
-    setCampaigns(prev => prev.map(c => {
+    updateCampaigns(prev => prev.map(c => {
       if (c.id === activeCampaignId) {
         return {
           ...c,
@@ -676,7 +676,7 @@ export default function App() {
   // Delete street function
   const deleteStreet = (streetId) => {
     if (confirm('Are you sure you want to delete this street? This action cannot be undone.')) {
-      setCampaigns(prev => prev.map(c => {
+      updateCampaigns(prev => prev.map(c => {
         if (c.id === activeCampaignId) {
           return {
             ...c,
@@ -714,7 +714,7 @@ export default function App() {
       resultAt: null
     };
     
-    setCampaigns(prev => prev.map(c => {
+    updateCampaigns(prev => prev.map(c => {
       if (c.id === activeCampaignId) {
         // Update the campaign's streets and properties
         const updatedCampaign = {
@@ -786,7 +786,7 @@ export default function App() {
           
           // Update to "completed" if all properties have been handled (excluding no_answer as it requires follow-up)
           const streetHandledProperties = street.properties.filter(p => p.result && p.result !== "none" && p.result !== "no_answer").length;
-          if (streetTotalProperties > 0 && streetHandledProperties === streetTotalProperties) {
+            if (streetTotalProperties > 0 && streetHandledProperties === streetTotalProperties) {
             streetStatus = "completed";
           }
           
@@ -813,7 +813,7 @@ export default function App() {
 
   const removeProperty = (propertyId) => {
     if (confirm('Are you sure you want to remove this property?')) {
-      setCampaigns(prev => prev.map(c => {
+      updateCampaigns(prev => prev.map(c => {
         if (c.id === activeCampaignId) {
           return {
             ...c,
@@ -834,7 +834,7 @@ export default function App() {
   };
 
   const editPropertyLabel = (propertyId, newLabel) => {
-    setCampaigns(prev => prev.map(c => {
+    updateCampaigns(prev => prev.map(c => {
       if (c.id === activeCampaignId) {
         return {
           ...c,
@@ -862,7 +862,7 @@ export default function App() {
   const togglePropertyStatus = (propertyId, status) => {
     const today = new Date().toISOString().split('T')[0];
     
-    setCampaigns(prev => prev.map(c => {
+    updateCampaigns(prev => prev.map(c => {
       if (c.id !== activeCampaignId) return c;
       
       // Update the campaign's streets and properties
@@ -958,7 +958,7 @@ export default function App() {
         ...updatedCampaign,
         streets: updatedStreets,
         status: newStatus
-      };
+        };
     }));
   };
 
@@ -1268,7 +1268,7 @@ export default function App() {
     }));
 
     // Add streets to the current campaign
-    setCampaigns(prev => prev.map(c => {
+    updateCampaigns(prev => prev.map(c => {
       if (c.id === activeCampaignId) {
         return {
           ...c,
@@ -1533,7 +1533,7 @@ export default function App() {
               }}
               onDelete={deleteCampaign}
               onToggleComplete={(campaignId) => {
-                setCampaigns(prev => prev.map(campaign => {
+                updateCampaigns(prev => prev.map(campaign => {
                   if (campaign.id === campaignId) {
                     const newStatus = campaign.status === 'completed' ? 'active' : 'completed';
                     
