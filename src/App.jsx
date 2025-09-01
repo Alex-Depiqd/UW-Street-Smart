@@ -337,7 +337,7 @@ export default function App() {
                   newUpdates.followUpAt = updates.followUpAt;
                   
                   // Build detailed follow-up note
-                  let followUpNote = `📅 Follow-up scheduled for ${updates.followUpAt}`;
+                  let followUpNote = `📅 Follow-up scheduled: ${updates.followUpAt}`;
                   
                   // Add follow-up types if specified
                   if (updates.followUpTypes) {
@@ -2774,8 +2774,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                       const line = noteLines[i];
                       
                       // Check if this line starts a follow-up note (with or without emoji)
-                      if (line.includes('Follow-up scheduled:') || line.includes('Follow-up scheduled for') || 
-                          line.includes('📅 Follow-up scheduled:') || line.includes('📅 Follow-up scheduled for')) {
+                      if (line.includes('📅 Follow-up scheduled') || line.includes('Follow-up scheduled')) {
                         skipNextLines = true;
                         continue; // Skip this line
                       }
@@ -3012,8 +3011,7 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
                                 const line = noteLines[i];
                                 
                                 // Check if this line starts a follow-up note (with or without emoji)
-                                if (line.includes('Follow-up scheduled:') || line.includes('Follow-up scheduled for') || 
-                                    line.includes('📅 Follow-up scheduled:') || line.includes('📅 Follow-up scheduled for')) {
+                                if (line.includes('📅 Follow-up scheduled') || line.includes('Follow-up scheduled')) {
                                   skipNextLines = true;
                                   continue; // Skip this line
                                 }
