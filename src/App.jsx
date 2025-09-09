@@ -251,6 +251,8 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
   const [showNewCampaignModal, setShowNewCampaignModal] = useState(false);
   const [showNewStreetModal, setShowNewStreetModal] = useState(false);
   const [showImportStreetsModal, setShowImportStreetsModal] = useState(false);
@@ -483,7 +485,15 @@ export default function App() {
       campaigns,
       settings: { dark },
       exportDate: new Date().toISOString(),
-      version: '1.0.0'
+      version: '1.0.0',
+      backupInfo: {
+        totalCampaigns: campaigns.length,
+        totalStreets: campaigns.reduce((sum, c) => sum + c.streets.length, 0),
+        totalProperties: campaigns.reduce((sum, c) => 
+          sum + c.streets.reduce((streetSum, s) => streetSum + s.properties.length, 0), 0
+        ),
+        exportReason: 'Manual backup before update'
+      }
     };
     
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1362,6 +1372,34 @@ export default function App() {
   // Cache for API results (reduces API calls by 80%+)
   const [addressCache, setAddressCache] = useState({});
 
+  // Update notification system
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'SW_UPDATE_AVAILABLE') {
+          setUpdateAvailable(true);
+          setShowUpdateModal(true);
+        }
+      });
+    }
+  }, []);
+
+  const handleUpdateAccept = () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then(registration => {
+        if (registration && registration.waiting) {
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          window.location.reload();
+        }
+      });
+    }
+    setShowUpdateModal(false);
+  };
+
+  const handleUpdateDismiss = () => {
+    setShowUpdateModal(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 overflow-x-hidden">
       {/* Top Bar */}
@@ -1704,6 +1742,46 @@ export default function App() {
               className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               Cancel
+            </button>
+          </div>
+        </div>
+      </Drawer>
+
+      {/* Update Available Modal */}
+      <Drawer open={showUpdateModal} onClose={handleUpdateDismiss} title="Update Available" size="small">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+            <div className="w-5 h-5 text-blue-600 dark:text-blue-400">🔄</div>
+            <div className="text-sm">
+              <div className="font-medium text-blue-800 dark:text-blue-200">New Version Available</div>
+              <div className="text-blue-600 dark:text-blue-400">A new version of Street Smart is ready to install.</div>
+            </div>
+          </div>
+          
+          <div className="text-sm space-y-2">
+            <p><strong>What's new:</strong></p>
+            <ul className="space-y-1 text-gray-600 dark:text-gray-400 ml-4">
+              <li>• Bug fixes and performance improvements</li>
+              <li>• Enhanced mobile UI for better usability</li>
+              <li>• Improved data backup and security</li>
+            </ul>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+              <strong>Your data is safe:</strong> All your campaigns and progress will be preserved during the update.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button 
+              onClick={handleUpdateAccept}
+              className="flex-1 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+            >
+              Update Now
+            </button>
+            <button 
+              onClick={handleUpdateDismiss}
+              className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              Later
             </button>
           </div>
         </div>
@@ -4474,6 +4552,11 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
       
       <div className="space-y-2">
         <h4 className="font-medium">Data & Privacy</h4>
+        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+          <div className="text-xs text-amber-800 dark:text-amber-200">
+            <strong>💡 Backup Tip:</strong> Export your data regularly to avoid losing progress during updates or device changes.
+          </div>
+        </div>
         <button className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2">
           <Shield className="w-4 h-4" />
           Privacy settings
