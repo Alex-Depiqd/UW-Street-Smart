@@ -7274,19 +7274,19 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
     <div className="space-y-4">
       <div>
         <h4 className="text-sm font-medium mb-2">Add New Property</h4>
-        <form onSubmit={handleAddProperty} className="flex gap-2">
+        <form onSubmit={handleAddProperty} className="space-y-2">
           <input 
             type="text" 
             value={newPropertyLabel} 
             onChange={e => setNewPropertyLabel(e.target.value)}
-            className="flex-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+            className="w-full p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
             placeholder="Property numbers or names (e.g., 1, 3, 5 or The Old Post Office, Rose Cottage)"
           />
           <button 
             type="submit"
-            className="px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+            className="w-full px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
           >
-            Add
+            Add Property
           </button>
         </form>
         <div className="text-xs text-gray-500 mt-1">
@@ -7298,7 +7298,7 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
         <h4 className="text-sm font-medium mb-2">Existing Properties ({street.properties.length})</h4>
         <div className="space-y-2 max-h-60 overflow-y-auto">
           {street.properties.map(property => (
-            <div key={property.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-gray-800">
+            <div key={property.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-gray-800 min-w-0">
               {editingProperty === property.id ? (
                 <div className="flex items-center gap-2 flex-1">
                   <input 
@@ -7326,8 +7326,8 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">{property.label}</span>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-sm truncate">{property.label}</span>
                     {property.followUpAt && (
                       <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-xs">
                         <CalendarClock className="w-3 h-3" />
@@ -7335,19 +7335,19 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 flex-shrink-0">
                     <button 
                       onClick={() => {
                         setEditingProperty(property.id);
                         setEditLabel(property.label);
                       }}
-                      className="px-2 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700"
+                      className="px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700 whitespace-nowrap"
                     >
                       Edit
                     </button>
                     <button 
                       onClick={() => onRemoveProperty(property.id)}
-                      className="px-2 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700"
+                      className="px-3 py-1 rounded bg-red-600 text-white text-xs hover:bg-red-700 whitespace-nowrap"
                     >
                       Remove
                     </button>
