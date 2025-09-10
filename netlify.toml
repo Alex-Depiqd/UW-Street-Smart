@@ -6,11 +6,6 @@
   NODE_VERSION = "20"
 
 [[redirects]]
-  from = "/google5d74a3b809e87eea.html"
-  to = "/google5d74a3b809e87eea.html"
-  status = 200
-
-[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['favicon.ico'],
+      includeAssets: ['favicon.ico', 'google5d74a3b809e87eea.html'],
       manifest: {
         name: 'UW Street Smart - NL Activity Tracker',
         short_name: 'Street Smart',
