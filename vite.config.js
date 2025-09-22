@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      disable: true,
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'google5d74a3b809e87eea.html'],
       manifest: {
@@ -35,10 +36,7 @@ export default defineConfig({
         ],
 
       },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        cleanupOutdatedCaches: true
-      }
+      // Disabled: we use a minimal, custom service worker in /public/sw.js
     })
   ],
   server: {
