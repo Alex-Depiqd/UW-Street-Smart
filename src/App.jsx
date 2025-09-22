@@ -1010,6 +1010,10 @@ export default function App() {
     console.log('Making API request for:', searchTerm);
     
     try {
+      if (!config.addressLookupEnabled) {
+        setAddressSuggestions([]);
+        return;
+      }
       // Get a comprehensive list of suggestions from multiple sources
       let allSuggestions = [];
       

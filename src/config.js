@@ -12,7 +12,10 @@ export const config = {
   openStreetMap: {
     baseUrl: 'https://nominatim.openstreetmap.org',
     userAgent: 'UW-Street-Smart-NL-Tracker/1.0'
-  }
+  },
+
+  // Feature flags
+  addressLookupEnabled: false
 };
 
 // Usage instructions:
