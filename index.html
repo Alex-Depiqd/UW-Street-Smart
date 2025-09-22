@@ -116,19 +116,9 @@
       window.addEventListener('focus', restoreViewport);
     </script>
     
-    <!-- Service Worker Registration -->
+    <!-- Service Worker Registration (temporarily disabled to reduce Safe Browsing false positives) -->
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('SW registered: ', registration);
-            })
-            .catch((registrationError) => {
-              console.log('SW registration failed: ', registrationError);
-            });
-        });
-      }
+      // Intentionally disabled. See commit notes and netlify headers for context.
     </script>
 </body>
 </html> 
