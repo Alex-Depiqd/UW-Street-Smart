@@ -6246,7 +6246,13 @@ function NewStreetForm({ onSubmit, onCancel }) {
     setIsSearching(true);
     try {
       console.log('Searching Google Places API for:', query);
-      
+
+      // If no API key or SDK not available, gracefully no-op
+      if (!GOOGLE_PLACES_API_KEY) {
+        setSearchResults([]);
+        return;
+      }
+
       // Load Google Maps SDK if not already loaded
       if (!window.google || !window.google.maps) {
         console.log('Loading Google Maps SDK...');
@@ -6254,22 +6260,23 @@ function NewStreetForm({ onSubmit, onCancel }) {
           await window.loadGoogleMapsSDK(GOOGLE_PLACES_API_KEY);
           console.log('Google Maps SDK loaded successfully');
         } catch (error) {
-          console.error('Failed to load Google Maps SDK:', error);
+          console.warn('Maps SDK load skipped/failed; disabling Places search.');
           setSearchResults([]);
           return;
         }
       }
 
-      // Use the WORKING AutocompleteService (it works, ignore deprecation warnings)
-      if (!window.google.maps.places) {
-        throw new Error('Google Maps Places library not available');
+      // If Places lib still not ready, exit quietly
+      if (!window.google || !window.google.maps || !window.google.maps.places) {
+        setSearchResults([]);
+        return;
       }
 
       const { AutocompleteService } = window.google.maps.places;
       const service = new AutocompleteService();
 
       // Get place predictions using the WORKING API
-      const predictions = await new Promise((resolve, reject) => {
+      const predictions = await new Promise((resolve) => {
         console.log('Making API call with query:', query);
         service.getPlacePredictions({
           input: query,
@@ -6280,8 +6287,8 @@ function NewStreetForm({ onSubmit, onCancel }) {
           if (status === window.google.maps.places.PlacesServiceStatus.OK) {
             resolve(predictions || []);
           } else {
-            console.error('Places API failed with status:', status);
-            reject(new Error(`Places API error: ${status}`));
+            console.warn('Places API not OK; returning empty list');
+            resolve([]);
           }
         });
       });
