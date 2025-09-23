@@ -10,29 +10,6 @@ import {
 } from "lucide-react";
 import { config } from './config';
 
-// One-time: Unregister service workers and clear caches to avoid Safe Browsing false positives
-useEffect(() => {
-  const FLAG_KEY = 'uw_ss_sw_cleanup_done_v1';
-  if (typeof window === 'undefined') return;
-  if (localStorage.getItem(FLAG_KEY)) return;
-  (async () => {
-    try {
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map(r => r.unregister()));
-      }
-      if (window.caches && caches.keys) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map(k => caches.delete(k)));
-      }
-    } catch (e) {
-      // best-effort cleanup
-      console.warn('SW/cache cleanup skipped:', e);
-    } finally {
-      try { localStorage.setItem(FLAG_KEY, '1'); } catch {}
-    }
-  })();
-}, []);
 
 
 
@@ -237,6 +214,30 @@ const Drawer = ({ open, onClose, title, children, size = "default" }) => {
 
 // --- Main App ---
 export default function App() {
+  // One-time: Unregister service workers and clear caches to avoid Safe Browsing false positives
+  useEffect(() => {
+    const FLAG_KEY = 'uw_ss_sw_cleanup_done_v1';
+    if (typeof window === 'undefined') return;
+    if (localStorage.getItem(FLAG_KEY)) return;
+    (async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map(r => r.unregister()));
+        }
+        if (window.caches && caches.keys) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+      } catch (e) {
+        // best-effort cleanup
+        console.warn('SW/cache cleanup skipped:', e);
+      } finally {
+        try { localStorage.setItem(FLAG_KEY, '1'); } catch {}
+      }
+    })();
+  }, []);
+
   // API functionality disabled - manual entry only
   const GOOGLE_PLACES_API_KEY = '';
   
