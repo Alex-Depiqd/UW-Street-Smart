@@ -66,10 +66,12 @@
     <script>
       // Load Google Maps SDK dynamically when API key is available
       function loadGoogleMapsSDK(apiKey) {
-        if (window.google && window.google.maps) {
-          return Promise.resolve(); // Already loaded
+        if (!apiKey) {
+          return Promise.resolve();
         }
-        
+        if (window.google && window.google.maps) {
+          return Promise.resolve();
+        }
         return new Promise((resolve, reject) => {
           const script = document.createElement('script');
           script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&libraries=places&loading=async`;
