@@ -8,3 +8,15 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>,
 ) 
+
+// Remove the HTML loading screen once React has mounted (with a fallback)
+const hideLoading = () => {
+  const loading = document.querySelector('.loading-screen');
+  if (loading && loading.parentElement) {
+    loading.parentElement.removeChild(loading);
+  }
+};
+
+// Try immediately and after a short delay as a fallback
+hideLoading();
+setTimeout(hideLoading, 1000);
