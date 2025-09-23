@@ -87,6 +87,18 @@
     
     <script type="module" src="/src/main.jsx"></script>
     
+    <!-- Fallback: ensure splash/loading screen is removed on mobile (including installed PWA) -->
+    <script>
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          var loading = document.querySelector('.loading-screen');
+          if (loading && loading.parentElement) {
+            loading.parentElement.removeChild(loading);
+          }
+        }, 2500);
+      });
+    </script>
+    
     <!-- Auto-restore viewport after input -->
     <script>
       // Function to restore viewport to normal

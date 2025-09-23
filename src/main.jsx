@@ -3,7 +3,13 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './styles/index.css'
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+// Ensure any static splash content is cleared before mounting React
+const rootEl = document.getElementById('root')
+if (rootEl) {
+  try { rootEl.innerHTML = '' } catch {}
+}
+
+ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>,
