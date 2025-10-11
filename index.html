@@ -133,9 +133,13 @@
       window.addEventListener('focus', restoreViewport);
     </script>
     
-    <!-- Service Worker Registration (temporarily disabled to avoid Safe Browsing flags) -->
+    <!-- Service Worker Registration (minimal SW for installability only) -->
     <script>
-      // Disabled to reduce false positive risk
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
     </script>
 </body>
 </html> 
