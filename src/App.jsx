@@ -4586,10 +4586,24 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
             <strong>💡 Backup Tip:</strong> Export your data regularly to avoid losing progress during updates or device changes.
           </div>
         </div>
-        <button className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2">
+        <a 
+          href="/privacy.html" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+        >
           <Shield className="w-4 h-4" />
-          Privacy settings
-        </button>
+          Privacy Policy
+        </a>
+        <a 
+          href="/terms.html" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+        >
+          <FileText className="w-4 h-4" />
+          Terms of Use
+        </a>
         <button 
           onClick={onExport}
           className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
