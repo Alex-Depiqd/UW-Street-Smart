@@ -65,30 +65,7 @@
         </div>
     </div>
     
-    <!-- Google Maps JavaScript SDK -->
-    <script>
-      // Load Google Maps SDK dynamically when API key is available
-      function loadGoogleMapsSDK(apiKey) {
-        if (!apiKey) {
-          return Promise.resolve();
-        }
-        if (window.google && window.google.maps) {
-          return Promise.resolve();
-        }
-        return new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&libraries=places&loading=async`;
-          script.async = true;
-          script.defer = true;
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-      
-      // Make function globally available
-      window.loadGoogleMapsSDK = loadGoogleMapsSDK;
-    </script>
+    <!-- Google Maps SDK removed - not currently used -->
     
     <script type="module" src="/src/main.jsx"></script>
     

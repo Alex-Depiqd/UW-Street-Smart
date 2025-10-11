@@ -1,4 +1,4 @@
-/* Street Smart: uses Google Places API only for address lookup.
+/* Street Smart: local-only campaign tracking app.
    No user credentials, banking, or personal data collected.
    See /privacy.html for details. */
 
