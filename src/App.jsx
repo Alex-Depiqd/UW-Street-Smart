@@ -265,11 +265,11 @@ export default function App() {
     const storedVersion = localStorage.getItem(VERSION_KEY);
     const dismissedVersion = localStorage.getItem(VERSION_UPDATE_DISMISSED_KEY);
     
-    // Show update notification if:
-    // 1. No version stored (first time user)
-    // 2. Stored version is different from current version
+    // Show update notification ONLY if:
+    // 1. User has a stored version (not first time)
+    // 2. Stored version is different from current version (actual update)
     // 3. User hasn't dismissed this specific version
-    if (!storedVersion || (storedVersion !== APP_VERSION && dismissedVersion !== APP_VERSION)) {
+    if (storedVersion && storedVersion !== APP_VERSION && dismissedVersion !== APP_VERSION) {
       const timer = setTimeout(() => {
         setShowVersionUpdate(true);
         setCurrentVersion(APP_VERSION);
@@ -278,7 +278,7 @@ export default function App() {
       return () => clearTimeout(timer);
     }
     
-    // Update stored version
+    // Always update stored version (for first time users and existing users)
     localStorage.setItem(VERSION_KEY, APP_VERSION);
   }, []);
 
