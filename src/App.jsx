@@ -238,6 +238,24 @@ export default function App() {
     })();
   }, []);
 
+  // Facebook group reminder - show every 3 days
+  useEffect(() => {
+    const FACEBOOK_REMINDER_KEY = 'uw_ss_facebook_reminder_last_shown';
+    const now = Date.now();
+    const lastShown = localStorage.getItem(FACEBOOK_REMINDER_KEY);
+    const threeDays = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
+    
+    if (!lastShown || (now - parseInt(lastShown)) > threeDays) {
+      // Show reminder after a short delay
+      const timer = setTimeout(() => {
+        setShowFacebookReminder(true);
+        localStorage.setItem(FACEBOOK_REMINDER_KEY, now.toString());
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // API functionality disabled - manual entry only
   const GOOGLE_PLACES_API_KEY = '';
   
@@ -247,6 +265,9 @@ export default function App() {
   });
   
   const [view, setView] = useState("dashboard");
+  
+  // Facebook group reminder state
+  const [showFacebookReminder, setShowFacebookReminder] = useState(false);
   
   // Load campaigns from localStorage or use seed data only on first run
   const [campaigns, setCampaigns] = useState(() => {
@@ -1948,7 +1969,54 @@ export default function App() {
       <div className="max-w-6xl mx-auto px-4 pb-20 lg:pb-8 text-xs opacity-70">
         UW Street Smart - NL Activity Tracker v1.0.0 | Built for UW partners making a difference in their communities. | © 2025 Alex Cameron. All rights reserved.
       </div>
-      
+
+      {/* Facebook Group Reminder Modal */}
+      {showFacebookReminder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                <span className="text-blue-600 dark:text-blue-400 text-lg">📘</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Join Our Beta Group!</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Connect with other UW partners</p>
+              </div>
+            </div>
+            
+            <div className="space-y-3 mb-6">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                Get the latest updates, share tips, and connect with other UW partners using Street Smart.
+              </p>
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">Benefits:</div>
+                <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                  <li>• Early access to new features</li>
+                  <li>• Tips from successful partners</li>
+                  <li>• Direct feedback to developers</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <a
+                href="https://facebook.com/groups/uw-street-smart-beta"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm font-medium text-center"
+              >
+                Join Facebook Group
+              </a>
+              <button
+                onClick={() => setShowFacebookReminder(false)}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm"
+              >
+                Maybe Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
@@ -4603,6 +4671,15 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
         >
           <FileText className="w-4 h-4" />
           Terms of Use
+        </a>
+        <a 
+          href="https://facebook.com/groups/uw-street-smart-beta" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+        >
+          <span className="w-4 h-4 text-blue-600">📘</span>
+          Join Facebook Beta Group
         </a>
         <button 
           onClick={onExport}
