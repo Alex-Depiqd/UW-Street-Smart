@@ -4688,7 +4688,8 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
           className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
         >
           <span className="w-4 h-4 text-orange-600">☕</span>
-          Support Development (Ko-Fi)
+          <span className="flex-1">Support Street Smart</span>
+          <ExternalLink className="w-3 h-3 text-gray-400" />
         </a>
         <button 
           onClick={onExport}
