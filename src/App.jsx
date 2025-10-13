@@ -260,7 +260,7 @@ export default function App() {
   useEffect(() => {
     const VERSION_KEY = 'uw_ss_app_version';
     const VERSION_UPDATE_DISMISSED_KEY = 'uw_ss_version_update_dismissed';
-    const APP_VERSION = '1.0.1'; // Update this when you release a new version
+    const APP_VERSION = '1.0.0'; // Update this when you release a new version
     
     const storedVersion = localStorage.getItem(VERSION_KEY);
     const dismissedVersion = localStorage.getItem(VERSION_UPDATE_DISMISSED_KEY);
