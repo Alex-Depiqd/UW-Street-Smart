@@ -2000,7 +2000,7 @@ export default function App() {
 
             <div className="flex gap-3">
               <a
-                href="https://facebook.com/groups/uw-street-smart-beta"
+                href="https://www.facebook.com/groups/24642395235425303/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm font-medium text-center"
@@ -4673,7 +4673,7 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
           Terms of Use
         </a>
         <a 
-          href="https://facebook.com/groups/uw-street-smart-beta" 
+          href="https://www.facebook.com/groups/24642395235425303/" 
           target="_blank" 
           rel="noopener noreferrer"
           className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
