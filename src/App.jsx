@@ -256,6 +256,32 @@ export default function App() {
     }
   }, []);
 
+  // Version update check - show when new version is available
+  useEffect(() => {
+    const VERSION_KEY = 'uw_ss_app_version';
+    const VERSION_UPDATE_DISMISSED_KEY = 'uw_ss_version_update_dismissed';
+    const APP_VERSION = '1.0.1'; // Update this when you release a new version
+    
+    const storedVersion = localStorage.getItem(VERSION_KEY);
+    const dismissedVersion = localStorage.getItem(VERSION_UPDATE_DISMISSED_KEY);
+    
+    // Show update notification if:
+    // 1. No version stored (first time user)
+    // 2. Stored version is different from current version
+    // 3. User hasn't dismissed this specific version
+    if (!storedVersion || (storedVersion !== APP_VERSION && dismissedVersion !== APP_VERSION)) {
+      const timer = setTimeout(() => {
+        setShowVersionUpdate(true);
+        setCurrentVersion(APP_VERSION);
+      }, 3000); // Show after 3 seconds
+      
+      return () => clearTimeout(timer);
+    }
+    
+    // Update stored version
+    localStorage.setItem(VERSION_KEY, APP_VERSION);
+  }, []);
+
   // API functionality disabled - manual entry only
   const GOOGLE_PLACES_API_KEY = '';
   
@@ -268,6 +294,10 @@ export default function App() {
   
   // Facebook group reminder state
   const [showFacebookReminder, setShowFacebookReminder] = useState(false);
+  
+  // Version update notification state
+  const [showVersionUpdate, setShowVersionUpdate] = useState(false);
+  const [currentVersion, setCurrentVersion] = useState('1.0.0');
   
   // Load campaigns from localStorage or use seed data only on first run
   const [campaigns, setCampaigns] = useState(() => {
@@ -2012,6 +2042,77 @@ export default function App() {
                 className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm"
               >
                 Maybe Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Version Update Modal */}
+      {showVersionUpdate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+                <span className="text-green-600 dark:text-green-400 text-lg">🔄</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">New Version Available!</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Version {currentVersion} is ready</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <div className="font-medium text-amber-800 dark:text-amber-200 mb-2">Important: Backup Your Data First!</div>
+                    <p className="text-amber-700 dark:text-amber-300 mb-3">
+                      To get the latest features and fixes, you'll need to update the app. This requires backing up your data first.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="text-sm font-medium text-gray-800 dark:text-gray-200">Update Steps:</div>
+                <ol className="text-sm text-gray-700 dark:text-gray-300 space-y-2 ml-4">
+                  <li className="flex items-start gap-2">
+                    <span className="bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium flex-shrink-0 mt-0.5">1</span>
+                    <span>Go to Settings → Export all data (save the file)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium flex-shrink-0 mt-0.5">2</span>
+                    <span>Remove the app from your home screen</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium flex-shrink-0 mt-0.5">3</span>
+                    <span>Visit the website again and reinstall</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium flex-shrink-0 mt-0.5">4</span>
+                    <span>Go to Settings → Import data (select your backup file)</span>
+                  </li>
+                </ol>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowVersionUpdate(false);
+                  localStorage.setItem('uw_ss_version_update_dismissed', currentVersion);
+                }}
+                className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors text-sm font-medium"
+              >
+                I Understand
+              </button>
+              <button
+                onClick={() => setShowVersionUpdate(false)}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm"
+              >
+                Later
               </button>
             </div>
           </div>
