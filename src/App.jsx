@@ -4681,6 +4681,15 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
           <span className="w-4 h-4 text-blue-600">📘</span>
           Join Facebook Beta Group
         </a>
+        <a 
+          href="https://ko-fi.com/uwalexc" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+        >
+          <span className="w-4 h-4 text-orange-600">☕</span>
+          Support Development (Ko-Fi)
+        </a>
         <button 
           onClick={onExport}
           className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
