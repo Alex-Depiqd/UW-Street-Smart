@@ -7413,8 +7413,15 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
       return;
     }
 
+    // Prevent duplicate searches
+    if (isLoadingIdealAddresses) {
+      console.log('Search already in progress, ignoring duplicate request');
+      return;
+    }
+
     setIsLoadingIdealAddresses(true);
     setIdealPostcodeError('');
+    setResultsTruncated({ truncated: false, total: 0, shown: 0 });
     
     try {
       const encodedQuery = encodeURIComponent(streetName.trim());
