@@ -13,6 +13,7 @@ exports.handler = async (event, context) => {
   // Get parameters from query string
   const postcode = event.queryStringParameters?.postcode;
   const query = event.queryStringParameters?.query; // For address/street name search
+  const page = event.queryStringParameters?.page; // For pagination
   
   if (!postcode && !query) {
     return {
@@ -40,7 +41,12 @@ exports.handler = async (event, context) => {
       // Address/street name search - try addresses endpoint first
       const encodedQuery = encodeURIComponent(query.trim());
       // Try /addresses endpoint which returns full address details
-      url = `https://api.ideal-postcodes.co.uk/v1/addresses?query=${encodedQuery}&api_key=${apiKey}`;
+      let urlBase = `https://api.ideal-postcodes.co.uk/v1/addresses?query=${encodedQuery}&api_key=${apiKey}`;
+      // Add pagination if specified
+      if (page) {
+        urlBase += `&page=${page}`;
+      }
+      url = urlBase;
     }
     
     const response = await fetch(url);

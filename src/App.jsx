@@ -7429,6 +7429,13 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
       
       // Debug logging
       console.log('Address search response:', data);
+      console.log('Result structure:', data.result);
+      console.log('Result type:', typeof data.result, Array.isArray(data.result));
+      if (data.result && typeof data.result === 'object') {
+        console.log('Result keys:', Object.keys(data.result));
+        console.log('Result.total:', data.result.total);
+        console.log('Result.length:', data.result.length);
+      }
       
       // Check for error response
       if (data.error) {
@@ -7438,12 +7445,15 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
       
       // Handle different response formats
       let addresses = [];
+      let hasMore = false;
+      let totalResults = 0;
       
       // Format 1: Direct result array (like postcode lookup)
       if (data.code === 2000 && data.result && Array.isArray(data.result) && data.result.length > 0) {
         addresses = data.result;
+        totalResults = data.result.length;
       }
-      // Format 2: Autocomplete format with hits
+      // Format 2: Result with hits array (autocomplete format)
       else if (data.code === 2000 && data.result && data.result.hits && Array.isArray(data.result.hits) && data.result.hits.length > 0) {
         addresses = data.result.hits.map(hit => ({
           line_1: hit.line_1 || hit.address || hit.suggestion || '',
@@ -7454,22 +7464,76 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
           thoroughfare: hit.thoroughfare || hit.line_1?.split(',')[0]?.trim() || '',
           premise: hit.premise || hit.line_1?.split(',')[0]?.trim() || ''
         }));
+        totalResults = data.result.hits.length;
+        hasMore = data.result.total > data.result.hits.length;
       }
-      // Format 3: Suggestions array
-      else if (data.code === 2000 && data.result && data.result.suggestions && Array.isArray(data.result.suggestions) && data.result.suggestions.length > 0) {
-        addresses = data.result.suggestions.map(suggestion => ({
-          line_1: suggestion.line_1 || suggestion.address || suggestion.suggestion || '',
-          line_2: suggestion.line_2 || '',
-          line_3: suggestion.line_3 || '',
-          post_town: suggestion.post_town || '',
-          postcode: suggestion.postcode || '',
-          thoroughfare: suggestion.thoroughfare || suggestion.line_1?.split(',')[0]?.trim() || '',
-          premise: suggestion.premise || suggestion.line_1?.split(',')[0]?.trim() || ''
-        }));
+      // Format 3: Result object with addresses array
+      else if (data.code === 2000 && data.result && data.result.addresses && Array.isArray(data.result.addresses) && data.result.addresses.length > 0) {
+        addresses = data.result.addresses;
+        totalResults = data.result.addresses.length;
+        hasMore = data.result.total > data.result.addresses.length;
+      }
+      // Format 4: Direct result object (check if it's an object with address properties)
+      else if (data.code === 2000 && data.result && typeof data.result === 'object' && !Array.isArray(data.result)) {
+        // Check if result has a count or total property indicating pagination
+        if (data.result.total && data.result.total > 0) {
+          // Try to find the addresses array
+          const addressesKey = Object.keys(data.result).find(key => 
+            Array.isArray(data.result[key]) && data.result[key].length > 0
+          );
+          if (addressesKey) {
+            addresses = data.result[addressesKey];
+            totalResults = data.result.total;
+            hasMore = data.result[addressesKey].length < data.result.total;
+          }
+        }
       }
       
       if (addresses.length > 0) {
-        setIdealAddresses(addresses);
+        // If there are more results, fetch them
+        if (hasMore && data.result && data.result.total) {
+          // Fetch additional pages to get all results
+          const allAddresses = [...addresses];
+          const pageSize = addresses.length;
+          const totalPages = Math.ceil(data.result.total / pageSize);
+          
+          // Fetch remaining pages (limit to reasonable number to avoid too many API calls)
+          for (let page = 2; page <= Math.min(totalPages, 10); page++) {
+            try {
+              const pageUrl = `/.netlify/functions/postcode-lookup?query=${encodeURIComponent(streetName.trim())}&page=${page}`;
+              const pageResponse = await fetch(pageUrl);
+              if (pageResponse.ok) {
+                const pageData = await pageResponse.json();
+                if (pageData.code === 2000 && pageData.result) {
+                  let pageAddresses = [];
+                  if (Array.isArray(pageData.result)) {
+                    pageAddresses = pageData.result;
+                  } else if (pageData.result.hits && Array.isArray(pageData.result.hits)) {
+                    pageAddresses = pageData.result.hits.map(hit => ({
+                      line_1: hit.line_1 || hit.address || hit.suggestion || '',
+                      line_2: hit.line_2 || '',
+                      line_3: hit.line_3 || '',
+                      post_town: hit.post_town || '',
+                      postcode: hit.postcode || '',
+                      thoroughfare: hit.thoroughfare || hit.line_1?.split(',')[0]?.trim() || '',
+                      premise: hit.premise || hit.line_1?.split(',')[0]?.trim() || ''
+                    }));
+                  } else if (pageData.result.addresses && Array.isArray(pageData.result.addresses)) {
+                    pageAddresses = pageData.result.addresses;
+                  }
+                  allAddresses.push(...pageAddresses);
+                }
+              }
+            } catch (err) {
+              console.warn(`Failed to fetch page ${page}:`, err);
+              break; // Stop trying if we hit an error
+            }
+          }
+          
+          setIdealAddresses(allAddresses);
+        } else {
+          setIdealAddresses(addresses);
+        }
         setSelectedIdealAddresses([]);
         setStep('ideal-select');
       } else if (data.code === 2000) {
