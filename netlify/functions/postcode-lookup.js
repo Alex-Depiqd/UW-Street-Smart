@@ -10,17 +10,18 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Get postcode from query string
+  // Get parameters from query string
   const postcode = event.queryStringParameters?.postcode;
+  const query = event.queryStringParameters?.query; // For address/street name search
   
-  if (!postcode) {
+  if (!postcode && !query) {
     return {
       statusCode: 400,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify({ error: 'Postcode parameter is required' })
+      body: JSON.stringify({ error: 'Either postcode or query parameter is required' })
     };
   }
 
@@ -29,8 +30,17 @@ exports.handler = async (event, context) => {
   const apiKey = process.env.IDEAL_POSTCODES_API_KEY || 'ak_mjtdtn6bmxMboMnlL6AM7Mhrvle34';
 
   try {
-    const encodedPostcode = encodeURIComponent(postcode.trim());
-    const url = `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodedPostcode}?api_key=${apiKey}`;
+    let url;
+    
+    if (postcode) {
+      // Postcode lookup
+      const encodedPostcode = encodeURIComponent(postcode.trim());
+      url = `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodedPostcode}?api_key=${apiKey}`;
+    } else {
+      // Address/street name search
+      const encodedQuery = encodeURIComponent(query.trim());
+      url = `https://api.ideal-postcodes.co.uk/v1/addresses?query=${encodedQuery}&api_key=${apiKey}`;
+    }
     
     const response = await fetch(url);
     const data = await response.json();

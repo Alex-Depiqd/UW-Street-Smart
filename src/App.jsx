@@ -6535,7 +6535,7 @@ function ImportStreetsForm({
 function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
   const GOOGLE_PLACES_API_KEY = '';
   
-  const [step, setStep] = useState('options'); // 'options', 'postcode', 'streets', 'properties', 'manual', 'ideal-postcode', 'ideal-select'
+  const [step, setStep] = useState('options'); // 'options', 'postcode', 'streets', 'properties', 'manual', 'ideal-postcode', 'ideal-select', 'ideal-street-search'
   const [formData, setFormData] = useState({
     name: "",
     postcode: "",
@@ -6552,6 +6552,7 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
   
   // Ideal Postcodes state
   const [idealPostcodeInput, setIdealPostcodeInput] = useState('');
+  const [idealStreetNameInput, setIdealStreetNameInput] = useState('');
   const [idealAddresses, setIdealAddresses] = useState([]);
   const [selectedIdealAddresses, setSelectedIdealAddresses] = useState([]);
   const [isLoadingIdealAddresses, setIsLoadingIdealAddresses] = useState(false);
@@ -7018,22 +7019,40 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
 
         <div className="grid grid-cols-1 gap-3">
           {config.idealPostcodes.enabled && config.idealPostcodes.apiKey && (
-            <button
-              onClick={() => setStep('ideal-postcode')}
-              className="p-4 rounded-xl border-2 border-dashed border-secondary-300 dark:border-secondary-700 hover:border-secondary-400 dark:hover:border-secondary-600 transition-colors text-left"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-secondary-100 dark:bg-secondary-900/20">
-                  <Search className="w-5 h-5 text-secondary-600" />
-                </div>
-                <div>
-                  <div className="font-medium">Import from Postcode</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Look up all addresses at a postcode and import them
+            <>
+              <button
+                onClick={() => setStep('ideal-postcode')}
+                className="p-4 rounded-xl border-2 border-dashed border-secondary-300 dark:border-secondary-700 hover:border-secondary-400 dark:hover:border-secondary-600 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-secondary-100 dark:bg-secondary-900/20">
+                    <Search className="w-5 h-5 text-secondary-600" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Import from Postcode</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Look up all addresses at a postcode and import them
+                    </div>
                   </div>
                 </div>
-              </div>
-            </button>
+              </button>
+              <button
+                onClick={() => setStep('ideal-street-search')}
+                className="p-4 rounded-xl border-2 border-dashed border-secondary-300 dark:border-secondary-700 hover:border-secondary-400 dark:hover:border-secondary-600 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-secondary-100 dark:bg-secondary-900/20">
+                    <MapPin className="w-5 h-5 text-secondary-600" />
+                  </div>
+                  <div>
+                    <div className="font-medium">Search by Street Name</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      Find addresses by street name (e.g., "Cross Street, Elmswell")
+                    </div>
+                  </div>
+                </div>
+              </button>
+            </>
           )}
           <button
             onClick={() => setStep('manual')}
@@ -7385,6 +7404,47 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
     }
   };
 
+  // Ideal Postcodes street name search function
+  const searchIdealStreetName = async (streetName) => {
+    if (!config.idealPostcodes.apiKey) {
+      setIdealPostcodeError('API key not configured. Please add your Ideal Postcodes API key to config.js');
+      return;
+    }
+
+    setIsLoadingIdealAddresses(true);
+    setIdealPostcodeError('');
+    
+    try {
+      const encodedQuery = encodeURIComponent(streetName.trim());
+      // Use Netlify function as proxy to avoid CORS issues
+      const url = `/.netlify/functions/postcode-lookup?query=${encodedQuery}`;
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.code === 2000 && data.result && data.result.length > 0) {
+        setIdealAddresses(data.result);
+        setSelectedIdealAddresses([]);
+        setStep('ideal-select');
+      } else if (data.code === 4040) {
+        setIdealPostcodeError(`No addresses found for "${streetName}". Try adding a town name (e.g., "Cross Street, Elmswell") or check the spelling.`);
+      } else if (data.code === 4010) {
+        setIdealPostcodeError('Invalid API key. Please check your Ideal Postcodes API key in config.js');
+      } else {
+        setIdealPostcodeError(data.message || 'An error occurred while searching for addresses.');
+      }
+    } catch (error) {
+      setIdealPostcodeError(`Network error: ${error.message}. Please check your internet connection.`);
+    } finally {
+      setIsLoadingIdealAddresses(false);
+    }
+  };
+
   // Parse and group addresses by street
   const parseIdealAddresses = (addresses) => {
     const streetsMap = new Map();
@@ -7453,6 +7513,7 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
     // Close modal and reset state after all streets are added
     setTimeout(() => {
       setIdealPostcodeInput('');
+      setIdealStreetNameInput('');
       setIdealAddresses([]);
       setSelectedIdealAddresses([]);
       setStep('options');
@@ -7473,6 +7534,81 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
       alert(summary);
     }, 200);
   };
+
+  if (step === 'ideal-street-search') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => {
+              setStep('options');
+              setIdealStreetNameInput('');
+              setIdealPostcodeError('');
+            }}
+            className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h3 className="font-medium">Search by Street Name</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Enter a street name to find all addresses
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs opacity-70">Street Name *</label>
+          <input
+            type="text"
+            value={idealStreetNameInput}
+            onChange={(e) => {
+              setIdealStreetNameInput(e.target.value);
+              setIdealPostcodeError('');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && idealStreetNameInput.trim()) {
+                e.preventDefault();
+                searchIdealStreetName(idealStreetNameInput);
+              }
+            }}
+            placeholder="e.g., Cross Street, Elmswell or Cross Street, IP30"
+            className="w-full mt-1 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+          />
+          <div className="text-xs text-gray-500 mt-1">
+            Tip: Add a town name or postcode area for better results (e.g., "High Street, London" or "Church Road, IP30")
+          </div>
+        </div>
+
+        {idealPostcodeError && (
+          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300">
+            {idealPostcodeError}
+          </div>
+        )}
+
+        <button
+          onClick={() => searchIdealStreetName(idealStreetNameInput)}
+          disabled={!idealStreetNameInput.trim() || isLoadingIdealAddresses}
+          className="w-full px-4 py-2 rounded-xl bg-secondary-600 text-white text-sm hover:bg-secondary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isLoadingIdealAddresses ? 'Searching addresses...' : 'Search Addresses'}
+        </button>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            onClick={() => {
+              setStep('options');
+              setIdealStreetNameInput('');
+              setIdealPostcodeError('');
+            }}
+            className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Toggle address selection
   const toggleIdealAddress = (address) => {
