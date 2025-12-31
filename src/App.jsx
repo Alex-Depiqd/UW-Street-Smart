@@ -6557,6 +6557,7 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
   const [selectedIdealAddresses, setSelectedIdealAddresses] = useState([]);
   const [isLoadingIdealAddresses, setIsLoadingIdealAddresses] = useState(false);
   const [idealPostcodeError, setIdealPostcodeError] = useState('');
+  const [resultsTruncated, setResultsTruncated] = useState({ truncated: false, total: 0, shown: 0 });
 
   // OpenStreetMap Nominatim API
   const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
@@ -7557,14 +7558,18 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
           
           // Store warning message if results were truncated
           if (data.result.total > finalCount) {
-            // We'll show this in the UI
-            setIdealPostcodeError(`Found ${data.result.total} results, showing first ${finalCount}. Try a more specific search (e.g., include postcode area) to narrow results.`);
-            // Clear error after a moment so user can still see the results
-            setTimeout(() => setIdealPostcodeError(''), 5000);
+            setResultsTruncated({
+              truncated: true,
+              total: data.result.total,
+              shown: finalCount
+            });
+          } else {
+            setResultsTruncated({ truncated: false, total: 0, shown: 0 });
           }
           
           setIdealAddresses(allAddresses);
         } else {
+          setResultsTruncated({ truncated: false, total: 0, shown: 0 });
           setIdealAddresses(addresses);
         }
         setSelectedIdealAddresses([]);
