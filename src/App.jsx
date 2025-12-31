@@ -7453,8 +7453,8 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
         addresses = data.result;
         totalResults = data.result.length;
       }
-      // Format 2: Result with hits array (autocomplete format)
-      else if (data.code === 2000 && data.result && data.result.hits && Array.isArray(data.result.hits) && data.result.hits.length > 0) {
+      // Format 2: Result with hits array (autocomplete format) - THIS IS THE ACTUAL FORMAT
+      if (data.code === 2000 && data.result && data.result.hits && Array.isArray(data.result.hits) && data.result.hits.length > 0) {
         addresses = data.result.hits.map(hit => ({
           line_1: hit.line_1 || hit.address || hit.suggestion || '',
           line_2: hit.line_2 || '',
@@ -7464,8 +7464,9 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
           thoroughfare: hit.thoroughfare || hit.line_1?.split(',')[0]?.trim() || '',
           premise: hit.premise || hit.line_1?.split(',')[0]?.trim() || ''
         }));
-        totalResults = data.result.hits.length;
+        totalResults = data.result.total || data.result.hits.length;
         hasMore = data.result.total > data.result.hits.length;
+        console.log(`Found ${addresses.length} addresses, total: ${totalResults}, hasMore: ${hasMore}`);
       }
       // Format 3: Result object with addresses array
       else if (data.code === 2000 && data.result && data.result.addresses && Array.isArray(data.result.addresses) && data.result.addresses.length > 0) {
@@ -7492,24 +7493,30 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
       if (addresses.length > 0) {
         // If there are more results, fetch them
         if (hasMore && data.result && data.result.total) {
+          console.log(`Fetching additional pages. Total: ${data.result.total}, Current: ${addresses.length}`);
           // Fetch additional pages to get all results
           const allAddresses = [...addresses];
-          const pageSize = addresses.length;
+          const pageSize = data.result.limit || addresses.length;
           const totalPages = Math.ceil(data.result.total / pageSize);
           
+          console.log(`Page size: ${pageSize}, Total pages: ${totalPages}`);
+          
           // Fetch remaining pages (limit to reasonable number to avoid too many API calls)
-          for (let page = 2; page <= Math.min(totalPages, 10); page++) {
-            try {
-              const pageUrl = `/.netlify/functions/postcode-lookup?query=${encodeURIComponent(streetName.trim())}&page=${page}`;
-              const pageResponse = await fetch(pageUrl);
-              if (pageResponse.ok) {
-                const pageData = await pageResponse.json();
-                if (pageData.code === 2000 && pageData.result) {
-                  let pageAddresses = [];
-                  if (Array.isArray(pageData.result)) {
-                    pageAddresses = pageData.result;
-                  } else if (pageData.result.hits && Array.isArray(pageData.result.hits)) {
-                    pageAddresses = pageData.result.hits.map(hit => ({
+          const fetchPromises = [];
+          for (let page = 1; page < Math.min(totalPages, 10); page++) {
+            const pageUrl = `/.netlify/functions/postcode-lookup?query=${encodeURIComponent(streetName.trim())}&page=${page}`;
+            console.log(`Fetching page ${page}: ${pageUrl}`);
+            fetchPromises.push(
+              fetch(pageUrl)
+                .then(pageResponse => {
+                  if (!pageResponse.ok) {
+                    throw new Error(`HTTP ${pageResponse.status}`);
+                  }
+                  return pageResponse.json();
+                })
+                .then(pageData => {
+                  if (pageData.code === 2000 && pageData.result && pageData.result.hits && Array.isArray(pageData.result.hits)) {
+                    const pageAddresses = pageData.result.hits.map(hit => ({
                       line_1: hit.line_1 || hit.address || hit.suggestion || '',
                       line_2: hit.line_2 || '',
                       line_3: hit.line_3 || '',
@@ -7518,18 +7525,24 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
                       thoroughfare: hit.thoroughfare || hit.line_1?.split(',')[0]?.trim() || '',
                       premise: hit.premise || hit.line_1?.split(',')[0]?.trim() || ''
                     }));
-                  } else if (pageData.result.addresses && Array.isArray(pageData.result.addresses)) {
-                    pageAddresses = pageData.result.addresses;
+                    console.log(`Page ${page} returned ${pageAddresses.length} addresses`);
+                    return pageAddresses;
                   }
-                  allAddresses.push(...pageAddresses);
-                }
-              }
-            } catch (err) {
-              console.warn(`Failed to fetch page ${page}:`, err);
-              break; // Stop trying if we hit an error
-            }
+                  return [];
+                })
+                .catch(err => {
+                  console.warn(`Failed to fetch page ${page}:`, err);
+                  return [];
+                })
+            );
           }
           
+          // Wait for all pages to load
+          const additionalAddresses = await Promise.all(fetchPromises);
+          const flatAddresses = additionalAddresses.flat();
+          allAddresses.push(...flatAddresses);
+          
+          console.log(`Total addresses after pagination: ${allAddresses.length} (expected: ${data.result.total})`);
           setIdealAddresses(allAddresses);
         } else {
           setIdealAddresses(addresses);
