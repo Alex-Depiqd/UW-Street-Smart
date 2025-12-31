@@ -7491,7 +7491,7 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
       }
       
       if (addresses.length > 0) {
-        // If there are more results, fetch them
+        // If there are more results, fetch them (but limit to reasonable number)
         if (hasMore && data.result && data.result.total) {
           console.log(`Fetching additional pages. Total: ${data.result.total}, Current: ${addresses.length}`);
           // Fetch additional pages to get all results
@@ -7499,11 +7499,20 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
           const pageSize = data.result.limit || addresses.length;
           const totalPages = Math.ceil(data.result.total / pageSize);
           
-          console.log(`Page size: ${pageSize}, Total pages: ${totalPages}`);
+          // Limit to max 5 pages (50 results) to avoid excessive API calls and irrelevant results
+          const MAX_PAGES = 5;
+          const pagesToFetch = Math.min(totalPages - 1, MAX_PAGES - 1); // -1 because we already have page 0
+          
+          console.log(`Page size: ${pageSize}, Total pages: ${totalPages}, Will fetch: ${pagesToFetch} pages`);
+          
+          if (totalPages > MAX_PAGES) {
+            // Show warning that results are limited
+            console.warn(`Too many results (${data.result.total}). Limiting to first ${MAX_PAGES * pageSize} results.`);
+          }
           
           // Fetch remaining pages (limit to reasonable number to avoid too many API calls)
           const fetchPromises = [];
-          for (let page = 1; page < Math.min(totalPages, 10); page++) {
+          for (let page = 1; page <= pagesToFetch; page++) {
             const pageUrl = `/.netlify/functions/postcode-lookup?query=${encodeURIComponent(streetName.trim())}&page=${page}`;
             console.log(`Fetching page ${page}: ${pageUrl}`);
             fetchPromises.push(
@@ -7542,7 +7551,18 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
           const flatAddresses = additionalAddresses.flat();
           allAddresses.push(...flatAddresses);
           
-          console.log(`Total addresses after pagination: ${allAddresses.length} (expected: ${data.result.total})`);
+          const finalCount = allAddresses.length;
+          const expectedCount = Math.min(data.result.total, MAX_PAGES * pageSize);
+          console.log(`Total addresses after pagination: ${finalCount} (limited to ${expectedCount} of ${data.result.total} total)`);
+          
+          // Store warning message if results were truncated
+          if (data.result.total > finalCount) {
+            // We'll show this in the UI
+            setIdealPostcodeError(`Found ${data.result.total} results, showing first ${finalCount}. Try a more specific search (e.g., include postcode area) to narrow results.`);
+            // Clear error after a moment so user can still see the results
+            setTimeout(() => setIdealPostcodeError(''), 5000);
+          }
+          
           setIdealAddresses(allAddresses);
         } else {
           setIdealAddresses(addresses);
