@@ -7356,9 +7356,15 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
     
     try {
       const encodedPostcode = encodeURIComponent(postcode.trim());
-      const url = `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodedPostcode}?api_key=${config.idealPostcodes.apiKey}`;
+      // Use Netlify function as proxy to avoid CORS issues
+      const url = `/.netlify/functions/postcode-lookup?postcode=${encodedPostcode}`;
       
       const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       
       if (data.code === 2000 && data.result && data.result.length > 0) {
@@ -8122,9 +8128,15 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
     
     try {
       const encodedPostcode = encodeURIComponent(postcode.trim());
-      const url = `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodedPostcode}?api_key=${config.idealPostcodes.apiKey}`;
+      // Use Netlify function as proxy to avoid CORS issues
+      const url = `/.netlify/functions/postcode-lookup?postcode=${encodedPostcode}`;
       
       const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
       
       if (data.code === 2000 && data.result && data.result.length > 0) {
