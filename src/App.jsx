@@ -660,13 +660,49 @@ export default function App() {
   };
 
   const createNewStreet = (streetData) => {
+    // Calculate results BEFORE updating state (so we can return them synchronously)
+    const currentCampaign = campaigns.find(c => c.id === activeCampaignId);
+    let streetCreated = false;
+    let streetUpdated = false;
+    let propertiesAdded = 0;
+    let propertiesSkipped = 0;
+    
+    if (currentCampaign) {
+      // Check if street with same name and postcode already exists
+      const existingStreet = currentCampaign.streets.find(s => 
+        s.name.toLowerCase().trim() === streetData.name.toLowerCase().trim() &&
+        s.postcode.toLowerCase().trim() === (streetData.postcode || '').toLowerCase().trim()
+      );
+      
+      if (existingStreet) {
+        // Street exists - calculate what will be added
+        const existingPropertyLabels = existingStreet.properties.map(p => p.label.toLowerCase().trim());
+        const newProperties = streetData.properties.filter(prop => 
+          !existingPropertyLabels.includes(prop.toLowerCase().trim())
+        );
+        propertiesAdded = newProperties.length;
+        propertiesSkipped = streetData.properties.length - newProperties.length;
+        streetUpdated = true;
+      } else {
+        // Street doesn't exist - will create new one
+        streetCreated = true;
+        propertiesAdded = streetData.properties.length;
+        propertiesSkipped = 0;
+      }
+    } else {
+      // No campaign found - will create new street
+      streetCreated = true;
+      propertiesAdded = streetData.properties.length;
+      propertiesSkipped = 0;
+    }
+    
     const newStreet = {
-      id: `street-${Date.now()}`,
+      id: `street-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: streetData.name,
       postcode: streetData.postcode,
       status: "not_started",
       properties: streetData.properties.map((prop, index) => ({
-        id: `property-${Date.now()}-${index}`,
+        id: `property-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
         label: prop,
         dropped: false,
         knocked: false,
@@ -676,7 +712,86 @@ export default function App() {
     };
     
     updateCampaigns(prev => prev.map(c => {
-      if (c.id === activeCampaignId) {
+      if (c.id !== activeCampaignId) return c;
+      
+      // Check if we're adding to a specific existing street
+      if (streetData._targetStreet) {
+        const targetStreetIdx = c.streets.findIndex(s => s.id === streetData._targetStreet.id);
+        if (targetStreetIdx !== -1) {
+          const targetStreet = c.streets[targetStreetIdx];
+          const existingPropertyLabels = targetStreet.properties.map(p => p.label.toLowerCase().trim());
+          
+          const newProperties = streetData.properties
+            .filter(prop => {
+              const propLabel = prop.toLowerCase().trim();
+              return !existingPropertyLabels.includes(propLabel);
+            })
+            .map((prop, index) => ({
+              id: `property-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+              label: prop,
+              dropped: false,
+              knocked: false,
+              spoke: false,
+              result: "none"
+            }));
+          
+          const updatedStreets = [...c.streets];
+          updatedStreets[targetStreetIdx] = {
+            ...targetStreet,
+            properties: [...targetStreet.properties, ...newProperties]
+          };
+          
+          setActiveStreetId(targetStreet.id);
+          
+          return {
+            ...c,
+            streets: updatedStreets
+          };
+        }
+      }
+      
+      // Check if street with same name and postcode already exists
+      const existingStreetIdx = c.streets.findIndex(s => 
+        s.name.toLowerCase().trim() === streetData.name.toLowerCase().trim() &&
+        s.postcode.toLowerCase().trim() === (streetData.postcode || '').toLowerCase().trim()
+      );
+      
+      if (existingStreetIdx !== -1) {
+        // Street exists - merge properties (add new ones, skip duplicates)
+        const existingStreet = c.streets[existingStreetIdx];
+        const existingPropertyLabels = existingStreet.properties.map(p => p.label.toLowerCase().trim());
+        
+        const newProperties = streetData.properties
+          .filter(prop => {
+            const propLabel = prop.toLowerCase().trim();
+            return !existingPropertyLabels.includes(propLabel);
+          })
+          .map((prop, index) => ({
+            id: `property-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+            label: prop,
+            dropped: false,
+            knocked: false,
+            spoke: false,
+            result: "none"
+          }));
+        
+        // Update existing street with new properties
+        const updatedStreets = [...c.streets];
+        updatedStreets[existingStreetIdx] = {
+          ...existingStreet,
+          properties: [...existingStreet.properties, ...newProperties]
+        };
+        
+        setActiveStreetId(existingStreet.id);
+        
+        return {
+          ...c,
+          streets: updatedStreets
+        };
+      } else {
+        // Street doesn't exist - create new one
+        setActiveStreetId(newStreet.id);
+        
         const updatedCampaign = {
           ...c,
           streets: [...c.streets, newStreet]
@@ -684,15 +799,25 @@ export default function App() {
         
         // Don't auto-update campaign status when adding streets - keep as "planned" until there's actual activity
         return updatedCampaign;
-        
-        return updatedCampaign;
       }
-      return c;
     }));
     
-    setActiveStreetId(newStreet.id);
-    setShowNewStreetModal(false);
-    alert('New street added successfully!');
+    // Only close modal and show alert if not doing bulk import
+    // (bulk import will handle this separately)
+    if (!streetData._bulkImport) {
+      setShowNewStreetModal(false);
+      if (streetUpdated) {
+        if (propertiesAdded > 0) {
+          alert(`Street updated! Added ${propertiesAdded} new propert${propertiesAdded !== 1 ? 'ies' : 'y'}${propertiesSkipped > 0 ? ` (${propertiesSkipped} duplicate${propertiesSkipped !== 1 ? 's' : ''} skipped)` : ''}.`);
+        } else {
+          alert(`Street already exists with all properties. No duplicates added.`);
+        }
+      } else {
+        alert('New street added successfully!');
+      }
+    }
+    
+    return { streetCreated, streetUpdated, propertiesAdded, propertiesSkipped };
   };
 
   // Edit campaign function
@@ -1894,6 +2019,7 @@ export default function App() {
         <NewStreetForm 
           onSubmit={createNewStreet} 
           onCancel={() => setShowNewStreetModal(false)}
+          existingStreets={activeCampaign?.streets || []}
         />
       </Drawer>
 
@@ -6406,10 +6532,10 @@ function ImportStreetsForm({
   );
 }
 
-function NewStreetForm({ onSubmit, onCancel }) {
+function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
   const GOOGLE_PLACES_API_KEY = '';
   
-  const [step, setStep] = useState('options'); // 'options', 'postcode', 'streets', 'properties', 'manual'
+  const [step, setStep] = useState('options'); // 'options', 'postcode', 'streets', 'properties', 'manual', 'ideal-postcode', 'ideal-select'
   const [formData, setFormData] = useState({
     name: "",
     postcode: "",
@@ -6423,6 +6549,13 @@ function NewStreetForm({ onSubmit, onCancel }) {
   const [selectedProperties, setSelectedProperties] = useState([]);
   const [currentPostcode, setCurrentPostcode] = useState('');
   const [availableStreets, setAvailableStreets] = useState([]);
+  
+  // Ideal Postcodes state
+  const [idealPostcodeInput, setIdealPostcodeInput] = useState('');
+  const [idealAddresses, setIdealAddresses] = useState([]);
+  const [selectedIdealAddresses, setSelectedIdealAddresses] = useState([]);
+  const [isLoadingIdealAddresses, setIsLoadingIdealAddresses] = useState(false);
+  const [idealPostcodeError, setIdealPostcodeError] = useState('');
 
   // OpenStreetMap Nominatim API
   const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
@@ -6884,6 +7017,24 @@ function NewStreetForm({ onSubmit, onCancel }) {
         </div>
 
         <div className="grid grid-cols-1 gap-3">
+          {config.idealPostcodes.enabled && config.idealPostcodes.apiKey && (
+            <button
+              onClick={() => setStep('ideal-postcode')}
+              className="p-4 rounded-xl border-2 border-dashed border-secondary-300 dark:border-secondary-700 hover:border-secondary-400 dark:hover:border-secondary-600 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-secondary-100 dark:bg-secondary-900/20">
+                  <Search className="w-5 h-5 text-secondary-600" />
+                </div>
+                <div>
+                  <div className="font-medium">Import from Postcode</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Look up all addresses at a postcode and import them
+                  </div>
+                </div>
+              </div>
+            </button>
+          )}
           <button
             onClick={() => setStep('manual')}
             className="p-4 rounded-xl border-2 border-dashed border-primary-300 dark:border-primary-700 hover:border-primary-400 dark:hover:border-primary-600 transition-colors text-left"
@@ -7189,6 +7340,366 @@ function NewStreetForm({ onSubmit, onCancel }) {
             </button>
           </div>
         )}
+      </div>
+    );
+  }
+
+  // Ideal Postcodes lookup function
+  const lookupIdealPostcode = async (postcode) => {
+    if (!config.idealPostcodes.apiKey) {
+      setIdealPostcodeError('API key not configured. Please add your Ideal Postcodes API key to config.js');
+      return;
+    }
+
+    setIsLoadingIdealAddresses(true);
+    setIdealPostcodeError('');
+    
+    try {
+      const encodedPostcode = encodeURIComponent(postcode.trim());
+      const url = `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodedPostcode}?api_key=${config.idealPostcodes.apiKey}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.code === 2000 && data.result && data.result.length > 0) {
+        setIdealAddresses(data.result);
+        setSelectedIdealAddresses([]);
+        setStep('ideal-select');
+      } else if (data.code === 4040) {
+        setIdealPostcodeError(`No addresses found for postcode "${postcode}". Please check the postcode and try again.`);
+      } else if (data.code === 4010) {
+        setIdealPostcodeError('Invalid API key. Please check your Ideal Postcodes API key in config.js');
+      } else {
+        setIdealPostcodeError(data.message || 'An error occurred while looking up addresses.');
+      }
+    } catch (error) {
+      setIdealPostcodeError(`Network error: ${error.message}. Please check your internet connection.`);
+    } finally {
+      setIsLoadingIdealAddresses(false);
+    }
+  };
+
+  // Parse and group addresses by street
+  const parseIdealAddresses = (addresses) => {
+    const streetsMap = new Map();
+    
+    addresses.forEach((addr, index) => {
+      const streetName = addr.thoroughfare || 'Unknown Street';
+      const postcode = addr.postcode || idealPostcodeInput;
+      
+      if (!streetsMap.has(streetName)) {
+        streetsMap.set(streetName, {
+          name: streetName,
+          postcode: postcode,
+          properties: []
+        });
+      }
+      
+      const street = streetsMap.get(streetName);
+      const propertyLabel = addr.premise || addr.line_1?.split(',')[0]?.trim() || `Property ${index + 1}`;
+      
+      street.properties.push({
+        label: propertyLabel,
+        fullAddress: [addr.line_1, addr.line_2, addr.line_3, addr.post_town, addr.postcode].filter(Boolean).join(', ')
+      });
+    });
+    
+    return Array.from(streetsMap.values());
+  };
+
+  // Handle bulk import of selected addresses
+  const handleIdealImport = () => {
+    if (selectedIdealAddresses.length === 0) {
+      alert('Please select at least one address to import.');
+      return;
+    }
+
+    const streets = parseIdealAddresses(selectedIdealAddresses);
+    let totalCreated = 0;
+    let totalUpdated = 0;
+    let totalPropertiesAdded = 0;
+    let totalPropertiesSkipped = 0;
+    
+    // Import all streets at once (mark as bulk import to prevent modal closing)
+    streets.forEach((street) => {
+      const streetData = {
+        name: street.name,
+        postcode: street.postcode,
+        properties: street.properties.map(p => p.label),
+        _bulkImport: true // Flag to prevent modal closing
+      };
+      
+      // Call onSubmit for each street and track results
+      const result = onSubmit(streetData);
+      
+      if (result) {
+        if (result.streetCreated) {
+          totalCreated++;
+          totalPropertiesAdded += result.propertiesAdded || street.properties.length;
+        } else if (result.streetUpdated) {
+          totalUpdated++;
+          totalPropertiesAdded += result.propertiesAdded || 0;
+          totalPropertiesSkipped += result.propertiesSkipped || 0;
+        }
+      }
+    });
+    
+    // Close modal and reset state after all streets are added
+    setTimeout(() => {
+      setIdealPostcodeInput('');
+      setIdealAddresses([]);
+      setSelectedIdealAddresses([]);
+      setStep('options');
+      onCancel(); // Close the modal
+      
+      // Build detailed summary message
+      let summary = '';
+      if (totalCreated > 0 && totalUpdated > 0) {
+        summary = `Successfully imported ${totalCreated} new street${totalCreated !== 1 ? 's' : ''} and updated ${totalUpdated} existing street${totalUpdated !== 1 ? 's' : ''}. Added ${totalPropertiesAdded} new propert${totalPropertiesAdded !== 1 ? 'ies' : 'y'}${totalPropertiesSkipped > 0 ? ` (${totalPropertiesSkipped} duplicate${totalPropertiesSkipped !== 1 ? 's' : ''} skipped)` : ''}.`;
+      } else if (totalCreated > 0) {
+        summary = `Successfully created ${totalCreated} new street${totalCreated !== 1 ? 's' : ''} with ${totalPropertiesAdded} propert${totalPropertiesAdded !== 1 ? 'ies' : 'y'}.`;
+      } else if (totalUpdated > 0) {
+        summary = `Successfully updated ${totalUpdated} street${totalUpdated !== 1 ? 's' : ''}. Added ${totalPropertiesAdded} new propert${totalPropertiesAdded !== 1 ? 'ies' : 'y'}${totalPropertiesSkipped > 0 ? ` (${totalPropertiesSkipped} duplicate${totalPropertiesSkipped !== 1 ? 's' : ''} already existed)` : ''}.`;
+      } else {
+        summary = `All addresses were already imported. No changes made.`;
+      }
+      
+      alert(summary);
+    }, 200);
+  };
+
+  // Toggle address selection
+  const toggleIdealAddress = (address) => {
+    setSelectedIdealAddresses(prev => {
+      const isSelected = prev.some(a => 
+        a.line_1 === address.line_1 && 
+        a.postcode === address.postcode
+      );
+      
+      if (isSelected) {
+        return prev.filter(a => 
+          !(a.line_1 === address.line_1 && a.postcode === address.postcode)
+        );
+      } else {
+        return [...prev, address];
+      }
+    });
+  };
+
+  if (step === 'ideal-postcode') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => {
+              setStep('options');
+              setIdealPostcodeInput('');
+              setIdealPostcodeError('');
+            }}
+            className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h3 className="font-medium">Import from Postcode</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Enter a postcode to find all addresses
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs opacity-70">Postcode *</label>
+          <input
+            type="text"
+            value={idealPostcodeInput}
+            onChange={(e) => {
+              setIdealPostcodeInput(e.target.value);
+              setIdealPostcodeError('');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && idealPostcodeInput.trim()) {
+                e.preventDefault();
+                lookupIdealPostcode(idealPostcodeInput);
+              }
+            }}
+            placeholder="e.g., IP30 9DR"
+            className="w-full mt-1 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+          />
+        </div>
+
+        {idealPostcodeError && (
+          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300">
+            {idealPostcodeError}
+          </div>
+        )}
+
+        <button
+          onClick={() => lookupIdealPostcode(idealPostcodeInput)}
+          disabled={!idealPostcodeInput.trim() || isLoadingIdealAddresses}
+          className="w-full px-4 py-2 rounded-xl bg-secondary-600 text-white text-sm hover:bg-secondary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isLoadingIdealAddresses ? 'Looking up addresses...' : 'Lookup Addresses'}
+        </button>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            onClick={() => {
+              setStep('options');
+              setIdealPostcodeInput('');
+              setIdealPostcodeError('');
+            }}
+            className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'ideal-select') {
+    const selectedCount = selectedIdealAddresses.length;
+    const streets = parseIdealAddresses(idealAddresses);
+    
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => {
+              setStep('ideal-postcode');
+              setSelectedIdealAddresses([]);
+            }}
+            className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h3 className="font-medium">Select Addresses to Import</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {idealAddresses.length} address{idealAddresses.length !== 1 ? 'es' : ''} found for {idealPostcodeInput}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between p-3 rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
+          <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
+            {selectedCount} address{selectedCount !== 1 ? 'es' : ''} selected
+          </span>
+          <button
+            onClick={() => {
+              if (selectedIdealAddresses.length === idealAddresses.length) {
+                setSelectedIdealAddresses([]);
+              } else {
+                setSelectedIdealAddresses([...idealAddresses]);
+              }
+            }}
+            className="px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 transition-colors"
+          >
+            {selectedIdealAddresses.length === idealAddresses.length ? 'Deselect All' : 'Select All'}
+          </button>
+        </div>
+
+        <div className="max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-xl">
+          {idealAddresses.map((address, index) => {
+            const fullAddress = [
+              address.line_1,
+              address.line_2,
+              address.line_3,
+              address.post_town,
+              address.postcode
+            ].filter(Boolean).join(', ');
+            
+            const isSelected = selectedIdealAddresses.some(a => 
+              a.line_1 === address.line_1 && a.postcode === address.postcode
+            );
+            
+            // Check if this address is already imported in any existing street
+            const propertyLabel = address.premise || address.line_1?.split(',')[0]?.trim() || '';
+            const streetName = address.thoroughfare || '';
+            const isAlreadyImported = existingStreets.some(s => {
+              // Check if street name matches and property exists
+              if (s.name.toLowerCase().trim() === streetName.toLowerCase().trim() ||
+                  (s.postcode && address.postcode && s.postcode.toLowerCase().trim() === address.postcode.toLowerCase().trim())) {
+                return s.properties.some(p => 
+                  p.label.toLowerCase().trim() === propertyLabel.toLowerCase().trim()
+                );
+              }
+              return false;
+            });
+            
+            return (
+              <button
+                key={index}
+                onClick={() => !isAlreadyImported && toggleIdealAddress(address)}
+                disabled={isAlreadyImported}
+                className={`w-full p-3 text-left text-sm transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${
+                  isAlreadyImported
+                    ? 'bg-gray-100 dark:bg-gray-800/50 opacity-60 cursor-not-allowed'
+                    : isSelected 
+                    ? 'bg-secondary-50 dark:bg-secondary-900/20 border-secondary-200 dark:border-secondary-800' 
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                    isAlreadyImported
+                      ? 'bg-gray-400 border-gray-400'
+                      : isSelected 
+                      ? 'bg-secondary-600 border-secondary-600' 
+                      : 'border-gray-300 dark:border-gray-600'
+                  }`}>
+                    {isAlreadyImported ? (
+                      <CheckCircle className="w-3 h-3 text-white" />
+                    ) : isSelected ? (
+                      <Check className="w-3 h-3 text-white" />
+                    ) : null}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
+                      {fullAddress}
+                    </div>
+                    {address.thoroughfare && (
+                      <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                        Street: {address.thoroughfare}
+                      </div>
+                    )}
+                    {isAlreadyImported && (
+                      <div className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium">
+                        ✓ Already imported
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+          <div className="text-xs text-blue-700 dark:text-blue-300">
+            <strong>Note:</strong> Addresses will be automatically grouped by street name and imported as separate streets with their properties.
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            onClick={() => {
+              setStep('ideal-postcode');
+              setSelectedIdealAddresses([]);
+            }}
+            className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            Change Postcode
+          </button>
+          <button
+            onClick={handleIdealImport}
+            disabled={selectedIdealAddresses.length === 0}
+            className="flex-1 px-4 py-2 rounded-xl bg-secondary-600 text-white text-sm hover:bg-secondary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Import {selectedCount} Address{selectedCount !== 1 ? 'es' : ''}
+          </button>
+        </div>
       </div>
     );
   }
@@ -7554,6 +8065,14 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
   const [newPropertyLabel, setNewPropertyLabel] = useState("");
   const [editingProperty, setEditingProperty] = useState(null);
   const [editLabel, setEditLabel] = useState("");
+  
+  // Postcode lookup state
+  const [showPostcodeLookup, setShowPostcodeLookup] = useState(false);
+  const [idealPostcodeInput, setIdealPostcodeInput] = useState(street?.postcode || '');
+  const [idealAddresses, setIdealAddresses] = useState([]);
+  const [selectedIdealAddresses, setSelectedIdealAddresses] = useState([]);
+  const [isLoadingIdealAddresses, setIsLoadingIdealAddresses] = useState(false);
+  const [idealPostcodeError, setIdealPostcodeError] = useState('');
 
   const handleAddProperty = (e) => {
     e.preventDefault();
@@ -7591,10 +8110,342 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
     setEditLabel("");
   };
 
+  // Ideal Postcodes lookup function
+  const lookupIdealPostcode = async (postcode) => {
+    if (!config.idealPostcodes.apiKey) {
+      setIdealPostcodeError('API key not configured. Please add your Ideal Postcodes API key to config.js');
+      return;
+    }
+
+    setIsLoadingIdealAddresses(true);
+    setIdealPostcodeError('');
+    
+    try {
+      const encodedPostcode = encodeURIComponent(postcode.trim());
+      const url = `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodedPostcode}?api_key=${config.idealPostcodes.apiKey}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.code === 2000 && data.result && data.result.length > 0) {
+        // Filter addresses to match current street if street name exists
+        let filteredAddresses = data.result;
+        if (street?.name) {
+          filteredAddresses = data.result.filter(addr => 
+            addr.thoroughfare?.toLowerCase().trim() === street.name.toLowerCase().trim()
+          );
+        }
+        
+        setIdealAddresses(filteredAddresses);
+        setSelectedIdealAddresses([]);
+      } else if (data.code === 4040) {
+        setIdealPostcodeError(`No addresses found for postcode "${postcode}". Please check the postcode and try again.`);
+      } else if (data.code === 4010) {
+        setIdealPostcodeError('Invalid API key. Please check your Ideal Postcodes API key in config.js');
+      } else {
+        setIdealPostcodeError(data.message || 'An error occurred while looking up addresses.');
+      }
+    } catch (error) {
+      setIdealPostcodeError(`Network error: ${error.message}. Please check your internet connection.`);
+    } finally {
+      setIsLoadingIdealAddresses(false);
+    }
+  };
+
+  // Handle importing selected addresses as properties
+  const handleImportProperties = () => {
+    if (selectedIdealAddresses.length === 0) {
+      alert('Please select at least one address to import.');
+      return;
+    }
+
+    // Extract property labels from selected addresses
+    const propertyLabels = selectedIdealAddresses.map(addr => {
+      return addr.premise || addr.line_1?.split(',')[0]?.trim() || '';
+    }).filter(label => label.length > 0);
+
+    // Check for duplicates and only add new ones
+    const existingPropertyLabels = street.properties.map(p => p.label.toLowerCase().trim());
+    const newProperties = propertyLabels.filter(label => 
+      !existingPropertyLabels.includes(label.toLowerCase().trim())
+    );
+
+    if (newProperties.length === 0) {
+      alert('All selected addresses are already added as properties.');
+      return;
+    }
+
+    // Add each new property
+    newProperties.forEach(label => {
+      onAddProperty(label);
+    });
+
+    // Reset state
+    setShowPostcodeLookup(false);
+    setIdealPostcodeInput(street?.postcode || '');
+    setIdealAddresses([]);
+    setSelectedIdealAddresses([]);
+    
+    const skipped = propertyLabels.length - newProperties.length;
+    if (skipped > 0) {
+      alert(`Added ${newProperties.length} new propert${newProperties.length !== 1 ? 'ies' : 'y'}${skipped > 0 ? ` (${skipped} duplicate${skipped !== 1 ? 's' : ''} skipped)` : ''}.`);
+    } else {
+      alert(`Added ${newProperties.length} new propert${newProperties.length !== 1 ? 'ies' : 'y'}.`);
+    }
+  };
+
+  // Toggle address selection
+  const toggleIdealAddress = (address) => {
+    setSelectedIdealAddresses(prev => {
+      const isSelected = prev.some(a => 
+        a.line_1 === address.line_1 && a.postcode === address.postcode
+      );
+      
+      if (isSelected) {
+        return prev.filter(a => 
+          !(a.line_1 === address.line_1 && a.postcode === address.postcode)
+        );
+      } else {
+        return [...prev, address];
+      }
+    });
+  };
+
+  if (showPostcodeLookup) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={() => {
+              setShowPostcodeLookup(false);
+              setIdealPostcodeInput(street?.postcode || '');
+              setIdealPostcodeError('');
+            }}
+            className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h3 className="font-medium">Import Properties from Postcode</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {street?.name ? `Adding to ${street.name}` : 'Look up addresses to add as properties'}
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-xs opacity-70">Postcode *</label>
+          <input
+            type="text"
+            value={idealPostcodeInput}
+            onChange={(e) => {
+              setIdealPostcodeInput(e.target.value);
+              setIdealPostcodeError('');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && idealPostcodeInput.trim()) {
+                e.preventDefault();
+                lookupIdealPostcode(idealPostcodeInput);
+              }
+            }}
+            placeholder="e.g., IP30 9DR"
+            className="w-full mt-1 p-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+          />
+        </div>
+
+        {idealPostcodeError && (
+          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300">
+            {idealPostcodeError}
+          </div>
+        )}
+
+        <button
+          onClick={() => lookupIdealPostcode(idealPostcodeInput)}
+          disabled={!idealPostcodeInput.trim() || isLoadingIdealAddresses}
+          className="w-full px-4 py-2 rounded-xl bg-secondary-600 text-white text-sm hover:bg-secondary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isLoadingIdealAddresses ? 'Looking up addresses...' : 'Lookup Addresses'}
+        </button>
+
+        {idealAddresses.length > 0 && (() => {
+          // Filter out addresses that are already added to the street
+          const availableAddresses = idealAddresses.filter(address => {
+            const propertyLabel = address.premise || address.line_1?.split(',')[0]?.trim() || '';
+            return !street.properties.some(p => 
+              p.label.toLowerCase().trim() === propertyLabel.toLowerCase().trim()
+            );
+          });
+          
+          const allAvailableSelected = availableAddresses.length > 0 && 
+            availableAddresses.every(addr => 
+              selectedIdealAddresses.some(a => 
+                a.line_1 === addr.line_1 && a.postcode === addr.postcode
+              )
+            );
+          
+          return (
+            <>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
+                  <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
+                    {selectedIdealAddresses.length} address{selectedIdealAddresses.length !== 1 ? 'es' : ''} selected
+                    {availableAddresses.length < idealAddresses.length && (
+                      <span className="text-xs text-gray-500 ml-1">
+                        ({idealAddresses.length - availableAddresses.length} already added)
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (allAvailableSelected) {
+                        setSelectedIdealAddresses([]);
+                      } else {
+                        // Only select addresses that aren't already added
+                        setSelectedIdealAddresses([...availableAddresses]);
+                      }
+                    }}
+                    disabled={availableAddresses.length === 0}
+                    className="px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {allAvailableSelected ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
+                
+                {/* Duplicate import button at top for easy access */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowPostcodeLookup(false);
+                      setIdealPostcodeInput(street?.postcode || '');
+                      setIdealAddresses([]);
+                      setSelectedIdealAddresses([]);
+                    }}
+                    className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleImportProperties}
+                    disabled={selectedIdealAddresses.length === 0}
+                    className="flex-1 px-4 py-2 rounded-xl bg-secondary-600 text-white text-sm hover:bg-secondary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Import {selectedIdealAddresses.length} Propert{selectedIdealAddresses.length !== 1 ? 'ies' : 'y'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-xl">
+              {idealAddresses.map((address, index) => {
+                const fullAddress = [
+                  address.line_1,
+                  address.line_2,
+                  address.line_3,
+                  address.post_town,
+                  address.postcode
+                ].filter(Boolean).join(', ');
+                
+                const isSelected = selectedIdealAddresses.some(a => 
+                  a.line_1 === address.line_1 && a.postcode === address.postcode
+                );
+                
+                // Check if this property is already in the street
+                const propertyLabel = address.premise || address.line_1?.split(',')[0]?.trim() || '';
+                const isAlreadyAdded = street.properties.some(p => 
+                  p.label.toLowerCase().trim() === propertyLabel.toLowerCase().trim()
+                );
+                
+                return (
+                  <button
+                    key={index}
+                    onClick={() => !isAlreadyAdded && toggleIdealAddress(address)}
+                    disabled={isAlreadyAdded}
+                    className={`w-full p-3 text-left text-sm transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0 ${
+                      isAlreadyAdded
+                        ? 'bg-gray-100 dark:bg-gray-800/50 opacity-60 cursor-not-allowed'
+                        : isSelected 
+                        ? 'bg-secondary-50 dark:bg-secondary-900/20 border-secondary-200 dark:border-secondary-800' 
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                        isAlreadyAdded
+                          ? 'bg-gray-400 border-gray-400'
+                          : isSelected 
+                          ? 'bg-secondary-600 border-secondary-600' 
+                          : 'border-gray-300 dark:border-gray-600'
+                      }`}>
+                        {isAlreadyAdded ? (
+                          <CheckCircle className="w-3 h-3 text-white" />
+                        ) : isSelected ? (
+                          <Check className="w-3 h-3 text-white" />
+                        ) : null}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 dark:text-gray-100">
+                          {fullAddress}
+                        </div>
+                        {isAlreadyAdded && (
+                          <div className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium">
+                            ✓ Already added to this street
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={() => {
+                  setShowPostcodeLookup(false);
+                  setIdealPostcodeInput(street?.postcode || '');
+                  setIdealAddresses([]);
+                  setSelectedIdealAddresses([]);
+                }}
+                className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImportProperties}
+                disabled={selectedIdealAddresses.length === 0}
+                className="flex-1 px-4 py-2 rounded-xl bg-secondary-600 text-white text-sm hover:bg-secondary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Import {selectedIdealAddresses.length} Propert{selectedIdealAddresses.length !== 1 ? 'ies' : 'y'}
+              </button>
+              </div>
+            </>
+          );
+        })()}
+
+        {!isLoadingIdealAddresses && idealAddresses.length === 0 && idealPostcodeInput && !idealPostcodeError && (
+          <div className="text-center py-4 text-sm text-gray-600 dark:text-gray-400">
+            {street?.name ? `No addresses found for ${street.name} at this postcode.` : 'Enter a postcode to lookup addresses.'}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div>
         <h4 className="text-sm font-medium mb-2">Add New Property</h4>
+        {config.idealPostcodes.enabled && config.idealPostcodes.apiKey && (
+          <button
+            onClick={() => {
+              setShowPostcodeLookup(true);
+              setIdealPostcodeInput(street?.postcode || '');
+            }}
+            className="w-full mb-2 px-4 py-2 rounded-xl bg-secondary-600 text-white text-sm hover:bg-secondary-700 transition-colors flex items-center justify-center gap-2"
+          >
+            <Search className="w-4 h-4" />
+            Import from Postcode
+          </button>
+        )}
         <form onSubmit={handleAddProperty} className="space-y-2">
           <input 
             type="text" 
