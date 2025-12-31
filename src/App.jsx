@@ -7388,6 +7388,7 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
       const data = await response.json();
       
       if (data.code === 2000 && data.result && data.result.length > 0) {
+        setResultsTruncated({ truncated: false, total: 0, shown: 0 });
         setIdealAddresses(data.result);
         setSelectedIdealAddresses([]);
         setStep('ideal-select');
@@ -7987,6 +7988,15 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
             );
           })}
         </div>
+
+        {resultsTruncated.truncated && (
+          <div className="p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+            <div className="text-xs text-yellow-800 dark:text-yellow-200">
+              <strong>⚠️ Results Limited:</strong> Found {resultsTruncated.total.toLocaleString()} results, showing first {resultsTruncated.shown}. 
+              For more accurate results, try using <strong>Postcode Lookup</strong> instead, or make your search more specific (e.g., include full postcode).
+            </div>
+          </div>
+        )}
 
         <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
           <div className="text-xs text-blue-700 dark:text-blue-300">
