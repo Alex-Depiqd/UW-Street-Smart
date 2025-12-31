@@ -7588,22 +7588,44 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between p-3 rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
-          <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
-            {selectedCount} address{selectedCount !== 1 ? 'es' : ''} selected
-          </span>
-          <button
-            onClick={() => {
-              if (selectedIdealAddresses.length === idealAddresses.length) {
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
+            <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
+              {selectedCount} address{selectedCount !== 1 ? 'es' : ''} selected
+            </span>
+            <button
+              onClick={() => {
+                if (selectedIdealAddresses.length === idealAddresses.length) {
+                  setSelectedIdealAddresses([]);
+                } else {
+                  setSelectedIdealAddresses([...idealAddresses]);
+                }
+              }}
+              className="px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 transition-colors"
+            >
+              {selectedIdealAddresses.length === idealAddresses.length ? 'Deselect All' : 'Select All'}
+            </button>
+          </div>
+          
+          {/* Duplicate import button at top for easy access */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setStep('ideal-postcode');
                 setSelectedIdealAddresses([]);
-              } else {
-                setSelectedIdealAddresses([...idealAddresses]);
-              }
-            }}
-            className="px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 transition-colors"
-          >
-            {selectedIdealAddresses.length === idealAddresses.length ? 'Deselect All' : 'Select All'}
-          </button>
+              }}
+              className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              Change Postcode
+            </button>
+            <button
+              onClick={handleIdealImport}
+              disabled={selectedIdealAddresses.length === 0}
+              className="flex-1 px-4 py-2 rounded-xl bg-secondary-600 text-white text-sm hover:bg-secondary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Import {selectedCount} Address{selectedCount !== 1 ? 'es' : ''}
+            </button>
+          </div>
         </div>
 
         <div className="max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-xl">

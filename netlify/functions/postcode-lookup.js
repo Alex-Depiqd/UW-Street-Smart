@@ -1,7 +1,7 @@
 // Netlify serverless function to proxy Ideal Postcodes API requests
 // This avoids CORS issues by making the request from the server side
 
-export const handler = async (event, context) => {
+exports.handler = async (event, context) => {
   // Only allow GET requests
   if (event.httpMethod !== 'GET') {
     return {
