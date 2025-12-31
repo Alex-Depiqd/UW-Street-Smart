@@ -37,13 +37,17 @@ exports.handler = async (event, context) => {
       const encodedPostcode = encodeURIComponent(postcode.trim());
       url = `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodedPostcode}?api_key=${apiKey}`;
     } else {
-      // Address/street name search
+      // Address/street name search - try addresses endpoint first
       const encodedQuery = encodeURIComponent(query.trim());
+      // Try /addresses endpoint which returns full address details
       url = `https://api.ideal-postcodes.co.uk/v1/addresses?query=${encodedQuery}&api_key=${apiKey}`;
     }
     
     const response = await fetch(url);
     const data = await response.json();
+    
+    // Log for debugging (remove in production)
+    console.log('API Response:', JSON.stringify(data).substring(0, 200));
 
     return {
       statusCode: 200,

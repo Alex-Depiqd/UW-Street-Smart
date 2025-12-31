@@ -7427,16 +7427,62 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
       
       const data = await response.json();
       
-      if (data.code === 2000 && data.result && data.result.length > 0) {
-        setIdealAddresses(data.result);
+      // Debug logging
+      console.log('Address search response:', data);
+      
+      // Check for error response
+      if (data.error) {
+        setIdealPostcodeError(data.error || 'An error occurred while searching for addresses.');
+        return;
+      }
+      
+      // Handle different response formats
+      let addresses = [];
+      
+      // Format 1: Direct result array (like postcode lookup)
+      if (data.code === 2000 && data.result && Array.isArray(data.result) && data.result.length > 0) {
+        addresses = data.result;
+      }
+      // Format 2: Autocomplete format with hits
+      else if (data.code === 2000 && data.result && data.result.hits && Array.isArray(data.result.hits) && data.result.hits.length > 0) {
+        addresses = data.result.hits.map(hit => ({
+          line_1: hit.line_1 || hit.address || hit.suggestion || '',
+          line_2: hit.line_2 || '',
+          line_3: hit.line_3 || '',
+          post_town: hit.post_town || '',
+          postcode: hit.postcode || '',
+          thoroughfare: hit.thoroughfare || hit.line_1?.split(',')[0]?.trim() || '',
+          premise: hit.premise || hit.line_1?.split(',')[0]?.trim() || ''
+        }));
+      }
+      // Format 3: Suggestions array
+      else if (data.code === 2000 && data.result && data.result.suggestions && Array.isArray(data.result.suggestions) && data.result.suggestions.length > 0) {
+        addresses = data.result.suggestions.map(suggestion => ({
+          line_1: suggestion.line_1 || suggestion.address || suggestion.suggestion || '',
+          line_2: suggestion.line_2 || '',
+          line_3: suggestion.line_3 || '',
+          post_town: suggestion.post_town || '',
+          postcode: suggestion.postcode || '',
+          thoroughfare: suggestion.thoroughfare || suggestion.line_1?.split(',')[0]?.trim() || '',
+          premise: suggestion.premise || suggestion.line_1?.split(',')[0]?.trim() || ''
+        }));
+      }
+      
+      if (addresses.length > 0) {
+        setIdealAddresses(addresses);
         setSelectedIdealAddresses([]);
         setStep('ideal-select');
+      } else if (data.code === 2000) {
+        setIdealPostcodeError(`No addresses found for "${streetName}". Try adding a town name (e.g., "Cross Street, Elmswell") or check the spelling.`);
       } else if (data.code === 4040) {
         setIdealPostcodeError(`No addresses found for "${streetName}". Try adding a town name (e.g., "Cross Street, Elmswell") or check the spelling.`);
       } else if (data.code === 4010) {
         setIdealPostcodeError('Invalid API key. Please check your Ideal Postcodes API key in config.js');
       } else {
-        setIdealPostcodeError(data.message || 'An error occurred while searching for addresses.');
+        // Show the actual error for debugging
+        const errorMsg = data.message || data.error || `Unexpected response. Code: ${data.code || 'unknown'}`;
+        setIdealPostcodeError(errorMsg);
+        console.error('Address search error:', data);
       }
     } catch (error) {
       setIdealPostcodeError(`Network error: ${error.message}. Please check your internet connection.`);
