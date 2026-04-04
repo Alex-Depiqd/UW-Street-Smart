@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Convert to PDF - Helper Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .step {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .file-list {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .file-list ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📄 Convert HTML to PDF - Helper Tool</h1>
+        <p>This tool helps you convert the HTML template files to PDF format for use in the UW Street Smart app.</p>
+
+        <div class="step">
+            <h3>Step 1: Open the HTML File</h3>
+            <p>Click on any of these template files to open them in your browser:</p>
+            <div class="file-list">
+                <ul>
+                    <li><a href="neighbour-letter-template.html" target="_blank">📝 Neighbour Letter Template</a></li>
+                    <li><a href="20k-giveaway-presenter.html" target="_blank">🎉 £20k Giveaway Presenter</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: Print to PDF</h3>
+            <p>Once the file opens in your browser:</p>
+            <ol>
+                <li>Press <strong>Ctrl+P</strong> (Windows) or <strong>Cmd+P</strong> (Mac)</li>
+                <li>Change the destination to <strong>"Save as PDF"</strong></li>
+                <li>Set margins to <strong>"Minimum"</strong> for best results</li>
+                <li>Click <strong>"Save"</strong></li>
+                <li>Save with the same name but <strong>.pdf</strong> extension</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>Step 3: Replace the HTML Files</h3>
+            <p>Once you have your PDF files:</p>
+            <ol>
+                <li>Delete the <strong>.html</strong> files</li>
+                <li>Place your new <strong>.pdf</strong> files in this folder</li>
+                <li>The app will automatically use the PDF versions</li>
+            </ol>
+        </div>
+
+        <div class="warning">
+            <h3>⚠️ Important Notes</h3>
+            <ul>
+                <li>PDF files should be under <strong>5MB</strong> for mobile viewing</li>
+                <li>Test the PDFs on your phone to ensure they display correctly</li>
+                <li>Use descriptive filenames that match the document titles</li>
+                <li>Consider adding your contact details to the templates before converting</li>
+            </ul>
+        </div>
+
+        <div class="success">
+            <h3>✅ Success!</h3>
+            <p>Once you have your PDF files in place, you can:</p>
+            <ul>
+                <li>Open the UW Street Smart app</li>
+                <li>Go to the <strong>Documents</strong> drawer</li>
+                <li>View and share your PDFs with customers</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <h3>📱 Mobile PDF Creation</h3>
+            <p>If you're working on mobile:</p>
+            <ul>
+                <li>Use apps like <strong>Adobe Acrobat</strong> or <strong>PDF Expert</strong></li>
+                <li>Create PDFs from Word documents or Google Docs</li>
+                <li>Use online converters like <strong>SmallPDF</strong> or <strong>ILovePDF</strong></li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+            <p><strong>Need Help?</strong></p>
+            <p>Contact your UW support team for assistance with document creation.</p>
+        </div>
+    </div>
+</body>
+</html>
