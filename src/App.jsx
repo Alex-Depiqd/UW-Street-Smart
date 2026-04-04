@@ -1841,6 +1841,7 @@ export default function App() {
               street={activeStreet}
               property={activeProperty}
               onBack={()=>setView("streets")}
+              onNavigateProperty={(propertyId) => setActivePropertyId(propertyId)}
               onUpdate={setProperty}
               onShowScripts={()=>setShowScripts(true)}
               onShowLinks={()=>setShowLinks(true)}
@@ -3110,10 +3111,16 @@ function ToggleRow({ label, value, onChange }) {
   );
 }
 
-function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onShowLinks, onShowDocuments, onToggleStatus, onViewImage }) {
+function PropertyView({ street, property, onBack, onNavigateProperty, onUpdate, onShowScripts, onShowLinks, onShowDocuments, onToggleStatus, onViewImage }) {
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [notes, setNotes] = useState(property.notes || "");
+
+  const propertiesOnStreet = street.properties || [];
+  const propertyIndex = propertiesOnStreet.findIndex((p) => p.id === property.id);
+  const propertyCount = propertiesOnStreet.length;
+  const hasPrev = propertyIndex > 0;
+  const hasNext = propertyIndex >= 0 && propertyIndex < propertyCount - 1;
 
   // Sync notes state when property changes
   useEffect(() => {
@@ -3130,12 +3137,48 @@ function PropertyView({ street, property, onBack, onUpdate, onShowScripts, onSho
 
   return (
     <div className="space-y-4">
-      <button 
-        onClick={onBack} 
-        className="text-sm opacity-70 hover:opacity-100 transition-opacity flex items-center gap-1"
-      >
-        <ChevronRight className="w-4 h-4 rotate-180" /> Back to streets
-      </button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <button 
+          type="button"
+          onClick={onBack} 
+          className="text-sm opacity-70 hover:opacity-100 transition-opacity flex items-center gap-1"
+        >
+          <ChevronRight className="w-4 h-4 rotate-180" /> Back to streets
+        </button>
+        {propertyCount > 1 && onNavigateProperty && propertyIndex >= 0 && (
+          <div
+            className="flex items-center rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-800/80"
+            role="navigation"
+            aria-label="Property on street"
+          >
+            <button
+              type="button"
+              disabled={!hasPrev}
+              onClick={() => hasPrev && onNavigateProperty(propertiesOnStreet[propertyIndex - 1].id)}
+              className="px-2.5 py-1.5 text-sm flex items-center gap-0.5 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+              title="Previous property on this street"
+            >
+              <ChevronLeft className="w-4 h-4 shrink-0" />
+              <span className="hidden xs:inline">Prev</span>
+            </button>
+            <div className="w-px self-stretch bg-gray-200 dark:bg-gray-700 shrink-0" aria-hidden />
+            <span className="px-2.5 py-1.5 text-xs tabular-nums text-gray-600 dark:text-gray-300 min-w-[3.25rem] text-center">
+              {propertyIndex + 1} / {propertyCount}
+            </span>
+            <div className="w-px self-stretch bg-gray-200 dark:bg-gray-700 shrink-0" aria-hidden />
+            <button
+              type="button"
+              disabled={!hasNext}
+              onClick={() => hasNext && onNavigateProperty(propertiesOnStreet[propertyIndex + 1].id)}
+              className="px-2.5 py-1.5 text-sm flex items-center gap-0.5 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+              title="Next property on this street"
+            >
+              <span className="hidden xs:inline">Next</span>
+              <ChevronRight className="w-4 h-4 shrink-0" />
+            </button>
+          </div>
+        )}
+      </div>
 
       <SectionCard 
         title={`${property.label} · ${street.name}`} 
