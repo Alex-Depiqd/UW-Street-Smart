@@ -97,3 +97,16 @@ export function formatCloudUpdatedAt(data) {
   }
   return null;
 }
+
+/** Milliseconds from Firestore `updatedAt`, or 0 if missing. */
+export function getCloudUpdatedAtMs(data) {
+  const ts = data?.updatedAt;
+  if (ts && typeof ts.toDate === "function") {
+    try {
+      return ts.toDate().getTime();
+    } catch {
+      return 0;
+    }
+  }
+  return 0;
+}

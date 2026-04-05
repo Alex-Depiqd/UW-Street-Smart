@@ -19,6 +19,8 @@ import {
   buildLocalPayload,
   cloudPayloadHasCampaigns,
   fetchCloudPayload,
+  formatCloudUpdatedAt,
+  getCloudUpdatedAtMs,
   saveCloudPayload,
 } from "@/cloudFirestoreSync";
 
@@ -388,6 +390,9 @@ export default function App() {
   const [cloudSyncMessage, setCloudSyncMessage] = useState("");
   /** True after user taps "Decide later" on merge modal — blocks auto-upload until they resolve or use "Save to cloud now". */
   const [cloudPushPaused, setCloudPushPaused] = useState(false);
+  /** Shown when cloud backup `updatedAt` is newer than last successful sync on this device. */
+  const [cloudNewerHint, setCloudNewerHint] = useState(null);
+  const cloudBannerDismissedRemoteMsRef = useRef(0);
 
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
   const activeStreet = useMemo(() => activeCampaign?.streets.find(s => s.id === activeStreetId), [activeCampaign, activeStreetId]);
@@ -1626,6 +1631,7 @@ export default function App() {
         setCloudMergeOpen(false);
         setCloudMergeRemote(null);
         setCloudPushPaused(false);
+        setCloudNewerHint(null);
         return;
       }
       if (prevUid !== newUid) {
@@ -1692,12 +1698,111 @@ export default function App() {
       setLastCloudSyncAt(Date.now());
       setCloudSyncStatus("ok");
       setCloudSyncMessage("");
+      setCloudNewerHint(null);
     } catch (e) {
       console.error(e);
       setCloudSyncStatus("error");
       setCloudSyncMessage(e.message || "Sync failed");
     }
   }, [firebaseUser, campaigns, dark]);
+
+  const handlePullFromCloud = useCallback(async () => {
+    if (!firebaseUser?.uid) return;
+    if (!window.confirm("Replace this device with the latest cloud backup? Export a backup from Settings first if you are unsure.")) {
+      return;
+    }
+    try {
+      setCloudSyncStatus("syncing");
+      setCloudSyncMessage("");
+      const remote = await fetchCloudPayload(firebaseUser.uid);
+      if (!remote || !cloudPayloadHasCampaigns(remote)) {
+        window.alert("No cloud backup found yet.");
+        setCloudSyncStatus("idle");
+        return;
+      }
+      applyPayloadToStores(remote, {
+        updateCampaigns,
+        setDark,
+        setActiveCampaignId,
+        setActiveStreetId,
+        setActivePropertyId,
+      });
+      const payload = {
+        schemaVersion: remote.schemaVersion || 1,
+        campaigns: remote.campaigns,
+        settings: remote.settings,
+        partner_name: remote.partner_name,
+        partner_scripts: remote.partner_scripts,
+        partner_script_order: remote.partner_script_order,
+        partner_documents: remote.partner_documents,
+      };
+      await saveCloudPayload(firebaseUser.uid, payload);
+      const remoteMs = getCloudUpdatedAtMs(remote);
+      cloudBannerDismissedRemoteMsRef.current = Math.max(cloudBannerDismissedRemoteMsRef.current, remoteMs, Date.now());
+      setLastCloudSyncAt(Date.now());
+      setCloudNewerHint(null);
+      setCloudSyncStatus("ok");
+    } catch (e) {
+      console.error(e);
+      setCloudSyncStatus("error");
+      setCloudSyncMessage(e.message || "Could not load cloud data");
+    }
+  }, [
+    firebaseUser,
+    updateCampaigns,
+    setDark,
+    setActiveCampaignId,
+    setActiveStreetId,
+    setActivePropertyId,
+  ]);
+
+  const dismissCloudNewerBanner = useCallback(() => {
+    setCloudNewerHint((hint) => {
+      if (hint?.remoteMs != null) {
+        cloudBannerDismissedRemoteMsRef.current = Math.max(
+          cloudBannerDismissedRemoteMsRef.current,
+          hint.remoteMs
+        );
+      }
+      return null;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!firebaseUser?.uid || cloudMergeOpen) return () => {};
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const remote = await fetchCloudPayload(firebaseUser.uid);
+        if (cancelled || !remote) return;
+        const remoteMs = getCloudUpdatedAtMs(remote);
+        if (!remoteMs) return;
+        const localMs = lastCloudSyncAt ?? 0;
+        if (
+          remoteMs > localMs + 5000 &&
+          remoteMs > cloudBannerDismissedRemoteMsRef.current
+        ) {
+          setCloudNewerHint({
+            remoteMs,
+            label: formatCloudUpdatedAt(remote) || "",
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    run();
+    const iv = setInterval(run, 45000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") run();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [firebaseUser?.uid, lastCloudSyncAt, cloudMergeOpen]);
 
   const handleMergeUseCloud = useCallback(async () => {
     const user = firebaseUser;
@@ -1726,6 +1831,7 @@ export default function App() {
       };
       await saveCloudPayload(user.uid, payload);
       setLastCloudSyncAt(Date.now());
+      setCloudNewerHint(null);
       setCloudSyncStatus("ok");
       setCloudSyncMessage("");
     } catch (e) {
@@ -1753,6 +1859,7 @@ export default function App() {
       setCloudMergeRemote(null);
       await saveCloudPayload(user.uid, buildLocalPayload(campaigns, dark));
       setLastCloudSyncAt(Date.now());
+      setCloudNewerHint(null);
       setCloudSyncStatus("ok");
       setCloudSyncMessage("");
     } catch (e) {
@@ -1788,6 +1895,34 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 overflow-x-hidden">
       <FirebaseEmailLinkHandler />
+      {cloudNewerHint && firebaseUser && (
+        <div
+          role="status"
+          className="bg-amber-100 dark:bg-amber-900/35 border-b border-amber-300 dark:border-amber-700 px-3 py-2.5 text-sm flex flex-wrap items-center gap-2 justify-between"
+        >
+          <span className="text-amber-950 dark:text-amber-100 pr-2">
+            Newer backup in the cloud
+            {cloudNewerHint.label ? ` (${cloudNewerHint.label})` : ""}. Get latest to load it on this device.
+          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handlePullFromCloud}
+              disabled={cloudSyncStatus === "syncing"}
+              className="px-3 py-1.5 rounded-lg bg-amber-800 text-white text-xs font-medium hover:bg-amber-900 disabled:opacity-50 dark:bg-amber-700 dark:hover:bg-amber-600"
+            >
+              Get latest
+            </button>
+            <button
+              type="button"
+              onClick={dismissCloudNewerBanner}
+              className="px-3 py-1.5 rounded-lg bg-amber-200/80 text-amber-950 text-xs font-medium hover:bg-amber-200 dark:bg-amber-800/50 dark:text-amber-100"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       <CloudMergeModal
         open={cloudMergeOpen}
         remoteData={cloudMergeRemote}
@@ -2091,6 +2226,7 @@ export default function App() {
           cloudSyncStatus={cloudSyncStatus}
           cloudSyncMessage={cloudSyncMessage}
           onCloudSyncNow={handleCloudSyncNow}
+          onPullFromCloud={handlePullFromCloud}
           cloudPushPaused={cloudPushPaused}
         />
       </Drawer>
@@ -5068,7 +5204,7 @@ function PdfViewer({ url, title }) {
   );
 }
 
-function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShowAbout, lastCloudSyncAt, cloudSyncStatus, cloudSyncMessage, onCloudSyncNow, cloudPushPaused }) {
+function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShowAbout, lastCloudSyncAt, cloudSyncStatus, cloudSyncMessage, onCloudSyncNow, onPullFromCloud, cloudPushPaused }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [apiKey, setApiKey] = useState(localStorage.getItem('google_places_api_key') || '');
   const [partnerName, setPartnerName] = useState(() => {
@@ -5115,6 +5251,7 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShow
         cloudSyncStatus={cloudSyncStatus}
         cloudSyncMessage={cloudSyncMessage}
         onSyncNow={onCloudSyncNow}
+        onPullFromCloud={onPullFromCloud}
         cloudPushPaused={cloudPushPaused}
       />
 
