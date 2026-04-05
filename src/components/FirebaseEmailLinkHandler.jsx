@@ -1,7 +1,9 @@
 import { useEffect } from "react";
-import { isSignInWithEmailLink, signInWithEmailLink } from "firebase/auth";
+import { isSignInWithEmailLink } from "firebase/auth";
 import { getFirebaseAuth } from "@/firebase";
 import { EMAIL_SIGNIN_STORAGE_KEY } from "@/firebaseAuthShared";
+import { completeEmailLinkSignIn } from "@/firebaseEmailLinkComplete";
+import { isStandaloneDisplayMode } from "@/pwaUtils";
 
 /**
  * Completes email-link sign-in when the user lands with oobCode in the URL.
@@ -27,7 +29,6 @@ export default function FirebaseEmailLinkHandler() {
 
     const lockKey = `uw_ss_email_link_${oob}`;
     if (sessionStorage.getItem(lockKey)) return;
-    sessionStorage.setItem(lockKey, "1");
 
     let email = window.localStorage.getItem(EMAIL_SIGNIN_STORAGE_KEY)?.trim() || "";
     // Email apps often open the link in a different browser / WebView than the tab where
@@ -41,26 +42,22 @@ export default function FirebaseEmailLinkHandler() {
           )
           ?.trim() || "";
       if (!email) {
-        sessionStorage.removeItem(lockKey);
         window.alert("Sign-in was cancelled. Request a new link from Settings if you still want to sign in.");
         return;
       }
     }
 
-    signInWithEmailLink(auth, email, href)
+    completeEmailLinkSignIn(auth, href, email)
       .then(() => {
-        try {
-          window.localStorage.removeItem(EMAIL_SIGNIN_STORAGE_KEY);
-        } catch {
-          /* ignore */
-        }
         window.history.replaceState({}, document.title, `${url.origin}/`);
+        const installedApp = isStandaloneDisplayMode();
         window.alert(
-          "You are signed in to your Street Smart account. Your data is still stored on this device as before. Cloud sync will arrive in a later update."
+          installedApp
+            ? "You are signed in inside the Street Smart app you opened from your home screen.\n\nCloud backup will run while you use the app here."
+            : "You are signed in in this web browser tab.\n\nIf you use Street Smart from a home-screen icon as well, that copy is separate: open it, go to Settings → Account & cloud sync, copy the link from your sign-in email (don’t tap it), and paste it into the text box there — all on your phone, not a terminal."
         );
       })
       .catch((err) => {
-        sessionStorage.removeItem(lockKey);
         window.alert(err?.message || "Sign-in failed. You can request a new link from Settings.");
       });
   }, []);
