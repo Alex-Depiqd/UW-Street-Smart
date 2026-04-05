@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Check, MapPin, Home, ListChecks, CalendarClock, MessageSquare, 
@@ -10,7 +11,16 @@ import {
 } from "lucide-react";
 import { config } from './config';
 import FirebaseEmailLinkHandler from "@/components/FirebaseEmailLinkHandler.jsx";
+import CloudMergeModal from "@/components/CloudMergeModal.jsx";
 import CloudSyncSection from "@/components/CloudSyncSection.jsx";
+import { getFirebaseAuth } from "@/firebase";
+import {
+  applyPayloadToStores,
+  buildLocalPayload,
+  cloudPayloadHasCampaigns,
+  fetchCloudPayload,
+  saveCloudPayload,
+} from "@/cloudFirestoreSync";
 
 
 
@@ -214,6 +224,8 @@ const Drawer = ({ open, onClose, title, children, size = "default" }) => {
   );
 };
 
+const mergeDoneStorageKey = (uid) => `uw_ss_merge_done_${uid}`;
+
 // --- Main App ---
 export default function App() {
   // One-time: Unregister service workers and clear caches to avoid Safe Browsing false positives
@@ -366,6 +378,16 @@ export default function App() {
   const [addressLookupStep, setAddressLookupStep] = useState("search"); // search, select, import
   const [searchTimeout, setSearchTimeout] = useState(null);
   const mainContentRef = useRef(null);
+  const firebaseUidRef = useRef(null);
+
+  const [firebaseUser, setFirebaseUser] = useState(null);
+  const [cloudMergeOpen, setCloudMergeOpen] = useState(false);
+  const [cloudMergeRemote, setCloudMergeRemote] = useState(null);
+  const [lastCloudSyncAt, setLastCloudSyncAt] = useState(null);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState("idle");
+  const [cloudSyncMessage, setCloudSyncMessage] = useState("");
+  /** True after user taps "Decide later" on merge modal — blocks auto-upload until they resolve or use "Save to cloud now". */
+  const [cloudPushPaused, setCloudPushPaused] = useState(false);
 
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
   const activeStreet = useMemo(() => activeCampaign?.streets.find(s => s.id === activeStreetId), [activeCampaign, activeStreetId]);
@@ -1591,6 +1613,162 @@ export default function App() {
     }
   }, []);
 
+  useEffect(() => {
+    const auth = getFirebaseAuth();
+    if (!auth) return () => {};
+    return onAuthStateChanged(auth, async (user) => {
+      const prevUid = firebaseUidRef.current;
+      const newUid = user?.uid ?? null;
+      firebaseUidRef.current = newUid;
+      setFirebaseUser(user);
+      if (!user) {
+        firebaseUidRef.current = null;
+        setCloudMergeOpen(false);
+        setCloudMergeRemote(null);
+        setCloudPushPaused(false);
+        return;
+      }
+      if (prevUid !== newUid) {
+        setCloudPushPaused(false);
+      }
+      try {
+        const remote = await fetchCloudPayload(user.uid);
+        const done = localStorage.getItem(mergeDoneStorageKey(user.uid));
+        const snooze = sessionStorage.getItem("uw_ss_merge_snooze");
+        if (remote && cloudPayloadHasCampaigns(remote) && !done && !snooze) {
+          setCloudMergeRemote(remote);
+          setCloudMergeOpen(true);
+        }
+      } catch (e) {
+        console.error("Cloud pull failed", e);
+        setCloudSyncStatus("error");
+        setCloudSyncMessage(e.message || "Could not load cloud data");
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!firebaseUser?.uid || cloudMergeOpen || cloudPushPaused) return () => {};
+    const uid = firebaseUser.uid;
+    const t = setTimeout(async () => {
+      try {
+        setCloudSyncStatus("syncing");
+        await saveCloudPayload(uid, buildLocalPayload(campaigns, dark));
+        setLastCloudSyncAt(Date.now());
+        setCloudSyncStatus("ok");
+        setCloudSyncMessage("");
+      } catch (e) {
+        console.error(e);
+        setCloudSyncStatus("error");
+        setCloudSyncMessage(e.message || "Sync failed");
+      }
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [campaigns, dark, firebaseUser?.uid, cloudMergeOpen, cloudPushPaused]);
+
+  useEffect(() => {
+    if (!firebaseUser?.uid || cloudMergeOpen || cloudPushPaused) return () => {};
+    const uid = firebaseUser.uid;
+    const id = setInterval(async () => {
+      try {
+        setCloudSyncStatus("syncing");
+        await saveCloudPayload(uid, buildLocalPayload(campaigns, dark));
+        setLastCloudSyncAt(Date.now());
+        setCloudSyncStatus("ok");
+      } catch (e) {
+        console.error(e);
+        setCloudSyncStatus("error");
+      }
+    }, 120000);
+    return () => clearInterval(id);
+  }, [firebaseUser?.uid, cloudMergeOpen, cloudPushPaused, campaigns, dark]);
+
+  const handleCloudSyncNow = useCallback(async () => {
+    if (!firebaseUser?.uid) return;
+    setCloudPushPaused(false);
+    try {
+      setCloudSyncStatus("syncing");
+      await saveCloudPayload(firebaseUser.uid, buildLocalPayload(campaigns, dark));
+      setLastCloudSyncAt(Date.now());
+      setCloudSyncStatus("ok");
+      setCloudSyncMessage("");
+    } catch (e) {
+      console.error(e);
+      setCloudSyncStatus("error");
+      setCloudSyncMessage(e.message || "Sync failed");
+    }
+  }, [firebaseUser, campaigns, dark]);
+
+  const handleMergeUseCloud = useCallback(async () => {
+    const user = firebaseUser;
+    const remote = cloudMergeRemote;
+    if (!user?.uid || !remote) return;
+    try {
+      applyPayloadToStores(remote, {
+        updateCampaigns,
+        setDark,
+        setActiveCampaignId,
+        setActiveStreetId,
+        setActivePropertyId,
+      });
+      localStorage.setItem(mergeDoneStorageKey(user.uid), "1");
+      setCloudPushPaused(false);
+      setCloudMergeOpen(false);
+      setCloudMergeRemote(null);
+      const payload = {
+        schemaVersion: remote.schemaVersion || 1,
+        campaigns: remote.campaigns,
+        settings: remote.settings,
+        partner_name: remote.partner_name,
+        partner_scripts: remote.partner_scripts,
+        partner_script_order: remote.partner_script_order,
+        partner_documents: remote.partner_documents,
+      };
+      await saveCloudPayload(user.uid, payload);
+      setLastCloudSyncAt(Date.now());
+      setCloudSyncStatus("ok");
+      setCloudSyncMessage("");
+    } catch (e) {
+      console.error(e);
+      setCloudSyncStatus("error");
+      setCloudSyncMessage(e.message || "Could not apply cloud data");
+    }
+  }, [
+    firebaseUser,
+    cloudMergeRemote,
+    updateCampaigns,
+    setDark,
+    setActiveCampaignId,
+    setActiveStreetId,
+    setActivePropertyId,
+  ]);
+
+  const handleMergeKeepDevice = useCallback(async () => {
+    const user = firebaseUser;
+    if (!user?.uid) return;
+    try {
+      localStorage.setItem(mergeDoneStorageKey(user.uid), "1");
+      setCloudPushPaused(false);
+      setCloudMergeOpen(false);
+      setCloudMergeRemote(null);
+      await saveCloudPayload(user.uid, buildLocalPayload(campaigns, dark));
+      setLastCloudSyncAt(Date.now());
+      setCloudSyncStatus("ok");
+      setCloudSyncMessage("");
+    } catch (e) {
+      console.error(e);
+      setCloudSyncStatus("error");
+      setCloudSyncMessage(e.message || "Could not upload to cloud");
+    }
+  }, [firebaseUser, campaigns, dark]);
+
+  const handleMergeLater = useCallback(() => {
+    sessionStorage.setItem("uw_ss_merge_snooze", "1");
+    setCloudPushPaused(true);
+    setCloudMergeOpen(false);
+    setCloudMergeRemote(null);
+  }, []);
+
   const handleUpdateAccept = () => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistration().then(registration => {
@@ -1610,6 +1788,13 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 overflow-x-hidden">
       <FirebaseEmailLinkHandler />
+      <CloudMergeModal
+        open={cloudMergeOpen}
+        remoteData={cloudMergeRemote}
+        onUseCloud={handleMergeUseCloud}
+        onKeepDevice={handleMergeKeepDevice}
+        onDecideLater={handleMergeLater}
+      />
       {/* Top Bar */}
       <div className="sticky top-0 z-40 backdrop-blur bg-white/60 dark:bg-gray-950/60 border-b border-gray-200/50 dark:border-gray-800/50">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 flex items-center justify-between">
@@ -1902,6 +2087,11 @@ export default function App() {
           onImport={importData}
           onReset={resetData}
           onShowAbout={() => setShowAbout(true)}
+          lastCloudSyncAt={lastCloudSyncAt}
+          cloudSyncStatus={cloudSyncStatus}
+          cloudSyncMessage={cloudSyncMessage}
+          onCloudSyncNow={handleCloudSyncNow}
+          cloudPushPaused={cloudPushPaused}
         />
       </Drawer>
 
@@ -4878,7 +5068,7 @@ function PdfViewer({ url, title }) {
   );
 }
 
-function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShowAbout }) {
+function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShowAbout, lastCloudSyncAt, cloudSyncStatus, cloudSyncMessage, onCloudSyncNow, cloudPushPaused }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [apiKey, setApiKey] = useState(localStorage.getItem('google_places_api_key') || '');
   const [partnerName, setPartnerName] = useState(() => {
@@ -4919,7 +5109,14 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShow
         />
       </div>
 
-      <CloudSyncSection onExport={onExport} />
+      <CloudSyncSection
+        onExport={onExport}
+        lastCloudSyncAt={lastCloudSyncAt}
+        cloudSyncStatus={cloudSyncStatus}
+        cloudSyncMessage={cloudSyncMessage}
+        onSyncNow={onCloudSyncNow}
+        cloudPushPaused={cloudPushPaused}
+      />
 
       <div className="space-y-2">
         <h4 className="font-medium">Data & Privacy</h4>
