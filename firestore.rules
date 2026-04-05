@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Deny all reads/writes until cloud sync is implemented with per-user rules.
+    // Publish these in Firebase console → Firestore → Rules → Publish.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

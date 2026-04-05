@@ -5,10 +5,12 @@ import {
   Download, QrCode, Link2, Plus, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, X, CheckCircle, 
   Clock, Phone, FileText, FolderOpen, Share2, UploadCloud, 
   Moon, Sun, Settings, Bell, Search, Filter, MoreVertical,
-  User, LogOut, HelpCircle, Info, Shield, Database, BarChart3, Target,
+  User, HelpCircle, Info, Shield, Database, BarChart3, Target,
   Upload, Trash2, AlertTriangle, Camera, Globe, File, ExternalLink, Eye, Maximize, Menu, Edit, Copy, Minus
 } from "lucide-react";
 import { config } from './config';
+import FirebaseEmailLinkHandler from "@/components/FirebaseEmailLinkHandler.jsx";
+import CloudSyncSection from "@/components/CloudSyncSection.jsx";
 
 
 
@@ -1607,6 +1609,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 overflow-x-hidden">
+      <FirebaseEmailLinkHandler />
       {/* Top Bar */}
       <div className="sticky top-0 z-40 backdrop-blur bg-white/60 dark:bg-gray-950/60 border-b border-gray-200/50 dark:border-gray-800/50">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 flex items-center justify-between">
@@ -1891,13 +1894,14 @@ export default function App() {
         <ImageViewer url={currentImageUrl} title={currentImageTitle} onClose={()=>setShowImageViewer(false)} />
       </Drawer>
 
-      <Drawer open={showSettings} onClose={()=>setShowSettings(false)} title="Settings" size="small">
+      <Drawer open={showSettings} onClose={()=>setShowSettings(false)} title="Settings" size="default">
         <SettingsPanel 
           dark={dark} 
           onToggleDark={toggleDark} 
           onExport={exportData}
           onImport={importData}
           onReset={resetData}
+          onShowAbout={() => setShowAbout(true)}
         />
       </Drawer>
 
@@ -4874,7 +4878,7 @@ function PdfViewer({ url, title }) {
   );
 }
 
-function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
+function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShowAbout }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [apiKey, setApiKey] = useState(localStorage.getItem('google_places_api_key') || '');
   const [partnerName, setPartnerName] = useState(() => {
@@ -4914,9 +4918,9 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
           onChange={onToggleDark} 
         />
       </div>
-      
 
-      
+      <CloudSyncSection onExport={onExport} />
+
       <div className="space-y-2">
         <h4 className="font-medium">Data & Privacy</h4>
         <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
@@ -5019,18 +5023,12 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset }) {
         <h4 className="font-medium">Support</h4>
 
         <button 
-          onClick={() => setShowAbout(true)}
+          type="button"
+          onClick={() => onShowAbout?.()}
           className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
         >
           <Info className="w-4 h-4" />
           About
-        </button>
-      </div>
-      
-      <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
-        <button className="w-full text-left px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2 text-error-600 dark:text-error-400">
-          <LogOut className="w-4 h-4" />
-          Sign out
         </button>
       </div>
 
