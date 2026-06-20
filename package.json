@@ -11,6 +11,7 @@
     "lint:fix": "eslint . --ext js,jsx,ts,tsx --fix"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
     "date-fns": "^2.30.0",
     "dexie": "^3.2.4",
     "firebase": "^11.10.0",

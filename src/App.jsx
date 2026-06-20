@@ -1,5 +1,4 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { onAuthStateChanged } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Check, MapPin, Home, ListChecks, CalendarClock, MessageSquare, 
@@ -11,9 +10,11 @@ import {
 } from "lucide-react";
 import { config } from './config';
 import FirebaseEmailLinkHandler from "@/components/FirebaseEmailLinkHandler.jsx";
+import SupabaseAuthScreen from "@/components/SupabaseAuthScreen.jsx";
 import CloudMergeModal from "@/components/CloudMergeModal.jsx";
 import CloudSyncSection from "@/components/CloudSyncSection.jsx";
-import { getFirebaseAuth } from "@/firebase";
+import { isSupabaseConfigured } from "@/supabase";
+import { useCloudAuth, signOutCloudAuth } from "@/useCloudAuth";
 import {
   applyPayloadToStores,
   buildLocalPayload,
@@ -22,7 +23,7 @@ import {
   formatCloudUpdatedAt,
   getCloudUpdatedAtMs,
   saveCloudPayload,
-} from "@/cloudFirestoreSync";
+} from "@/cloudSync";
 
 
 
@@ -380,9 +381,9 @@ export default function App() {
   const [addressLookupStep, setAddressLookupStep] = useState("search"); // search, select, import
   const [searchTimeout, setSearchTimeout] = useState(null);
   const mainContentRef = useRef(null);
-  const firebaseUidRef = useRef(null);
+  const cloudUidRef = useRef(null);
 
-  const [firebaseUser, setFirebaseUser] = useState(null);
+  const { user: authUser, loading: authLoading, authRequired } = useCloudAuth();
   const [cloudMergeOpen, setCloudMergeOpen] = useState(false);
   const [cloudMergeRemote, setCloudMergeRemote] = useState(null);
   const [lastCloudSyncAt, setLastCloudSyncAt] = useState(null);
@@ -1619,43 +1620,46 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const auth = getFirebaseAuth();
-    if (!auth) return () => {};
-    return onAuthStateChanged(auth, async (user) => {
-      const prevUid = firebaseUidRef.current;
-      const newUid = user?.uid ?? null;
-      firebaseUidRef.current = newUid;
-      setFirebaseUser(user);
-      if (!user) {
-        firebaseUidRef.current = null;
-        setCloudMergeOpen(false);
-        setCloudMergeRemote(null);
-        setCloudPushPaused(false);
-        setCloudNewerHint(null);
-        return;
-      }
-      if (prevUid !== newUid) {
-        setCloudPushPaused(false);
-      }
+    const prevUid = cloudUidRef.current;
+    const newUid = authUser?.id ?? null;
+    cloudUidRef.current = newUid;
+    if (!newUid) {
+      cloudUidRef.current = null;
+      setCloudMergeOpen(false);
+      setCloudMergeRemote(null);
+      setCloudPushPaused(false);
+      setCloudNewerHint(null);
+      return;
+    }
+    if (prevUid !== newUid) {
+      setCloudPushPaused(false);
+    }
+    let cancelled = false;
+    (async () => {
       try {
-        const remote = await fetchCloudPayload(user.uid);
-        const done = localStorage.getItem(mergeDoneStorageKey(user.uid));
+        const remote = await fetchCloudPayload(newUid);
+        if (cancelled) return;
+        const done = localStorage.getItem(mergeDoneStorageKey(newUid));
         const snooze = sessionStorage.getItem("uw_ss_merge_snooze");
         if (remote && cloudPayloadHasCampaigns(remote) && !done && !snooze) {
           setCloudMergeRemote(remote);
           setCloudMergeOpen(true);
         }
       } catch (e) {
+        if (cancelled) return;
         console.error("Cloud pull failed", e);
         setCloudSyncStatus("error");
         setCloudSyncMessage(e.message || "Could not load cloud data");
       }
-    });
-  }, []);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser?.id]);
 
   useEffect(() => {
-    if (!firebaseUser?.uid || cloudMergeOpen || cloudPushPaused) return () => {};
-    const uid = firebaseUser.uid;
+    if (!authUser?.id || cloudMergeOpen || cloudPushPaused) return () => {};
+    const uid = authUser.id;
     const t = setTimeout(async () => {
       try {
         setCloudSyncStatus("syncing");
@@ -1670,11 +1674,11 @@ export default function App() {
       }
     }, 4000);
     return () => clearTimeout(t);
-  }, [campaigns, dark, firebaseUser?.uid, cloudMergeOpen, cloudPushPaused]);
+  }, [campaigns, dark, authUser?.id, cloudMergeOpen, cloudPushPaused]);
 
   useEffect(() => {
-    if (!firebaseUser?.uid || cloudMergeOpen || cloudPushPaused) return () => {};
-    const uid = firebaseUser.uid;
+    if (!authUser?.id || cloudMergeOpen || cloudPushPaused) return () => {};
+    const uid = authUser.id;
     const id = setInterval(async () => {
       try {
         setCloudSyncStatus("syncing");
@@ -1687,14 +1691,14 @@ export default function App() {
       }
     }, 120000);
     return () => clearInterval(id);
-  }, [firebaseUser?.uid, cloudMergeOpen, cloudPushPaused, campaigns, dark]);
+  }, [authUser?.id, cloudMergeOpen, cloudPushPaused, campaigns, dark]);
 
   const handleCloudSyncNow = useCallback(async () => {
-    if (!firebaseUser?.uid) return;
+    if (!authUser?.id) return;
     setCloudPushPaused(false);
     try {
       setCloudSyncStatus("syncing");
-      await saveCloudPayload(firebaseUser.uid, buildLocalPayload(campaigns, dark));
+      await saveCloudPayload(authUser.id, buildLocalPayload(campaigns, dark));
       setLastCloudSyncAt(Date.now());
       setCloudSyncStatus("ok");
       setCloudSyncMessage("");
@@ -1704,17 +1708,17 @@ export default function App() {
       setCloudSyncStatus("error");
       setCloudSyncMessage(e.message || "Sync failed");
     }
-  }, [firebaseUser, campaigns, dark]);
+  }, [authUser, campaigns, dark]);
 
   const handlePullFromCloud = useCallback(async () => {
-    if (!firebaseUser?.uid) return;
+    if (!authUser?.id) return;
     if (!window.confirm("Replace this device with the latest cloud backup? Export a backup from Settings first if you are unsure.")) {
       return;
     }
     try {
       setCloudSyncStatus("syncing");
       setCloudSyncMessage("");
-      const remote = await fetchCloudPayload(firebaseUser.uid);
+      const remote = await fetchCloudPayload(authUser.id);
       if (!remote || !cloudPayloadHasCampaigns(remote)) {
         window.alert("No cloud backup found yet.");
         setCloudSyncStatus("idle");
@@ -1736,7 +1740,7 @@ export default function App() {
         partner_script_order: remote.partner_script_order,
         partner_documents: remote.partner_documents,
       };
-      await saveCloudPayload(firebaseUser.uid, payload);
+      await saveCloudPayload(authUser.id, payload);
       const remoteMs = getCloudUpdatedAtMs(remote);
       cloudBannerDismissedRemoteMsRef.current = Math.max(cloudBannerDismissedRemoteMsRef.current, remoteMs, Date.now());
       setLastCloudSyncAt(Date.now());
@@ -1748,7 +1752,7 @@ export default function App() {
       setCloudSyncMessage(e.message || "Could not load cloud data");
     }
   }, [
-    firebaseUser,
+    authUser,
     updateCampaigns,
     setDark,
     setActiveCampaignId,
@@ -1769,11 +1773,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!firebaseUser?.uid || cloudMergeOpen) return () => {};
+    if (!authUser?.id || cloudMergeOpen) return () => {};
     let cancelled = false;
     const run = async () => {
       try {
-        const remote = await fetchCloudPayload(firebaseUser.uid);
+        const remote = await fetchCloudPayload(authUser.id);
         if (cancelled || !remote) return;
         const remoteMs = getCloudUpdatedAtMs(remote);
         if (!remoteMs) return;
@@ -1802,12 +1806,12 @@ export default function App() {
       clearInterval(iv);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [firebaseUser?.uid, lastCloudSyncAt, cloudMergeOpen]);
+  }, [authUser?.id, lastCloudSyncAt, cloudMergeOpen]);
 
   const handleMergeUseCloud = useCallback(async () => {
-    const user = firebaseUser;
+    const user = authUser;
     const remote = cloudMergeRemote;
-    if (!user?.uid || !remote) return;
+    if (!user?.id || !remote) return;
     try {
       applyPayloadToStores(remote, {
         updateCampaigns,
@@ -1816,7 +1820,7 @@ export default function App() {
         setActiveStreetId,
         setActivePropertyId,
       });
-      localStorage.setItem(mergeDoneStorageKey(user.uid), "1");
+      localStorage.setItem(mergeDoneStorageKey(user.id), "1");
       setCloudPushPaused(false);
       setCloudMergeOpen(false);
       setCloudMergeRemote(null);
@@ -1829,7 +1833,7 @@ export default function App() {
         partner_script_order: remote.partner_script_order,
         partner_documents: remote.partner_documents,
       };
-      await saveCloudPayload(user.uid, payload);
+      await saveCloudPayload(user.id, payload);
       setLastCloudSyncAt(Date.now());
       setCloudNewerHint(null);
       setCloudSyncStatus("ok");
@@ -1840,7 +1844,7 @@ export default function App() {
       setCloudSyncMessage(e.message || "Could not apply cloud data");
     }
   }, [
-    firebaseUser,
+    authUser,
     cloudMergeRemote,
     updateCampaigns,
     setDark,
@@ -1850,14 +1854,14 @@ export default function App() {
   ]);
 
   const handleMergeKeepDevice = useCallback(async () => {
-    const user = firebaseUser;
-    if (!user?.uid) return;
+    const user = authUser;
+    if (!user?.id) return;
     try {
-      localStorage.setItem(mergeDoneStorageKey(user.uid), "1");
+      localStorage.setItem(mergeDoneStorageKey(user.id), "1");
       setCloudPushPaused(false);
       setCloudMergeOpen(false);
       setCloudMergeRemote(null);
-      await saveCloudPayload(user.uid, buildLocalPayload(campaigns, dark));
+      await saveCloudPayload(user.id, buildLocalPayload(campaigns, dark));
       setLastCloudSyncAt(Date.now());
       setCloudNewerHint(null);
       setCloudSyncStatus("ok");
@@ -1867,7 +1871,7 @@ export default function App() {
       setCloudSyncStatus("error");
       setCloudSyncMessage(e.message || "Could not upload to cloud");
     }
-  }, [firebaseUser, campaigns, dark]);
+  }, [authUser, campaigns, dark]);
 
   const handleMergeLater = useCallback(() => {
     sessionStorage.setItem("uw_ss_merge_snooze", "1");
@@ -1892,10 +1896,31 @@ export default function App() {
     setShowUpdateModal(false);
   };
 
+  const handleSignOut = useCallback(async () => {
+    try {
+      await signOutCloudAuth();
+    } catch (e) {
+      console.error(e);
+      window.alert(e?.message || "Could not sign out.");
+    }
+  }, []);
+
+  if (authRequired && authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 text-gray-600 dark:text-gray-300">
+        Loading…
+      </div>
+    );
+  }
+
+  if (authRequired && !authUser) {
+    return <SupabaseAuthScreen />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 overflow-x-hidden">
-      <FirebaseEmailLinkHandler />
-      {cloudNewerHint && firebaseUser && (
+      {!isSupabaseConfigured() && <FirebaseEmailLinkHandler />}
+      {cloudNewerHint && authUser && (
         <div
           role="status"
           className="bg-amber-100 dark:bg-amber-900/35 border-b border-amber-300 dark:border-amber-700 px-3 py-2.5 text-sm flex flex-wrap items-center gap-2 justify-between"
@@ -2228,6 +2253,8 @@ export default function App() {
           onCloudSyncNow={handleCloudSyncNow}
           onPullFromCloud={handlePullFromCloud}
           cloudPushPaused={cloudPushPaused}
+          accountEmail={authUser?.email ?? null}
+          onSignOut={handleSignOut}
         />
       </Drawer>
 
@@ -5204,7 +5231,7 @@ function PdfViewer({ url, title }) {
   );
 }
 
-function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShowAbout, lastCloudSyncAt, cloudSyncStatus, cloudSyncMessage, onCloudSyncNow, onPullFromCloud, cloudPushPaused }) {
+function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShowAbout, lastCloudSyncAt, cloudSyncStatus, cloudSyncMessage, onCloudSyncNow, onPullFromCloud, cloudPushPaused, accountEmail, onSignOut }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [apiKey, setApiKey] = useState(localStorage.getItem('google_places_api_key') || '');
   const [partnerName, setPartnerName] = useState(() => {
@@ -5247,6 +5274,8 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShow
 
       <CloudSyncSection
         onExport={onExport}
+        accountEmail={accountEmail}
+        onSignOut={onSignOut}
         lastCloudSyncAt={lastCloudSyncAt}
         cloudSyncStatus={cloudSyncStatus}
         cloudSyncMessage={cloudSyncMessage}
