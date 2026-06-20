@@ -1,9 +1,17 @@
 import React, { useState } from "react";
 import { LogIn, UserPlus } from "lucide-react";
 import { getSupabaseClient } from "@/supabase";
+import {
+  applyPartnerNameFromUser,
+  formatDisplayName,
+  savePartnerName,
+  stashPendingProfile,
+} from "@/supabaseAuthProfile";
 
 export default function SupabaseAuthScreen() {
   const [mode, setMode] = useState("signIn");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -16,9 +24,23 @@ export default function SupabaseAuthScreen() {
     setMessage("");
 
     const trimmedEmail = email.trim();
+    const trimmedFirst = firstName.trim();
+    const trimmedLast = lastName.trim();
+
     if (!trimmedEmail || !password) {
       setError("Please enter your email and password.");
       return;
+    }
+
+    if (mode === "signUp") {
+      if (!trimmedFirst) {
+        setError("Please enter your first name.");
+        return;
+      }
+      if (!trimmedLast) {
+        setError("Please enter your last name.");
+        return;
+      }
     }
 
     const supabase = getSupabaseClient();
@@ -30,21 +52,36 @@ export default function SupabaseAuthScreen() {
     setBusy(true);
     try {
       if (mode === "signUp") {
+        const displayName = formatDisplayName(trimmedFirst, trimmedLast);
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: trimmedEmail,
           password,
+          options: {
+            data: {
+              first_name: trimmedFirst,
+              last_name: trimmedLast,
+            },
+          },
         });
         if (signUpError) throw signUpError;
-        if (data.session) {
+
+        if (data.session?.user) {
+          savePartnerName(displayName);
+          applyPartnerNameFromUser(data.session.user);
           return;
         }
+
+        stashPendingProfile(trimmedFirst, trimmedLast);
+        savePartnerName(displayName);
         setMessage(
           "Account created. If email confirmation is enabled, check your inbox to confirm, then sign in."
         );
         setMode("signIn");
         setPassword("");
+        setFirstName("");
+        setLastName("");
       } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
           email: trimmedEmail,
           password,
         });
@@ -55,6 +92,20 @@ export default function SupabaseAuthScreen() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const switchToSignIn = () => {
+    setMode("signIn");
+    setError("");
+    setMessage("");
+    setFirstName("");
+    setLastName("");
+  };
+
+  const switchToSignUp = () => {
+    setMode("signUp");
+    setError("");
+    setMessage("");
   };
 
   return (
@@ -72,6 +123,41 @@ export default function SupabaseAuthScreen() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
+          {mode === "signUp" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  First name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  autoComplete="given-name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="mt-1 w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:ring-2 focus:ring-primary-500"
+                  placeholder="First name"
+                  disabled={busy}
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  Last name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  autoComplete="family-name"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="mt-1 w-full p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:ring-2 focus:ring-primary-500"
+                  placeholder="Last name"
+                  disabled={busy}
+                  required
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Email</label>
             <input
@@ -127,11 +213,7 @@ export default function SupabaseAuthScreen() {
               <button
                 type="button"
                 className="text-primary-600 dark:text-primary-400 font-medium hover:underline"
-                onClick={() => {
-                  setMode("signIn");
-                  setError("");
-                  setMessage("");
-                }}
+                onClick={switchToSignIn}
               >
                 Sign in
               </button>
@@ -142,11 +224,7 @@ export default function SupabaseAuthScreen() {
               <button
                 type="button"
                 className="text-primary-600 dark:text-primary-400 font-medium hover:underline"
-                onClick={() => {
-                  setMode("signUp");
-                  setError("");
-                  setMessage("");
-                }}
+                onClick={switchToSignUp}
               >
                 Create an account
               </button>

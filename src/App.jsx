@@ -12,8 +12,15 @@ import { config } from './config';
 import FirebaseEmailLinkHandler from "@/components/FirebaseEmailLinkHandler.jsx";
 import SupabaseAuthScreen from "@/components/SupabaseAuthScreen.jsx";
 import CloudMergeModal from "@/components/CloudMergeModal.jsx";
+import AccountSwitchModal from "@/components/AccountSwitchModal.jsx";
 import CloudSyncSection from "@/components/CloudSyncSection.jsx";
-import { isSupabaseConfigured } from "@/supabase";
+import { getSupabaseClient, isSupabaseConfigured } from "@/supabase";
+import {
+  applyPartnerNameFromUser,
+  detectAccountSwitch,
+  deviceHasLocalCampaigns,
+  recordAuthUserId,
+} from "@/supabaseAuthProfile";
 import { useCloudAuth, signOutCloudAuth } from "@/useCloudAuth";
 import {
   applyPayloadToStores,
@@ -391,6 +398,8 @@ export default function App() {
   const [cloudSyncMessage, setCloudSyncMessage] = useState("");
   /** True after user taps "Decide later" on merge modal — blocks auto-upload until they resolve or use "Save to cloud now". */
   const [cloudPushPaused, setCloudPushPaused] = useState(false);
+  /** Shown when a different account signs in but this device still has prior user's local data. */
+  const [accountSwitchOpen, setAccountSwitchOpen] = useState(false);
   /** Shown when cloud backup `updatedAt` is newer than last successful sync on this device. */
   const [cloudNewerHint, setCloudNewerHint] = useState(null);
   const cloudBannerDismissedRemoteMsRef = useRef(0);
@@ -1620,7 +1629,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const prevUid = cloudUidRef.current;
     const newUid = authUser?.id ?? null;
     cloudUidRef.current = newUid;
     if (!newUid) {
@@ -1629,13 +1637,27 @@ export default function App() {
       setCloudMergeRemote(null);
       setCloudPushPaused(false);
       setCloudNewerHint(null);
+      setAccountSwitchOpen(false);
       return;
-    }
-    if (prevUid !== newUid) {
-      setCloudPushPaused(false);
     }
     let cancelled = false;
     (async () => {
+      const accountSwitched = detectAccountSwitch(newUid);
+      recordAuthUserId(newUid);
+
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!cancelled && user) {
+          applyPartnerNameFromUser(user, { accountSwitched });
+        }
+      }
+
+      if (accountSwitched) {
+        setCloudPushPaused(true);
+        sessionStorage.removeItem("uw_ss_merge_snooze");
+      }
+
       try {
         const remote = await fetchCloudPayload(newUid);
         if (cancelled) return;
@@ -1644,6 +1666,11 @@ export default function App() {
         if (remote && cloudPayloadHasCampaigns(remote) && !done && !snooze) {
           setCloudMergeRemote(remote);
           setCloudMergeOpen(true);
+          setAccountSwitchOpen(false);
+        } else if (accountSwitched && deviceHasLocalCampaigns() && !done) {
+          setAccountSwitchOpen(true);
+        } else if (accountSwitched) {
+          setCloudPushPaused(false);
         }
       } catch (e) {
         if (cancelled) return;
@@ -1658,7 +1685,7 @@ export default function App() {
   }, [authUser?.id]);
 
   useEffect(() => {
-    if (!authUser?.id || cloudMergeOpen || cloudPushPaused) return () => {};
+    if (!authUser?.id || cloudMergeOpen || cloudPushPaused || accountSwitchOpen) return () => {};
     const uid = authUser.id;
     const t = setTimeout(async () => {
       try {
@@ -1674,10 +1701,10 @@ export default function App() {
       }
     }, 4000);
     return () => clearTimeout(t);
-  }, [campaigns, dark, authUser?.id, cloudMergeOpen, cloudPushPaused]);
+  }, [campaigns, dark, authUser?.id, cloudMergeOpen, cloudPushPaused, accountSwitchOpen]);
 
   useEffect(() => {
-    if (!authUser?.id || cloudMergeOpen || cloudPushPaused) return () => {};
+    if (!authUser?.id || cloudMergeOpen || cloudPushPaused || accountSwitchOpen) return () => {};
     const uid = authUser.id;
     const id = setInterval(async () => {
       try {
@@ -1691,7 +1718,59 @@ export default function App() {
       }
     }, 120000);
     return () => clearInterval(id);
-  }, [authUser?.id, cloudMergeOpen, cloudPushPaused, campaigns, dark]);
+  }, [authUser?.id, cloudMergeOpen, cloudPushPaused, accountSwitchOpen, campaigns, dark]);
+
+  const handleAccountSwitchUseLocal = useCallback(() => {
+    const user = authUser;
+    if (!user?.id) return;
+    localStorage.setItem(mergeDoneStorageKey(user.id), "1");
+    setAccountSwitchOpen(false);
+    setCloudPushPaused(false);
+  }, [authUser]);
+
+  const handleAccountSwitchStartFresh = useCallback(async () => {
+    const user = authUser;
+    if (!user?.id) return;
+    const emptyCampaigns = [
+      {
+        id: "new-campaign",
+        name: "New Campaign",
+        area: "",
+        status: "planned",
+        created_at: new Date().toISOString().split("T")[0],
+        links: { connector: "", quote: "", booking: "", faq: "" },
+        streets: [],
+      },
+    ];
+    updateCampaigns(emptyCampaigns);
+    setActiveCampaignId("new-campaign");
+    setActiveStreetId("");
+    setActivePropertyId("");
+    localStorage.removeItem("partner_scripts");
+    localStorage.removeItem("partner_script_order");
+    localStorage.removeItem("partner_documents");
+    localStorage.setItem(mergeDoneStorageKey(user.id), "1");
+    setAccountSwitchOpen(false);
+    setCloudPushPaused(false);
+    try {
+      setCloudSyncStatus("syncing");
+      await saveCloudPayload(user.id, buildLocalPayload(emptyCampaigns, dark));
+      setLastCloudSyncAt(Date.now());
+      setCloudSyncStatus("ok");
+      setCloudSyncMessage("");
+    } catch (e) {
+      console.error(e);
+      setCloudSyncStatus("error");
+      setCloudSyncMessage(e.message || "Could not save to cloud");
+    }
+  }, [
+    authUser,
+    dark,
+    updateCampaigns,
+    setActiveCampaignId,
+    setActiveStreetId,
+    setActivePropertyId,
+  ]);
 
   const handleCloudSyncNow = useCallback(async () => {
     if (!authUser?.id) return;
@@ -1954,6 +2033,13 @@ export default function App() {
         onUseCloud={handleMergeUseCloud}
         onKeepDevice={handleMergeKeepDevice}
         onDecideLater={handleMergeLater}
+      />
+      <AccountSwitchModal
+        open={accountSwitchOpen}
+        userEmail={authUser?.email}
+        onUseLocalForAccount={handleAccountSwitchUseLocal}
+        onStartFresh={handleAccountSwitchStartFresh}
+        onSignOut={handleSignOut}
       />
       {/* Top Bar */}
       <div className="sticky top-0 z-40 backdrop-blur bg-white/60 dark:bg-gray-950/60 border-b border-gray-200/50 dark:border-gray-800/50">
@@ -5239,6 +5325,11 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShow
     return saved || 'Your Name';
   });
   const [showNameModal, setShowNameModal] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('partner_name');
+    setPartnerName(saved || 'Your Name');
+  }, [accountEmail]);
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
