@@ -390,7 +390,7 @@ export default function App() {
   const mainContentRef = useRef(null);
   const cloudUidRef = useRef(null);
 
-  const { user: authUser, loading: authLoading, authRequired } = useCloudAuth();
+  const { user: authUser, loading: authLoading, authRequired, passwordRecovery, completePasswordRecovery } = useCloudAuth();
   const [cloudMergeOpen, setCloudMergeOpen] = useState(false);
   const [cloudMergeRemote, setCloudMergeRemote] = useState(null);
   const [lastCloudSyncAt, setLastCloudSyncAt] = useState(null);
@@ -1645,32 +1645,66 @@ export default function App() {
       const accountSwitched = detectAccountSwitch(newUid);
       recordAuthUserId(newUid);
 
-      const supabase = getSupabaseClient();
-      if (supabase) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!cancelled && user) {
-          applyPartnerNameFromUser(user, { accountSwitched });
-        }
-      }
-
-      if (accountSwitched) {
-        setCloudPushPaused(true);
-        sessionStorage.removeItem("uw_ss_merge_snooze");
-      }
-
       try {
         const remote = await fetchCloudPayload(newUid);
         if (cancelled) return;
+
+        const supabase = getSupabaseClient();
+        const applyAuthPartnerName = async (force = false) => {
+          if (!supabase) return;
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!cancelled && user) {
+            applyPartnerNameFromUser(user, { accountSwitched: force || accountSwitched });
+          }
+        };
+
+        if (accountSwitched) {
+          setCloudPushPaused(true);
+          sessionStorage.removeItem("uw_ss_merge_snooze");
+
+          if (remote && cloudPayloadHasCampaigns(remote)) {
+            applyPayloadToStores(remote, {
+              updateCampaigns,
+              setDark,
+              setActiveCampaignId,
+              setActiveStreetId,
+              setActivePropertyId,
+            });
+            localStorage.setItem(mergeDoneStorageKey(newUid), "1");
+            const remoteMs = getCloudUpdatedAtMs(remote);
+            cloudBannerDismissedRemoteMsRef.current = Math.max(
+              cloudBannerDismissedRemoteMsRef.current,
+              remoteMs,
+              Date.now()
+            );
+            setLastCloudSyncAt(remoteMs || Date.now());
+            setCloudNewerHint(null);
+            setCloudPushPaused(false);
+            setCloudSyncStatus("ok");
+            setCloudSyncMessage("");
+            if (!remote.partner_name) await applyAuthPartnerName(true);
+            return;
+          }
+
+          if (deviceHasLocalCampaigns()) {
+            await applyAuthPartnerName(true);
+            setAccountSwitchOpen(true);
+            return;
+          }
+
+          await applyAuthPartnerName(true);
+          setCloudPushPaused(false);
+          return;
+        }
+
+        await applyAuthPartnerName(false);
+
         const done = localStorage.getItem(mergeDoneStorageKey(newUid));
         const snooze = sessionStorage.getItem("uw_ss_merge_snooze");
         if (remote && cloudPayloadHasCampaigns(remote) && !done && !snooze) {
           setCloudMergeRemote(remote);
           setCloudMergeOpen(true);
           setAccountSwitchOpen(false);
-        } else if (accountSwitched && deviceHasLocalCampaigns() && !done) {
-          setAccountSwitchOpen(true);
-        } else if (accountSwitched) {
-          setCloudPushPaused(false);
         }
       } catch (e) {
         if (cancelled) return;
@@ -1992,8 +2026,22 @@ export default function App() {
     );
   }
 
-  if (authRequired && !authUser) {
+  if (authRequired && !authUser && !passwordRecovery) {
     return <SupabaseAuthScreen />;
+  }
+
+  if (authRequired && passwordRecovery) {
+    return (
+      <SupabaseAuthScreen
+        recoveryMode
+        onRecoveryComplete={() => {
+          completePasswordRecovery();
+          if (typeof window !== "undefined" && window.location.hash) {
+            window.history.replaceState(null, "", window.location.pathname + window.location.search);
+          }
+        }}
+      />
+    );
   }
 
   return (

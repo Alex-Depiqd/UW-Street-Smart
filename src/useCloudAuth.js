@@ -13,6 +13,7 @@ export function useCloudAuth() {
   const [loading, setLoading] = useState(
     () => isSupabaseConfigured() || isFirebaseConfigured()
   );
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     if (isSupabaseConfigured()) {
@@ -29,7 +30,10 @@ export function useCloudAuth() {
         setLoading(false);
       });
 
-      const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === "PASSWORD_RECOVERY") {
+          setPasswordRecovery(true);
+        }
         setUser(sessionToUser(session));
         setLoading(false);
       });
@@ -64,6 +68,8 @@ export function useCloudAuth() {
     user,
     loading,
     authRequired: isAuthRequired(),
+    passwordRecovery,
+    completePasswordRecovery: () => setPasswordRecovery(false),
   };
 }
 

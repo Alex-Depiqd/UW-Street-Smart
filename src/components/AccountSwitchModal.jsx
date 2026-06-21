@@ -27,7 +27,8 @@ export default function AccountSwitchModal({
         </div>
         <p className="text-sm text-gray-600 dark:text-gray-300">
           You signed in as <strong>{userEmail || "this account"}</strong>, but this device still has
-          street data from a previous login. Choose what to do before anything uploads to the cloud.
+          street data from a previous login and this account has no cloud backup yet. Choose what to
+          do before anything uploads to the cloud.
         </p>
         <div className="space-y-2">
           <button

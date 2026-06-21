@@ -34,3 +34,9 @@ export function getSupabaseClient() {
   }
   return clientInstance;
 }
+
+/** Redirect target for Supabase email links (confirm, password reset). */
+export function getAuthRedirectUrl() {
+  if (typeof window === "undefined") return undefined;
+  return `${window.location.origin}${window.location.pathname}`;
+}
