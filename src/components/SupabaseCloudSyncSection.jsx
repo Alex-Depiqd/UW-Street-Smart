@@ -1,6 +1,33 @@
 import React from "react";
 import { Cloud, DownloadCloud, LogOut, RefreshCw } from "lucide-react";
 
+function SettingsToggle({ label, description, value, onChange }) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-2">
+      <div className="min-w-0">
+        <div className="text-sm">{label}</div>
+        {description && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{description}</p>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange(!value)}
+        className={`w-11 h-6 rounded-full p-1 transition-colors shrink-0 ${
+          value ? "bg-primary-600" : "bg-gray-300 dark:bg-gray-700"
+        }`}
+        aria-pressed={value}
+      >
+        <div
+          className={`w-4 h-4 rounded-full bg-white transition-transform ${
+            value ? "translate-x-5" : ""
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
 /** Account & cloud sync when Supabase auth is active (user already signed in via app gate). */
 export default function SupabaseCloudSyncSection({
   accountEmail,
@@ -11,7 +38,12 @@ export default function SupabaseCloudSyncSection({
   onSyncNow,
   onPullFromCloud,
   cloudPushPaused = false,
+  cloudAutoSyncPaused = false,
+  onCloudAutoSyncPausedChange,
 }) {
+  const userPausedAutoSync = cloudAutoSyncPaused;
+  const systemPausedAutoSync = cloudPushPaused;
+
   return (
     <div className="space-y-2">
       <h4 className="font-medium flex items-center gap-2">
@@ -29,17 +61,34 @@ export default function SupabaseCloudSyncSection({
             Signed in as <span className="font-medium">{accountEmail}</span>
           </div>
         )}
+
+        {onCloudAutoSyncPausedChange && (
+          <SettingsToggle
+            label="Pause automatic cloud backup"
+            description="Stops background uploads while you edit locally. Use Save to cloud now when ready."
+            value={cloudAutoSyncPaused}
+            onChange={onCloudAutoSyncPausedChange}
+          />
+        )}
+
         <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-          {cloudPushPaused && (
+          {userPausedAutoSync && (
             <p className="text-amber-800 dark:text-amber-200">
-              Automatic cloud upload is paused. Use <strong>Save to cloud now</strong> when ready.
+              Automatic cloud upload is paused in Settings. Use <strong>Save to cloud now</strong>{" "}
+              when you want to back up this device.
+            </p>
+          )}
+          {systemPausedAutoSync && !userPausedAutoSync && (
+            <p className="text-amber-800 dark:text-amber-200">
+              Automatic cloud upload is paused until you resolve the backup choice. Use{" "}
+              <strong>Save to cloud now</strong> when ready.
             </p>
           )}
           {cloudSyncStatus === "syncing" && <p>Saving to cloud…</p>}
           {cloudSyncStatus === "ok" && lastCloudSyncAt != null && (
             <p>Last saved to cloud: {new Date(lastCloudSyncAt).toLocaleString()}</p>
           )}
-          {cloudSyncStatus === "ok" && lastCloudSyncAt == null && (
+          {cloudSyncStatus === "ok" && lastCloudSyncAt == null && !cloudPushPaused && !cloudAutoSyncPaused && (
             <p>Cloud backup will run shortly after you make changes.</p>
           )}
           {cloudSyncStatus === "error" && cloudSyncMessage && (

@@ -96,59 +96,6 @@ const seedScripts = {
   ],
 };
 
-const seedCampaigns = [
-  {
-    id: "c1",
-    name: "Elmswell NL – Aug 2025",
-    area: "IP30",
-    status: "active",
-    created_at: "2025-08-01",
-    links: {
-      connector: "https://example.com/connector",
-      quote: "https://example.com/quote",
-      booking: "https://example.com/book",
-      faq: "https://example.com/faq",
-    },
-    streets: [
-      {
-        id: "s1",
-        name: "Orchard Way",
-        postcode: "IP30 9XX",
-        status: "in_progress",
-        properties: [
-          { id: "p1", label: "1", dropped: true, knocked: true, spoke: false, result: "no_answer", photo: null },
-          { id: "p2", label: "3", dropped: true, knocked: true, spoke: true, result: "maybe", followUpAt: "2025-08-16T18:00:00", photo: null },
-          { id: "p3", label: "5", dropped: true, knocked: false, spoke: false, result: "none", photo: null },
-        ],
-      },
-      {
-        id: "s2",
-        name: "Station Road",
-        postcode: "IP30 9YY",
-        status: "not_started",
-        properties: [
-          { id: "p4", label: "12", dropped: false, knocked: false, spoke: false, result: "none", photo: null },
-          { id: "p5", label: "14", dropped: false, knocked: false, spoke: false, result: "none", photo: null },
-        ],
-      },
-    ],
-  },
-  {
-    id: "c2",
-    name: "Stowmarket NL – Sept 2025",
-    area: "IP14",
-          status: "planned",
-    created_at: "2025-08-15",
-    links: {
-      connector: "https://example.com/connector",
-      quote: "https://example.com/quote",
-      booking: "https://example.com/book",
-      faq: "https://example.com/faq",
-    },
-    streets: [],
-  },
-];
-
 // Utility components
 const Chip = ({ children, variant = "default", className = "" }) => {
   const variants = {
@@ -323,10 +270,14 @@ export default function App() {
   const [showVersionUpdate, setShowVersionUpdate] = useState(false);
   const [currentVersion, setCurrentVersion] = useState('1.0.0');
   
-  // Load campaigns from localStorage or use seed data only on first run
+  // Load campaigns from localStorage; first install starts with no campaigns
   const [campaigns, setCampaigns] = useState(() => {
-    const saved = localStorage.getItem('uw_streetsmart_campaigns');
-    return saved ? JSON.parse(saved) : seedCampaigns;
+    try {
+      const saved = localStorage.getItem('uw_streetsmart_campaigns');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
   // Wrapper function to save campaigns to localStorage whenever they change
@@ -343,9 +294,9 @@ export default function App() {
     });
   };
   
-  const [activeCampaignId, setActiveCampaignId] = useState("c1");
-  const [activeStreetId, setActiveStreetId] = useState("s1");
-  const [activePropertyId, setActivePropertyId] = useState("p2");
+  const [activeCampaignId, setActiveCampaignId] = useState("");
+  const [activeStreetId, setActiveStreetId] = useState("");
+  const [activePropertyId, setActivePropertyId] = useState("");
   const [showScripts, setShowScripts] = useState(false);
   const [showLinks, setShowLinks] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -398,6 +349,28 @@ export default function App() {
   const [cloudSyncMessage, setCloudSyncMessage] = useState("");
   /** True after user taps "Decide later" on merge modal — blocks auto-upload until they resolve or use "Save to cloud now". */
   const [cloudPushPaused, setCloudPushPaused] = useState(false);
+  /** User-controlled pause for automatic cloud upload (Settings toggle). */
+  const [cloudAutoSyncPaused, setCloudAutoSyncPaused] = useState(() => {
+    try {
+      return localStorage.getItem("uw_ss_cloud_auto_sync_paused") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const cloudUploadBlocked = cloudPushPaused || cloudAutoSyncPaused;
+
+  const setCloudAutoSyncPausedPersisted = useCallback((paused) => {
+    setCloudAutoSyncPaused(paused);
+    try {
+      if (paused) {
+        localStorage.setItem("uw_ss_cloud_auto_sync_paused", "1");
+      } else {
+        localStorage.removeItem("uw_ss_cloud_auto_sync_paused");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
   /** Shown when a different account signs in but this device still has prior user's local data. */
   const [accountSwitchOpen, setAccountSwitchOpen] = useState(false);
   /** Shown when cloud backup `updatedAt` is newer than last successful sync on this device. */
@@ -1719,7 +1692,7 @@ export default function App() {
   }, [authUser?.id]);
 
   useEffect(() => {
-    if (!authUser?.id || cloudMergeOpen || cloudPushPaused || accountSwitchOpen) return () => {};
+    if (!authUser?.id || cloudMergeOpen || cloudUploadBlocked || accountSwitchOpen) return () => {};
     const uid = authUser.id;
     const t = setTimeout(async () => {
       try {
@@ -1735,10 +1708,10 @@ export default function App() {
       }
     }, 4000);
     return () => clearTimeout(t);
-  }, [campaigns, dark, authUser?.id, cloudMergeOpen, cloudPushPaused, accountSwitchOpen]);
+  }, [campaigns, dark, authUser?.id, cloudMergeOpen, cloudUploadBlocked, accountSwitchOpen]);
 
   useEffect(() => {
-    if (!authUser?.id || cloudMergeOpen || cloudPushPaused || accountSwitchOpen) return () => {};
+    if (!authUser?.id || cloudMergeOpen || cloudUploadBlocked || accountSwitchOpen) return () => {};
     const uid = authUser.id;
     const id = setInterval(async () => {
       try {
@@ -1752,7 +1725,7 @@ export default function App() {
       }
     }, 120000);
     return () => clearInterval(id);
-  }, [authUser?.id, cloudMergeOpen, cloudPushPaused, accountSwitchOpen, campaigns, dark]);
+  }, [authUser?.id, cloudMergeOpen, cloudUploadBlocked, accountSwitchOpen, campaigns, dark]);
 
   const handleAccountSwitchUseLocal = useCallback(() => {
     const user = authUser;
@@ -2387,6 +2360,8 @@ export default function App() {
           onCloudSyncNow={handleCloudSyncNow}
           onPullFromCloud={handlePullFromCloud}
           cloudPushPaused={cloudPushPaused}
+          cloudAutoSyncPaused={cloudAutoSyncPaused}
+          onCloudAutoSyncPausedChange={setCloudAutoSyncPausedPersisted}
           accountEmail={authUser?.email ?? null}
           onSignOut={handleSignOut}
         />
@@ -3035,6 +3010,14 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
         )}
       </SectionCard>
       
+      {filteredCampaigns.length === 0 && campaigns.length === 0 && (
+        <div className="rounded-2xl p-6 text-center bg-white/70 dark:bg-gray-900/70 border border-dashed border-gray-300 dark:border-gray-700">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            No campaigns yet. Create your first neighbourhood letters campaign to get started.
+          </p>
+        </div>
+      )}
+
       {filteredCampaigns.map(c => (
         <SectionCard key={c.id} title={c.name} icon={MapPin        } actions={
           <div className="flex flex-wrap gap-2 min-w-0">
@@ -5365,7 +5348,7 @@ function PdfViewer({ url, title }) {
   );
 }
 
-function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShowAbout, lastCloudSyncAt, cloudSyncStatus, cloudSyncMessage, onCloudSyncNow, onPullFromCloud, cloudPushPaused, accountEmail, onSignOut }) {
+function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShowAbout, lastCloudSyncAt, cloudSyncStatus, cloudSyncMessage, onCloudSyncNow, onPullFromCloud, cloudPushPaused, cloudAutoSyncPaused, onCloudAutoSyncPausedChange, accountEmail, onSignOut }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [apiKey, setApiKey] = useState(localStorage.getItem('google_places_api_key') || '');
   const [partnerName, setPartnerName] = useState(() => {
@@ -5421,6 +5404,8 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShow
         onSyncNow={onCloudSyncNow}
         onPullFromCloud={onPullFromCloud}
         cloudPushPaused={cloudPushPaused}
+        cloudAutoSyncPaused={cloudAutoSyncPaused}
+        onCloudAutoSyncPausedChange={onCloudAutoSyncPausedChange}
       />
 
       <div className="space-y-2">

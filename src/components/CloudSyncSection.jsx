@@ -28,6 +28,8 @@ export default function CloudSyncSection(props) {
         onSyncNow={props.onSyncNow}
         onPullFromCloud={props.onPullFromCloud}
         cloudPushPaused={props.cloudPushPaused}
+        cloudAutoSyncPaused={props.cloudAutoSyncPaused}
+        onCloudAutoSyncPausedChange={props.onCloudAutoSyncPausedChange}
       />
     );
   }

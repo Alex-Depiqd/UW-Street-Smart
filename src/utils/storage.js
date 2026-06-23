@@ -1,6 +1,7 @@
 // Storage utility for UW Street Smart PWA
 const STORAGE_KEYS = {
   CAMPAIGNS: 'uw_streetsmart_campaigns',
+  CLOUD_AUTO_SYNC_PAUSED: 'uw_ss_cloud_auto_sync_paused',
   DARK_MODE: 'uw_streetsmart_dark',
   PARTNER_NAME: 'partner_name',
   PARTNER_SCRIPTS: 'partner_scripts',
