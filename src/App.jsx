@@ -4814,7 +4814,7 @@ function DocumentsPanel({ onViewPdf, onViewImage }) {
       title: "UW Presenter",
       description: "Official UW presenter document for doorstep conversations",
       type: "link",
-      url: "https://assets.ctfassets.net/ihl5uj459rzx/6UbKQzbKP2sHmMz3fEn648/93f3b2fb3b047f63d0005181c62535dc/UW_Presenter.pdf",
+      url: "/documents/UW_Presenter.pdf",
       icon: FileText,
       category: "Tools",
       isDefault: true
