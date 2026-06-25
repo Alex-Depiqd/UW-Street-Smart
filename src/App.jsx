@@ -2340,7 +2340,7 @@ export default function App() {
         />
       </Drawer>
       <Drawer open={showPdfViewer} onClose={()=>setShowPdfViewer(false)} title={currentPdfTitle} size="full">
-        <PdfViewer url={currentPdfUrl} title={currentPdfTitle} />
+        <PdfViewer url={currentPdfUrl} title={currentPdfTitle} onClose={() => setShowPdfViewer(false)} />
       </Drawer>
       <Drawer open={showImageViewer} onClose={()=>setShowImageViewer(false)} title={currentImageTitle} size="large">
         <ImageViewer url={currentImageUrl} title={currentImageTitle} onClose={()=>setShowImageViewer(false)} />
@@ -5200,18 +5200,33 @@ function ImageViewer({ url, title, onClose }) {
   );
 }
 
-function PdfViewer({ url, title }) {
+function PdfViewer({ url, title, onClose }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [useFallback, setUseFallback] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     setIsLoading(true);
     setError(null);
     setUseFallback(false);
+    setIsFullScreen(false);
   }, [url]);
+
+  const handleClose = () => {
+    setIsFullScreen(false);
+    onClose?.();
+  };
 
   const handleLoad = () => {
     setIsLoading(false);
@@ -5247,14 +5262,32 @@ function PdfViewer({ url, title }) {
   };
 
   return (
-    <div className={`${isFullScreen ? 'fixed inset-0 z-50 bg-white dark:bg-gray-900' : 'h-full'} flex flex-col`}>
-      {/* Document Controls - Mobile Optimized */}
-      <div className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
-        <div className="text-xs sm:text-sm font-medium truncate flex-1 mr-2">{title}</div>
+    <div
+      className={`${
+        isFullScreen ? "fixed inset-0 z-[60] bg-white dark:bg-gray-900" : "h-full"
+      } flex flex-col`}
+      style={isFullScreen ? { paddingTop: "env(safe-area-inset-top)" } : undefined}
+    >
+      {/* Document Controls - sticky so Close stays visible above PDF on mobile */}
+      <div className="flex-shrink-0 sticky top-0 z-10 flex items-center justify-between gap-2 p-2 sm:p-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {onClose && (
+            <button
+              type="button"
+              onClick={handleClose}
+              className="shrink-0 px-3 py-2 rounded-xl bg-gray-200 dark:bg-gray-700 text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5"
+              style={{ touchAction: "manipulation" }}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Done</span>
+            </button>
+          )}
+          <div className="text-xs sm:text-sm font-medium truncate">{title}</div>
+        </div>
         <div className="flex gap-1 sm:gap-2 flex-shrink-0">
           {isPdf && (
             <>
-              <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl px-1 sm:px-2">
+              <div className="hidden sm:flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl px-1 sm:px-2">
                 <button
                   onClick={() => setZoomLevel(Math.max(50, zoomLevel - 25))}
                   className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -5271,13 +5304,16 @@ function PdfViewer({ url, title }) {
                   <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
                 </button>
               </div>
-              <button
-                onClick={() => setIsFullScreen(!isFullScreen)}
-                className="px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-blue-600 text-white text-xs sm:text-sm hover:bg-blue-700 transition-colors flex items-center gap-1 sm:gap-2"
-              >
-                {isFullScreen ? <X className="w-3 h-3 sm:w-4 sm:h-4" /> : <Maximize className="w-3 h-3 sm:w-4 sm:h-4" />}
-                <span className="hidden sm:inline">{isFullScreen ? 'Exit Full Screen' : 'Full Screen'}</span>
-              </button>
+              {!isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setIsFullScreen(!isFullScreen)}
+                  className="px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-blue-600 text-white text-xs sm:text-sm hover:bg-blue-700 transition-colors flex items-center gap-1 sm:gap-2"
+                >
+                  {isFullScreen ? <X className="w-3 h-3 sm:w-4 sm:h-4" /> : <Maximize className="w-3 h-3 sm:w-4 sm:h-4" />}
+                  <span>{isFullScreen ? "Exit Full Screen" : "Full Screen"}</span>
+                </button>
+              )}
             </>
           )}
           <a
@@ -5293,17 +5329,17 @@ function PdfViewer({ url, title }) {
             <a
               href={displayUrl}
               download
-              className="px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1 sm:gap-2"
+              className="hidden sm:flex px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors items-center gap-1 sm:gap-2"
             >
               <Download className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Download</span>
+              <span>Download</span>
             </a>
           )}
         </div>
       </div>
 
       {/* Document Viewer */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative min-h-0">
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
             <div className="text-center">
