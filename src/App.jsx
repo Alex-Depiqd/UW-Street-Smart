@@ -32,9 +32,51 @@ import {
   saveCloudPayload,
 } from "@/cloudSync";
 
+/** Call Ideal Postcodes via Netlify proxy; parse body even on HTTP error statuses. */
+async function fetchIdealPostcodesProxy(url) {
+  const response = await fetch(url);
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+  return { response, data };
+}
 
+/** Friendly copy for Ideal Postcodes / proxy failures (avoid raw HTTP status text). */
+function idealPostcodesUserMessage({ response, data, postcode, query }) {
+  const code = data?.code;
+  const status = response?.status;
 
+  if (code === 4040 || status === 404) {
+    if (postcode) {
+      return `We couldn't find postcode "${postcode}". Please check it's typed correctly and try again.`;
+    }
+    if (query) {
+      return `No addresses found for "${query}". Try adding a town name (e.g. "Cross Street, Elmswell") or check the spelling.`;
+    }
+    return "No addresses found. Please check your search and try again.";
+  }
 
+  if (code === 4010 || status === 401 || status === 403) {
+    return "Address lookup is temporarily unavailable. Please try again later or enter addresses manually.";
+  }
+
+  if (status === 502 || status === 503 || status === 504) {
+    return "Address lookup is temporarily unavailable. Please try again in a moment.";
+  }
+
+  if (data?.message && typeof data.message === "string" && !/^HTTP error/i.test(data.message)) {
+    return data.message;
+  }
+
+  if (!response?.ok) {
+    return "Something went wrong looking up addresses. Please try again.";
+  }
+
+  return null;
+}
 
 // --- Mock Seed Data ---
 const seedScripts = {
@@ -7942,29 +7984,21 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
       const encodedPostcode = encodeURIComponent(postcode.trim());
       // Use Netlify function as proxy to avoid CORS issues
       const url = `/.netlify/functions/postcode-lookup?postcode=${encodedPostcode}`;
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.code === 2000 && data.result && data.result.length > 0) {
+      const { response, data } = await fetchIdealPostcodesProxy(url);
+      const friendlyError = idealPostcodesUserMessage({ response, data, postcode: postcode.trim() });
+
+      if (data?.code === 2000 && data.result && data.result.length > 0) {
         setResultsTruncated({ truncated: false, total: 0, shown: 0 });
         setIdealAddresses(data.result);
         setSelectedIdealAddresses([]);
         setStep('ideal-select');
-      } else if (data.code === 4040) {
-        setIdealPostcodeError(`No addresses found for postcode "${postcode}". Please check the postcode and try again.`);
-      } else if (data.code === 4010) {
-        setIdealPostcodeError('Invalid API key. Please check your Ideal Postcodes API key in config.js');
+      } else if (friendlyError) {
+        setIdealPostcodeError(friendlyError);
       } else {
-        setIdealPostcodeError(data.message || 'An error occurred while looking up addresses.');
+        setIdealPostcodeError('An error occurred while looking up addresses.');
       }
     } catch (error) {
-      setIdealPostcodeError(`Network error: ${error.message}. Please check your internet connection.`);
+      setIdealPostcodeError('Could not reach address lookup. Please check your internet connection and try again.');
     } finally {
       setIsLoadingIdealAddresses(false);
     }
@@ -7991,27 +8025,29 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
       const encodedQuery = encodeURIComponent(streetName.trim());
       // Use Netlify function as proxy to avoid CORS issues
       const url = `/.netlify/functions/postcode-lookup?query=${encodedQuery}`;
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
+      const { response, data } = await fetchIdealPostcodesProxy(url);
+      const friendlyError = idealPostcodesUserMessage({
+        response,
+        data,
+        query: streetName.trim(),
+      });
+
       // Debug logging
       console.log('Address search response:', data);
-      console.log('Result structure:', data.result);
-      console.log('Result type:', typeof data.result, Array.isArray(data.result));
-      if (data.result && typeof data.result === 'object') {
+      console.log('Result structure:', data?.result);
+      console.log('Result type:', typeof data?.result, Array.isArray(data?.result));
+      if (data?.result && typeof data.result === 'object') {
         console.log('Result keys:', Object.keys(data.result));
         console.log('Result.total:', data.result.total);
         console.log('Result.length:', data.result.length);
       }
       
       // Check for error response
-      if (data.error) {
+      if (friendlyError && !(data?.code === 2000)) {
+        setIdealPostcodeError(friendlyError);
+        return;
+      }
+      if (data?.error && !(data?.code === 2000)) {
         setIdealPostcodeError(data.error || 'An error occurred while searching for addresses.');
         return;
       }
@@ -8148,18 +8184,18 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
         setStep('ideal-select');
       } else if (data.code === 2000) {
         setIdealPostcodeError(`No addresses found for "${streetName}". Try adding a town name (e.g., "Cross Street, Elmswell") or check the spelling.`);
+      } else if (friendlyError) {
+        setIdealPostcodeError(friendlyError);
       } else if (data.code === 4040) {
         setIdealPostcodeError(`No addresses found for "${streetName}". Try adding a town name (e.g., "Cross Street, Elmswell") or check the spelling.`);
-      } else if (data.code === 4010) {
-        setIdealPostcodeError('Invalid API key. Please check your Ideal Postcodes API key in config.js');
       } else {
         // Show the actual error for debugging
-        const errorMsg = data.message || data.error || `Unexpected response. Code: ${data.code || 'unknown'}`;
+        const errorMsg = data?.message || data?.error || `Unexpected response. Code: ${data?.code || 'unknown'}`;
         setIdealPostcodeError(errorMsg);
         console.error('Address search error:', data);
       }
     } catch (error) {
-      setIdealPostcodeError(`Network error: ${error.message}. Please check your internet connection.`);
+      setIdealPostcodeError('Could not reach address lookup. Please check your internet connection and try again.');
     } finally {
       setIsLoadingIdealAddresses(false);
     }
@@ -9017,16 +9053,10 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
       const encodedPostcode = encodeURIComponent(postcode.trim());
       // Use Netlify function as proxy to avoid CORS issues
       const url = `/.netlify/functions/postcode-lookup?postcode=${encodedPostcode}`;
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.code === 2000 && data.result && data.result.length > 0) {
+      const { response, data } = await fetchIdealPostcodesProxy(url);
+      const friendlyError = idealPostcodesUserMessage({ response, data, postcode: postcode.trim() });
+
+      if (data?.code === 2000 && data.result && data.result.length > 0) {
         // Filter addresses to match current street if street name exists
         let filteredAddresses = data.result;
         if (street?.name) {
@@ -9037,15 +9067,13 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
         
         setIdealAddresses(filteredAddresses);
         setSelectedIdealAddresses([]);
-      } else if (data.code === 4040) {
-        setIdealPostcodeError(`No addresses found for postcode "${postcode}". Please check the postcode and try again.`);
-      } else if (data.code === 4010) {
-        setIdealPostcodeError('Invalid API key. Please check your Ideal Postcodes API key in config.js');
+      } else if (friendlyError) {
+        setIdealPostcodeError(friendlyError);
       } else {
-        setIdealPostcodeError(data.message || 'An error occurred while looking up addresses.');
+        setIdealPostcodeError('An error occurred while looking up addresses.');
       }
     } catch (error) {
-      setIdealPostcodeError(`Network error: ${error.message}. Please check your internet connection.`);
+      setIdealPostcodeError('Could not reach address lookup. Please check your internet connection and try again.');
     } finally {
       setIsLoadingIdealAddresses(false);
     }
