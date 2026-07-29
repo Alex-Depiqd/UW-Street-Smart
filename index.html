@@ -81,33 +81,32 @@
       });
     </script>
     
-    <!-- Auto-restore viewport after input -->
+    <!-- Reset iOS zoom after leaving a text field (pinch-out workaround) -->
     <script>
-      // Function to restore viewport to normal
+      var VIEWPORT_NORMAL =
+        'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover';
+      var VIEWPORT_RESET =
+        'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+
       function restoreViewport() {
-        const viewport = document.querySelector('meta[name="viewport"]');
-        if (viewport) {
-          viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover');
-        }
+        var viewport = document.querySelector('meta[name="viewport"]');
+        if (!viewport) return;
+        // Briefly lock scale, then restore — forces iOS to drop focus zoom
+        viewport.setAttribute('content', VIEWPORT_RESET);
+        setTimeout(function () {
+          viewport.setAttribute('content', VIEWPORT_NORMAL);
+        }, 50);
       }
-      
-      // Restore viewport when input loses focus
-      document.addEventListener('blur', function(e) {
-        if (e.target.matches('input, textarea, select')) {
-          // Small delay to ensure the input has finished
+
+      document.addEventListener('blur', function (e) {
+        if (e.target && e.target.matches && e.target.matches('input, textarea, select')) {
           setTimeout(restoreViewport, 100);
         }
       }, true);
-      
-      // Also restore on page visibility change (when user switches back to app)
-      document.addEventListener('visibilitychange', function() {
-        if (!document.hidden) {
-          restoreViewport();
-        }
+
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) restoreViewport();
       });
-      
-      // Restore on window focus (when user returns to the tab)
-      window.addEventListener('focus', restoreViewport);
     </script>
     
     <!-- Service Worker Registration (minimal SW for installability only) -->

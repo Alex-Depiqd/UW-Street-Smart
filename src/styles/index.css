@@ -61,12 +61,30 @@
   display: none;  /* Safari and Chrome */
 }
 
-/* Allow natural input zoom but ensure proper styling */
-input, textarea, select {
-  font-size: 16px; /* Good readable size */
+/* Form controls: keep 16px so iOS/PWA does not auto-zoom on focus.
+   Tailwind text-sm/text-xs on inputs must not win on mobile. */
+input,
+textarea,
+select {
+  font-size: 16px;
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
+}
+
+@media (max-width: 1023px) {
+  input,
+  textarea,
+  select,
+  input.text-sm,
+  textarea.text-sm,
+  select.text-sm,
+  input.text-xs,
+  textarea.text-xs,
+  select.text-xs,
+  .form-input {
+    font-size: 16px !important;
+  }
 }
 
 /* Photo viewer specific touch improvements */
@@ -472,7 +490,7 @@ body {
   border-radius: var(--radius-lg);
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: 1rem; /* 16px — avoids iOS focus zoom */
   transition: border-color 0.2s ease;
 }
 
