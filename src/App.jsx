@@ -82,7 +82,7 @@ const FACEBOOK_REMINDER_LAST_SHOWN_KEY = 'uw_ss_facebook_reminder_last_shown';
 const FACEBOOK_REMINDER_DISMISSED_KEY = 'uw_ss_facebook_reminder_dismissed';
 
 /** Outcome colours deliberately avoid red/amber/green so progress traffic-light colours stay distinct. */
-const OUTCOME_SURFACE = 'bg-white dark:bg-gray-100';
+const OUTCOME_SURFACE = 'bg-white dark:bg-gray-200';
 
 function createOutcomeStyle({ abbr, label, statLabel, helpText, border, text, labelText, hoverBorder }) {
   return {
@@ -104,7 +104,7 @@ function createOutcomeStyle({ abbr, label, statLabel, helpText, border, text, la
   };
 }
 
-/** Distinct outcome palette (avoids progress red/amber/green): CS blue, AB indigo, I teal, NN pink, UW sky, NI zinc, NA slate, NC orange. */
+/** Distinct outcome palette (avoids progress red/amber/green): CS blue, AB violet, I teal, NN pink, UW sky, NI zinc, NA slate, NC orange. */
 
 const PROPERTY_OUTCOME_STYLES = {
   customer_signed: createOutcomeStyle({
@@ -112,20 +112,20 @@ const PROPERTY_OUTCOME_STYLES = {
     label: 'Customer Signed',
     statLabel: 'Customers Signed',
     helpText: 'Successfully signed up with UW',
-    border: 'border-blue-700',
+    border: 'border-blue-600',
     text: 'text-blue-900',
     labelText: 'text-blue-800',
-    hoverBorder: 'hover:border-blue-500 dark:hover:border-blue-700',
+    hoverBorder: 'hover:border-blue-400 dark:hover:border-blue-600',
   }),
   appointment_booked: createOutcomeStyle({
     abbr: 'AB',
     label: 'Appointment Booked',
     statLabel: 'Appointment Booked',
     helpText: 'Meeting scheduled for follow-up',
-    border: 'border-indigo-700',
-    text: 'text-indigo-900',
-    labelText: 'text-indigo-800',
-    hoverBorder: 'hover:border-indigo-500 dark:hover:border-indigo-700',
+    border: 'border-violet-700',
+    text: 'text-violet-900',
+    labelText: 'text-violet-800',
+    hoverBorder: 'hover:border-violet-500 dark:hover:border-violet-700',
   }),
   interested: createOutcomeStyle({
     abbr: 'I',
