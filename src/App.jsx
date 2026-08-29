@@ -78,6 +78,265 @@ function idealPostcodesUserMessage({ response, data, postcode, query }) {
   return null;
 }
 
+const FACEBOOK_REMINDER_LAST_SHOWN_KEY = 'uw_ss_facebook_reminder_last_shown';
+const FACEBOOK_REMINDER_DISMISSED_KEY = 'uw_ss_facebook_reminder_dismissed';
+
+/** Outcome colours deliberately avoid red/amber/green so progress traffic-light colours stay distinct. */
+const PROPERTY_OUTCOME_STYLES = {
+  customer_signed: {
+    abbr: 'CS',
+    label: 'Customer Signed',
+    statLabel: 'Customers Signed',
+    helpText: 'Successfully signed up with UW',
+    chip: 'border-2 border-blue-600 bg-white dark:bg-gray-900 text-blue-800 dark:text-blue-200',
+    legend: 'w-4 h-4 rounded border-2 border-blue-600 bg-white flex items-center justify-center text-[8px] font-bold text-blue-700 cursor-help',
+    panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-blue-600',
+    panelValue: 'text-base sm:text-lg font-semibold text-blue-800 dark:text-blue-200',
+    panelLabel: 'text-xs sm:text-sm text-blue-700 dark:text-blue-300',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-blue-600 bg-white dark:bg-gray-900 text-blue-800 dark:text-blue-200',
+    buttonActive: 'border-2 border-blue-600 bg-white dark:bg-gray-900 text-blue-800 dark:text-blue-200',
+    buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-blue-400 dark:hover:border-blue-600',
+    helpPanel: 'p-3 border-2 border-blue-600 bg-white dark:bg-gray-900 rounded-xl',
+    helpTitle: 'font-medium text-blue-800 dark:text-blue-200',
+    helpBody: 'text-blue-700 dark:text-blue-300',
+  },
+  appointment_booked: {
+    abbr: 'AB',
+    label: 'Appointment Booked',
+    statLabel: 'Appointment Booked',
+    helpText: 'Meeting scheduled for follow-up',
+    chip: 'border-2 border-indigo-600 bg-white dark:bg-gray-900 text-indigo-800 dark:text-indigo-200',
+    legend: 'w-4 h-4 rounded border-2 border-indigo-600 bg-white flex items-center justify-center text-[8px] font-bold text-indigo-700 cursor-help',
+    panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-indigo-600',
+    panelValue: 'text-base sm:text-lg font-semibold text-indigo-800 dark:text-indigo-200',
+    panelLabel: 'text-xs sm:text-sm text-indigo-700 dark:text-indigo-300',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-indigo-600 bg-white dark:bg-gray-900 text-indigo-800 dark:text-indigo-200',
+    buttonActive: 'border-2 border-indigo-600 bg-white dark:bg-gray-900 text-indigo-800 dark:text-indigo-200',
+    buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-indigo-400 dark:hover:border-indigo-600',
+    helpPanel: 'p-3 border-2 border-indigo-600 bg-white dark:bg-gray-900 rounded-xl',
+    helpTitle: 'font-medium text-indigo-800 dark:text-indigo-200',
+    helpBody: 'text-indigo-700 dark:text-indigo-300',
+  },
+  interested: {
+    abbr: 'I',
+    label: 'Interested',
+    statLabel: 'Interested',
+    helpText: 'Wants to learn more about UW',
+    chip: 'border-2 border-cyan-600 bg-white dark:bg-gray-900 text-cyan-800 dark:text-cyan-200',
+    legend: 'w-4 h-4 rounded border-2 border-cyan-600 bg-white flex items-center justify-center text-[8px] font-bold text-cyan-700 cursor-help',
+    panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-cyan-600',
+    panelValue: 'text-base sm:text-lg font-semibold text-cyan-800 dark:text-cyan-200',
+    panelLabel: 'text-xs sm:text-sm text-cyan-700 dark:text-cyan-300',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-cyan-600 bg-white dark:bg-gray-900 text-cyan-800 dark:text-cyan-200',
+    buttonActive: 'border-2 border-cyan-600 bg-white dark:bg-gray-900 text-cyan-800 dark:text-cyan-200',
+    buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-cyan-400 dark:hover:border-cyan-600',
+    helpPanel: 'p-3 border-2 border-cyan-600 bg-white dark:bg-gray-900 rounded-xl',
+    helpTitle: 'font-medium text-cyan-800 dark:text-cyan-200',
+    helpBody: 'text-cyan-700 dark:text-cyan-300',
+  },
+  no_for_now: {
+    abbr: 'NN',
+    label: 'No for Now',
+    statLabel: 'No for Now',
+    helpText: 'Not interested at this time',
+    chip: 'border-2 border-fuchsia-600 bg-white dark:bg-gray-900 text-fuchsia-800 dark:text-fuchsia-200',
+    legend: 'w-4 h-4 rounded border-2 border-fuchsia-600 bg-white flex items-center justify-center text-[8px] font-bold text-fuchsia-700 cursor-help',
+    panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-fuchsia-600',
+    panelValue: 'text-base sm:text-lg font-semibold text-fuchsia-800 dark:text-fuchsia-200',
+    panelLabel: 'text-xs sm:text-sm text-fuchsia-700 dark:text-fuchsia-300',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-fuchsia-600 bg-white dark:bg-gray-900 text-fuchsia-800 dark:text-fuchsia-200',
+    buttonActive: 'border-2 border-fuchsia-600 bg-white dark:bg-gray-900 text-fuchsia-800 dark:text-fuchsia-200',
+    buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-fuchsia-400 dark:hover:border-fuchsia-600',
+    helpPanel: 'p-3 border-2 border-fuchsia-600 bg-white dark:bg-gray-900 rounded-xl',
+    helpTitle: 'font-medium text-fuchsia-800 dark:text-fuchsia-200',
+    helpBody: 'text-fuchsia-700 dark:text-fuchsia-300',
+  },
+  already_uw: {
+    abbr: 'UW',
+    label: 'Already with UW',
+    statLabel: 'Already with UW',
+    helpText: 'Customer is already a UW member',
+    chip: 'border-2 border-sky-500 bg-white dark:bg-gray-900 text-sky-800 dark:text-sky-200',
+    legend: 'w-4 h-4 rounded border-2 border-sky-500 bg-white flex items-center justify-center text-[8px] font-bold text-sky-700 cursor-help',
+    panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-sky-500',
+    panelValue: 'text-base sm:text-lg font-semibold text-sky-800 dark:text-sky-200',
+    panelLabel: 'text-xs sm:text-sm text-sky-700 dark:text-sky-300',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-sky-500 bg-white dark:bg-gray-900 text-sky-800 dark:text-sky-200',
+    buttonActive: 'border-2 border-sky-500 bg-white dark:bg-gray-900 text-sky-800 dark:text-sky-200',
+    buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-sky-400 dark:hover:border-sky-500',
+    helpPanel: 'p-3 border-2 border-sky-500 bg-white dark:bg-gray-900 rounded-xl',
+    helpTitle: 'font-medium text-sky-800 dark:text-sky-200',
+    helpBody: 'text-sky-700 dark:text-sky-300',
+  },
+  not_interested: {
+    abbr: 'NI',
+    label: 'Not Interested',
+    statLabel: 'Not Interested',
+    helpText: 'Definitely not interested',
+    chip: 'border-2 border-stone-600 bg-white dark:bg-gray-900 text-stone-800 dark:text-stone-200',
+    legend: 'w-4 h-4 rounded border-2 border-stone-600 bg-white flex items-center justify-center text-[8px] font-bold text-stone-700 cursor-help',
+    panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-stone-600',
+    panelValue: 'text-base sm:text-lg font-semibold text-stone-800 dark:text-stone-200',
+    panelLabel: 'text-xs sm:text-sm text-stone-700 dark:text-stone-300',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-stone-600 bg-white dark:bg-gray-900 text-stone-800 dark:text-stone-200',
+    buttonActive: 'border-2 border-stone-600 bg-white dark:bg-gray-900 text-stone-800 dark:text-stone-200',
+    buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-stone-400 dark:hover:border-stone-600',
+    helpPanel: 'p-3 border-2 border-stone-600 bg-white dark:bg-gray-900 rounded-xl',
+    helpTitle: 'font-medium text-stone-800 dark:text-stone-200',
+    helpBody: 'text-stone-700 dark:text-stone-300',
+  },
+  no_answer: {
+    abbr: 'NA',
+    label: 'No Answer',
+    statLabel: 'No Answer',
+    helpText: 'No answer at the door',
+    chip: 'border-2 border-slate-500 bg-white dark:bg-gray-900 text-slate-800 dark:text-slate-200',
+    legend: 'w-4 h-4 rounded border-2 border-slate-500 bg-white flex items-center justify-center text-[8px] font-bold text-slate-700 cursor-help',
+    panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-slate-500',
+    panelValue: 'text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-200',
+    panelLabel: 'text-xs sm:text-sm text-slate-700 dark:text-slate-300',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-slate-500 bg-white dark:bg-gray-900 text-slate-800 dark:text-slate-200',
+    buttonActive: 'border-2 border-slate-500 bg-white dark:bg-gray-900 text-slate-800 dark:text-slate-200',
+    buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-slate-400 dark:hover:border-slate-500',
+    helpPanel: 'p-3 border-2 border-slate-500 bg-white dark:bg-gray-900 rounded-xl',
+    helpTitle: 'font-medium text-slate-800 dark:text-slate-200',
+    helpBody: 'text-slate-700 dark:text-slate-300',
+  },
+  no_cold_callers: {
+    abbr: 'NC',
+    label: 'No Cold Callers',
+    statLabel: 'No Cold Callers',
+    helpText: 'Resident does not want cold callers',
+    chip: 'border-2 border-purple-500 bg-white dark:bg-gray-900 text-purple-800 dark:text-purple-200',
+    legend: 'w-4 h-4 rounded border-2 border-purple-500 bg-white flex items-center justify-center text-[8px] font-bold text-purple-700 cursor-help',
+    panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-purple-500',
+    panelValue: 'text-base sm:text-lg font-semibold text-purple-800 dark:text-purple-200',
+    panelLabel: 'text-xs sm:text-sm text-purple-700 dark:text-purple-300',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-purple-500 bg-white dark:bg-gray-900 text-purple-800 dark:text-purple-200',
+    buttonActive: 'border-2 border-purple-500 bg-white dark:bg-gray-900 text-purple-800 dark:text-purple-200',
+    buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-purple-400 dark:hover:border-purple-500',
+    helpPanel: 'p-3 border-2 border-purple-500 bg-white dark:bg-gray-900 rounded-xl',
+    helpTitle: 'font-medium text-purple-800 dark:text-purple-200',
+    helpBody: 'text-purple-700 dark:text-purple-300',
+  },
+};
+
+const PROPERTY_PROGRESS_STYLES = {
+  dropped: {
+    abbr: 'D',
+    label: 'Dropped',
+    helpText: 'Letter delivered through letterbox',
+    chip: 'border border-red-400 bg-red-50/60 dark:bg-red-900/10 text-red-700 dark:text-red-300',
+    legend: 'w-4 h-4 rounded border border-red-400 bg-red-50/60 flex items-center justify-center text-[8px] font-bold text-red-700 cursor-help',
+    icon: 'text-red-600 dark:text-red-400',
+    checkBadge: 'inline-flex items-center justify-center w-5 h-5 rounded-full border border-red-400 bg-red-50/60 dark:bg-red-900/10 text-red-700 dark:text-red-300 text-xs',
+    helpPanel: 'p-3 border border-red-400 bg-red-50/60 dark:bg-red-900/10 rounded-xl',
+    helpTitle: 'font-medium text-red-800 dark:text-red-200',
+    helpBody: 'text-red-700 dark:text-red-300',
+  },
+  knocked: {
+    abbr: 'K',
+    label: 'Knocked',
+    helpText: 'Door knocked, no answer or brief interaction',
+    chip: 'border border-amber-400 bg-amber-50/60 dark:bg-amber-900/10 text-amber-700 dark:text-amber-300',
+    legend: 'w-4 h-4 rounded border border-amber-400 bg-amber-50/60 flex items-center justify-center text-[8px] font-bold text-amber-700 cursor-help',
+    icon: 'text-amber-600 dark:text-amber-400',
+    checkBadge: 'inline-flex items-center justify-center w-5 h-5 rounded-full border border-amber-400 bg-amber-50/60 dark:bg-amber-900/10 text-amber-700 dark:text-amber-300 text-xs',
+    helpPanel: 'p-3 border border-amber-400 bg-amber-50/60 dark:bg-amber-900/10 rounded-xl',
+    helpTitle: 'font-medium text-amber-800 dark:text-amber-200',
+    helpBody: 'text-amber-700 dark:text-amber-300',
+  },
+  spoke: {
+    abbr: 'S',
+    label: 'Spoke',
+    helpText: 'Full conversation had with resident',
+    chip: 'border border-green-500 bg-green-50/60 dark:bg-green-900/10 text-green-700 dark:text-green-300',
+    legend: 'w-4 h-4 rounded border border-green-500 bg-green-50/60 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help',
+    icon: 'text-green-600 dark:text-green-400',
+    checkBadge: 'inline-flex items-center justify-center w-5 h-5 rounded-full border border-green-500 bg-green-50/60 dark:bg-green-900/10 text-green-700 dark:text-green-300 text-xs',
+    helpPanel: 'p-3 border border-green-500 bg-green-50/60 dark:bg-green-900/10 rounded-xl',
+    helpTitle: 'font-medium text-green-800 dark:text-green-200',
+    helpBody: 'text-green-700 dark:text-green-300',
+  },
+};
+
+const OUTCOME_STAT_KEYS = [
+  'customer_signed',
+  'appointment_booked',
+  'interested',
+  'no_for_now',
+  'already_uw',
+  'not_interested',
+  'no_answer',
+  'no_cold_callers',
+];
+
+const PROPERTY_OUTCOME_LEGEND = Object.values(PROPERTY_OUTCOME_STYLES);
+const PROPERTY_PROGRESS_LEGEND = Object.values(PROPERTY_PROGRESS_STYLES);
+
+function getPropertyChipClassName(property) {
+  const defaultStyle = 'border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-600';
+
+  if (property.result && property.result !== 'none') {
+    return PROPERTY_OUTCOME_STYLES[property.result]?.chip ?? defaultStyle;
+  }
+  if (property.spoke) return PROPERTY_PROGRESS_STYLES.spoke.chip;
+  if (property.knocked) return PROPERTY_PROGRESS_STYLES.knocked.chip;
+  if (property.dropped) return PROPERTY_PROGRESS_STYLES.dropped.chip;
+  return defaultStyle;
+}
+
+function OutcomeStatCard({ outcomeKey, count }) {
+  const style = PROPERTY_OUTCOME_STYLES[outcomeKey];
+  if (!style) return null;
+
+  return (
+    <div className={style.panel}>
+      <div className={style.panelValue}>{count || 0}</div>
+      <div className={style.panelLabel}>{style.statLabel}</div>
+    </div>
+  );
+}
+
+function OutcomeResultBadge({ result }) {
+  if (!result || result === 'none') {
+    return <span className="text-gray-500 dark:text-gray-400">—</span>;
+  }
+
+  const style = PROPERTY_OUTCOME_STYLES[result];
+  if (style?.badge) {
+    return (
+      <span className={style.badge}>
+        {result.replace(/_/g, ' ')}
+      </span>
+    );
+  }
+
+  return <span className="text-gray-600 dark:text-gray-400">{result.replace(/_/g, ' ')}</span>;
+}
+
+function ProgressCheckBadge({ active, progressKey }) {
+  if (!active) {
+    return <span className="text-gray-400 dark:text-gray-600">—</span>;
+  }
+
+  const style = PROPERTY_PROGRESS_STYLES[progressKey];
+  return <span className={style.checkBadge}>✓</span>;
+}
+
+function PropertyStatusLegendSwatch({ entry, onShowTooltip, onHoverTooltip, useHover = true }) {
+  return (
+    <span
+      className={entry.legend}
+      onMouseEnter={useHover ? () => onHoverTooltip(entry.label) : undefined}
+      onMouseLeave={useHover ? () => onHoverTooltip(null) : undefined}
+      onClick={() => onShowTooltip(entry.label)}
+    >
+      {entry.abbr}
+    </span>
+  );
+}
+
 // --- Mock Seed Data ---
 const seedScripts = {
   opener: [
@@ -251,24 +510,6 @@ export default function App() {
     })();
   }, []);
 
-  // Facebook group reminder - show every 3 days
-  useEffect(() => {
-    const FACEBOOK_REMINDER_KEY = 'uw_ss_facebook_reminder_last_shown';
-    const now = Date.now();
-    const lastShown = localStorage.getItem(FACEBOOK_REMINDER_KEY);
-    const threeDays = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
-    
-    if (!lastShown || (now - parseInt(lastShown)) > threeDays) {
-      // Show reminder after a short delay
-      const timer = setTimeout(() => {
-        setShowFacebookReminder(true);
-        localStorage.setItem(FACEBOOK_REMINDER_KEY, now.toString());
-      }, 2000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
   // Version update check - show when new version is available
   useEffect(() => {
     const VERSION_KEY = 'uw_ss_app_version';
@@ -307,6 +548,33 @@ export default function App() {
   
   // Facebook group reminder state
   const [showFacebookReminder, setShowFacebookReminder] = useState(false);
+
+  // Facebook group reminder - show every 7 days unless permanently dismissed
+  useEffect(() => {
+    if (localStorage.getItem(FACEBOOK_REMINDER_DISMISSED_KEY)) return;
+
+    const now = Date.now();
+    const lastShown = localStorage.getItem(FACEBOOK_REMINDER_LAST_SHOWN_KEY);
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+
+    if (!lastShown || (now - parseInt(lastShown, 10)) > sevenDays) {
+      const timer = setTimeout(() => {
+        setShowFacebookReminder(true);
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const dismissFacebookReminderLater = useCallback(() => {
+    localStorage.setItem(FACEBOOK_REMINDER_LAST_SHOWN_KEY, Date.now().toString());
+    setShowFacebookReminder(false);
+  }, []);
+
+  const dismissFacebookReminderForever = useCallback(() => {
+    localStorage.setItem(FACEBOOK_REMINDER_DISMISSED_KEY, '1');
+    setShowFacebookReminder(false);
+  }, []);
   
   // Version update notification state
   const [showVersionUpdate, setShowVersionUpdate] = useState(false);
@@ -2174,16 +2442,16 @@ export default function App() {
               {view === "dashboard" && activeCampaign && (
                 <div className="flex items-center gap-2 text-xs">
                   <div className="flex items-center gap-1">
-                    <UploadCloud className="w-3 h-3 text-green-600" />
-                    <span className="text-green-600 font-medium">{stats.letters}</span>
+                    <UploadCloud className={`w-3 h-3 ${PROPERTY_PROGRESS_STYLES.dropped.icon}`} />
+                    <span className={`font-medium ${PROPERTY_PROGRESS_STYLES.dropped.icon}`}>{stats.letters}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Check className="w-3 h-3 text-indigo-600" />
-                    <span className="text-indigo-600 font-medium">{stats.knocked}</span>
+                    <Check className={`w-3 h-3 ${PROPERTY_PROGRESS_STYLES.knocked.icon}`} />
+                    <span className={`font-medium ${PROPERTY_PROGRESS_STYLES.knocked.icon}`}>{stats.knocked}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <MessageSquare className="w-3 h-3 text-blue-600" />
-                    <span className="text-blue-600 font-medium">{stats.convos}</span>
+                    <MessageSquare className={`w-3 h-3 ${PROPERTY_PROGRESS_STYLES.spoke.icon}`} />
+                    <span className={`font-medium ${PROPERTY_PROGRESS_STYLES.spoke.icon}`}>{stats.convos}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <CheckCircle className="w-3 h-3 text-primary-600" />
@@ -2663,21 +2931,32 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex gap-3">
-              <a
-                href="https://www.facebook.com/groups/24642395235425303/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm font-medium text-center"
-              >
-                Join Facebook Group
-              </a>
+            <div className="space-y-2">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <a
+                  href="https://www.facebook.com/groups/24642395235425303/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm font-medium text-center"
+                >
+                  Join Facebook Group
+                </a>
+                <button
+                  onClick={dismissFacebookReminderLater}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm"
+                >
+                  Maybe Later
+                </button>
+              </div>
               <button
-                onClick={() => setShowFacebookReminder(false)}
-                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm"
+                onClick={dismissFacebookReminderForever}
+                className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
               >
-                Maybe Later
+                Got it. Don&apos;t show this again
               </button>
+              <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+                You can always find the group link in Settings.
+              </p>
             </div>
           </div>
         </div>
@@ -2775,11 +3054,11 @@ function NavButton({ icon, label, active, onClick }) {
   );
 }
 
-function Stat({ icon: Icon, label, value, sub }) {
+function Stat({ icon: Icon, label, value, sub, accentClass = 'text-primary-600' }) {
   return (
     <div className="rounded-2xl p-3 sm:p-4 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 shadow-soft flex items-center gap-2 sm:gap-3 min-w-0">
       <div className="p-1.5 sm:p-2 rounded-xl bg-gray-100 dark:bg-gray-800 flex-shrink-0">
-        <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
+        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${accentClass}`} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-xl sm:text-2xl font-semibold leading-none">{value}</div>
@@ -2869,9 +3148,9 @@ function Dashboard({ stats, activeCampaign, onGoStreets, onGoToCampaigns, onCrea
       >
         {hasData ? (
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
-            <Stat icon={UploadCloud} label="Letters dropped" value={stats.letters} />
-            <Stat icon={Check} label="Knocked" value={stats.knocked} />
-            <Stat icon={MessageSquare} label="Conversations" value={stats.convos} />
+            <Stat icon={UploadCloud} label="Letters dropped" value={stats.letters} accentClass={PROPERTY_PROGRESS_STYLES.dropped.icon} />
+            <Stat icon={Check} label="Knocked" value={stats.knocked} accentClass={PROPERTY_PROGRESS_STYLES.knocked.icon} />
+            <Stat icon={MessageSquare} label="Conversations" value={stats.convos} accentClass={PROPERTY_PROGRESS_STYLES.spoke.icon} />
             <Stat icon={CheckCircle} label="Successes" value={stats.interested} />
             <Stat icon={CalendarClock} label="Follow Ups Due" value={stats.followups} />
           </div>
@@ -2888,39 +3167,13 @@ function Dashboard({ stats, activeCampaign, onGoStreets, onGoToCampaigns, onCrea
       {hasData && stats.outcomes && (
         <SectionCard title="Conversation Outcomes" icon={MessageSquare}>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-            <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
-              <div className="text-base sm:text-lg font-semibold text-green-800 dark:text-green-200">{stats.outcomes.customer_signed}</div>
-              <div className="text-xs sm:text-sm text-green-700 dark:text-green-300">Customers Signed</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500 dark:border-emerald-500">
-              <div className="text-base sm:text-lg font-semibold text-emerald-800 dark:text-emerald-200">{stats.outcomes.appointment_booked}</div>
-              <div className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300">Appointment Booked</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
-              <div className="text-base sm:text-lg font-semibold text-green-800 dark:text-green-200">{stats.outcomes.interested}</div>
-              <div className="text-xs sm:text-sm text-green-700 dark:text-green-300">Interested</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-500 dark:border-amber-500">
-              <div className="text-base sm:text-lg font-semibold text-amber-800 dark:text-amber-200">{stats.outcomes.no_for_now}</div>
-              <div className="text-xs sm:text-sm text-amber-700 dark:text-amber-300">No for Now</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-sky-50 dark:bg-sky-900/20 border-2 border-sky-500 dark:border-sky-500">
-              <div className="text-base sm:text-lg font-semibold text-sky-800 dark:text-sky-200">{stats.outcomes.already_uw}</div>
-              <div className="text-xs sm:text-sm text-sky-700 dark:text-sky-300">Already with UW</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-500">
-              <div className="text-base sm:text-lg font-semibold text-red-800 dark:text-red-200">{stats.outcomes.not_interested}</div>
-              <div className="text-xs sm:text-sm text-red-700 dark:text-red-300">Not Interested</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-slate-50 dark:bg-slate-900/20 border-2 border-slate-500 dark:border-slate-500">
-              <div className="text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-200">{stats.outcomes.no_answer || 0}</div>
-              <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">No Answer</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-500 dark:border-purple-500">
-              <div className="text-base sm:text-lg font-semibold text-purple-800 dark:text-purple-200">{stats.outcomes.no_cold_callers || 0}</div>
-              <div className="text-xs sm:text-sm text-purple-700 dark:text-purple-300">No Cold Callers</div>
-            </div>
-
+            {OUTCOME_STAT_KEYS.map((outcomeKey) => (
+              <OutcomeStatCard
+                key={outcomeKey}
+                outcomeKey={outcomeKey}
+                count={stats.outcomes[outcomeKey]}
+              />
+            ))}
           </div>
         </SectionCard>
       )}
@@ -3206,99 +3459,27 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
             <div className="flex items-center gap-2">
               <span className="font-medium">🎯 Outcomes:</span>
               <div className="flex items-center gap-1">
-                <span 
-                  className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Customer Signed')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Customer Signed')}
-                >
-                  CS
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Appointment Booked')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Appointment Booked')}
-                >
-                  AB
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Interested')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Interested')}
-                >
-                  I
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('No for Now')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('No for Now')}
-                >
-                  NN
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Already with UW')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Already with UW')}
-                >
-                  UW
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Not Interested')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Not Interested')}
-                >
-                  NI
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-slate-500 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('No Answer')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => setActiveTooltip(activeTooltip === 'No Answer' ? null : 'No Answer')}
-                >
-                  NA
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('No Cold Callers')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('No Cold Callers')}
-                >
-                  NC
-                </span>
+                {PROPERTY_OUTCOME_LEGEND.map((entry) => (
+                  <PropertyStatusLegendSwatch
+                    key={entry.abbr}
+                    entry={entry}
+                    onShowTooltip={showTooltip}
+                    onHoverTooltip={setActiveTooltip}
+                  />
+                ))}
               </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="font-medium">📊 Progress:</span>
               <div className="flex items-center gap-1">
-                <span 
-                  className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Dropped')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Dropped')}
-                >
-                  D
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Knocked')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Knocked')}
-                >
-                  K
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Spoke')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Spoke')}
-                >
-                  S
-                </span>
+                {PROPERTY_PROGRESS_LEGEND.map((entry) => (
+                  <PropertyStatusLegendSwatch
+                    key={entry.abbr}
+                    entry={entry}
+                    onShowTooltip={showTooltip}
+                    onHoverTooltip={setActiveTooltip}
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -3320,77 +3501,29 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
               <div className="flex items-center gap-2">
                 <span className="font-medium">🎯 Outcomes:</span>
                 <div className="flex items-center gap-1 flex-wrap">
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
-                    onClick={() => showTooltip('Customer Signed')}
-                  >
-                    CS
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700 cursor-help" 
-                    onClick={() => showTooltip('Appointment Booked')}
-                  >
-                    AB
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
-                    onClick={() => showTooltip('Interested')}
-                  >
-                    I
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700 cursor-help" 
-                    onClick={() => showTooltip('No for Now')}
-                  >
-                    NN
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700 cursor-help" 
-                    onClick={() => showTooltip('Already with UW')}
-                  >
-                    UW
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700 cursor-help" 
-                    onClick={() => showTooltip('Not Interested')}
-                  >
-                    NI
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-slate-500 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-700 cursor-help" 
-                    onClick={() => showTooltip('No Answer')}
-                  >
-                    NA
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700 cursor-help" 
-                    onClick={() => showTooltip('No Cold Callers')}
-                  >
-                    NC
-                  </span>
+                  {PROPERTY_OUTCOME_LEGEND.map((entry) => (
+                    <PropertyStatusLegendSwatch
+                      key={entry.abbr}
+                      entry={entry}
+                      onShowTooltip={showTooltip}
+                      onHoverTooltip={setActiveTooltip}
+                      useHover={false}
+                    />
+                  ))}
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-medium">📊 Progress:</span>
                 <div className="flex items-center gap-1">
-                  <span 
-                    className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700 cursor-help" 
-                    onClick={() => showTooltip('Dropped')}
-                  >
-                    D
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700 cursor-help" 
-                    onClick={() => showTooltip('Knocked')}
-                  >
-                    K
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700 cursor-help" 
-                    onClick={() => showTooltip('Spoke')}
-                  >
-                    S
-                  </span>
+                  {PROPERTY_PROGRESS_LEGEND.map((entry) => (
+                    <PropertyStatusLegendSwatch
+                      key={entry.abbr}
+                      entry={entry}
+                      onShowTooltip={showTooltip}
+                      onHoverTooltip={setActiveTooltip}
+                      useHover={false}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
@@ -3490,34 +3623,8 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
               <div className="mb-3">
                 <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
                   {s.properties.map(p => {
-                    // Determine button styling based on progression and outcome
-                    let buttonStyle = 'border border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600';
-                    
-                    // OUTCOMES (Final Results) - Bold borders (2px) + Saturated colors
-                    if (p.result === 'customer_signed') {
-                      buttonStyle = 'border-2 border-green-500 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200';
-                    } else if (p.result === 'appointment_booked') {
-                      buttonStyle = 'border-2 border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-200';
-                    } else if (p.result === 'no_for_now') {
-                      buttonStyle = 'border-2 border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200';
-                    } else if (p.result === 'already_uw') {
-                      buttonStyle = 'border-2 border-sky-500 bg-sky-50 dark:bg-sky-900/20 text-sky-800 dark:text-sky-200';
-                    } else if (p.result === 'not_interested') {
-                      buttonStyle = 'border-2 border-red-500 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200';
-                    } else if (p.result === 'no_answer') {
-                      buttonStyle = 'border-2 border-slate-500 bg-slate-50 dark:bg-slate-900/20 text-slate-800 dark:text-slate-200';
-                    } else if (p.result === 'no_cold_callers') {
-                      buttonStyle = 'border-2 border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200';
-                    } 
-                    // STATUS STATES (Activity Progress) - Thin borders (1px) + Muted colors
-                    else if (p.spoke) {
-                      buttonStyle = 'border border-teal-300 bg-teal-50/50 dark:bg-teal-900/10 text-teal-600 dark:text-teal-400';
-                    } else if (p.knocked) {
-                      buttonStyle = 'border border-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400';
-                    } else if (p.dropped) {
-                      buttonStyle = 'border border-orange-300 bg-orange-50/50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400';
-                    }
-                    
+                    const buttonStyle = getPropertyChipClassName(p);
+
                     return (
                       <button 
                         key={p.id} 
@@ -3725,18 +3832,21 @@ function PropertyView({ street, property, onBack, onNavigateProperty, onUpdate, 
             active={property.dropped} 
             icon={UploadCloud} 
             label="Dropped" 
+            progressKey="dropped"
             onClick={() => onToggleStatus(property.id, 'dropped')} 
           />
           <ActionButton 
             active={property.knocked} 
             icon={Check} 
             label="Knocked" 
+            progressKey="knocked"
             onClick={() => onToggleStatus(property.id, 'knocked')} 
           />
           <ActionButton 
             active={property.spoke} 
             icon={MessageSquare} 
             label="Spoke" 
+            progressKey="spoke"
             onClick={() => onToggleStatus(property.id, 'spoke')} 
           />
         </div>
@@ -3858,56 +3968,48 @@ function PropertyView({ street, property, onBack, onNavigateProperty, onUpdate, 
                 value="customer_signed" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'customer_signed' })}
-                variant="success"
               />
               <OutcomeButton 
                 label="Appointment Booked" 
                 value="appointment_booked" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'appointment_booked' })}
-                variant="success"
               />
               <OutcomeButton 
                 label="Interested" 
                 value="interested" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'interested' })}
-                variant="success"
               />
               <OutcomeButton 
                 label="No for Now" 
                 value="no_for_now" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'no_for_now' })}
-                variant="warning"
               />
               <OutcomeButton 
                 label="Already with UW" 
                 value="already_uw" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'already_uw' })}
-                variant="info"
               />
               <OutcomeButton 
                 label="Not Interested" 
                 value="not_interested" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'not_interested' })}
-                variant="error"
               />
               <OutcomeButton 
                 label="No Answer" 
                 value="no_answer" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'no_answer' })}
-                variant="default"
               />
               <OutcomeButton 
                 label="No Cold Callers" 
                 value="no_cold_callers" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'no_cold_callers' })}
-                variant="purple"
               />
             </div>
           </div>
@@ -4052,14 +4154,18 @@ function PropertyView({ street, property, onBack, onNavigateProperty, onUpdate, 
   );
 }
 
-function ActionButton({ icon: Icon, label, active, onClick }) {
+function ActionButton({ icon: Icon, label, active, onClick, progressKey }) {
+  const progressStyle = progressKey ? PROPERTY_PROGRESS_STYLES[progressKey] : null;
+
   return (
     <button 
       onClick={onClick} 
       className={`px-3 py-3 rounded-2xl border shadow-sm flex items-center justify-center gap-2 text-sm transition-all ${
-        active 
-          ? 'bg-secondary-50 dark:bg-secondary-900/20 border-secondary-400 text-secondary-700 dark:text-secondary-300' 
-          : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
+        active && progressStyle
+          ? `${progressStyle.chip} shadow-sm`
+          : active 
+            ? 'bg-secondary-50 dark:bg-secondary-900/20 border-secondary-400 text-secondary-700 dark:text-secondary-300' 
+            : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
       }`}
     >
       <Icon className="w-4 h-4" /> {label}
@@ -4067,34 +4173,16 @@ function ActionButton({ icon: Icon, label, active, onClick }) {
   );
 }
 
-function OutcomeButton({ label, value, current, onClick, variant = "default" }) {
+function OutcomeButton({ label, value, current, onClick }) {
   const isActive = current === value;
-  
-  const variantStyles = {
-    success: isActive 
-      ? 'bg-green-50 dark:bg-green-900/20 border-green-400 text-green-700 dark:text-green-300' 
-      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-green-300 dark:hover:border-green-700',
-    warning: isActive 
-      ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400 text-yellow-700 dark:text-yellow-300' 
-      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-yellow-300 dark:hover:border-yellow-700',
-    error: isActive 
-      ? 'bg-red-50 dark:bg-red-900/20 border-red-400 text-red-700 dark:text-red-300' 
-      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-red-300 dark:hover:border-red-700',
-    info: isActive 
-      ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 text-blue-700 dark:text-blue-300' 
-      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700',
-    purple: isActive 
-      ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 text-purple-700 dark:text-purple-300' 
-      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-purple-300 dark:hover:border-purple-700',
-    default: isActive 
-      ? 'bg-gray-50 dark:bg-gray-800/60 border-gray-400 text-gray-700 dark:text-gray-300' 
-      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
-  };
+  const style = PROPERTY_OUTCOME_STYLES[value];
+  const activeClass = style?.buttonActive ?? 'border-2 border-gray-400 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300';
+  const inactiveClass = style?.buttonInactive ?? 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-gray-300 dark:hover:border-gray-700';
 
   return (
     <button 
       onClick={onClick} 
-      className={`px-3 py-2 rounded-xl border text-sm transition-all ${variantStyles[variant]}`}
+      className={`px-3 py-2 rounded-xl text-sm transition-all ${isActive ? activeClass : inactiveClass}`}
     >
       {label}
     </button>
@@ -5791,18 +5879,15 @@ function HelpPanel() {
         {expandedSections.status && (
           <div className="p-4">
             <div className="grid md:grid-cols-2 gap-3 text-sm">
-              <div className="p-3 border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
-                <div className="font-medium text-orange-800 dark:text-orange-200">Dropped</div>
-                <div className="text-orange-700 dark:text-orange-300">Letter delivered through letterbox</div>
-              </div>
-              <div className="p-3 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-                <div className="font-medium text-blue-800 dark:text-blue-200">Knocked</div>
-                <div className="text-blue-700 dark:text-blue-300">Door knocked, no answer or brief interaction</div>
-              </div>
-              <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                <div className="font-medium text-green-800 dark:text-green-200">Spoke</div>
-                <div className="text-green-700 dark:text-green-300">Full conversation had with resident</div>
-              </div>
+              {['dropped', 'knocked', 'spoke'].map((progressKey) => {
+                const style = PROPERTY_PROGRESS_STYLES[progressKey];
+                return (
+                  <div key={progressKey} className={style.helpPanel}>
+                    <div className={style.helpTitle}>{style.label}</div>
+                    <div className={style.helpBody}>{style.helpText}</div>
+                  </div>
+                );
+              })}
               <div className="p-3 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/20 rounded-xl">
                 <div className="font-medium text-gray-800 dark:text-gray-200">Not Started</div>
                 <div className="text-gray-700 dark:text-gray-300">No activity recorded yet</div>
@@ -5827,34 +5912,15 @@ function HelpPanel() {
         {expandedSections.outcomes && (
           <div className="p-4">
             <div className="grid md:grid-cols-2 gap-3 text-sm">
-              <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                <div className="font-medium text-green-800 dark:text-green-200">Interested</div>
-                <div className="text-green-700 dark:text-green-300">Wants to learn more about UW</div>
-              </div>
-              <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                <div className="font-medium text-green-800 dark:text-green-200">Customers Signed</div>
-                <div className="text-green-700 dark:text-green-300">Successfully signed up with UW</div>
-              </div>
-              <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                <div className="font-medium text-green-800 dark:text-green-200">Appointment Booked</div>
-                <div className="text-green-700 dark:text-green-300">Meeting scheduled for follow-up</div>
-              </div>
-              <div className="p-3 border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl">
-                <div className="font-medium text-yellow-800 dark:text-yellow-200">No for Now</div>
-                <div className="text-yellow-700 dark:text-yellow-300">Not interested at this time</div>
-              </div>
-              <div className="p-3 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-                <div className="font-medium text-blue-800 dark:text-blue-200">Already with UW</div>
-                <div className="text-blue-700 dark:text-blue-300">Customer is already a UW member</div>
-              </div>
-                        <div className="p-3 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 rounded-xl">
-            <div className="font-medium text-red-800 dark:text-red-200">Not Interested</div>
-            <div className="text-red-700 dark:text-red-300">Definitely not interested</div>
-          </div>
-          <div className="p-3 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/20 rounded-xl">
-            <div className="font-medium text-gray-800 dark:text-gray-200">Unreachable</div>
-            <div className="text-gray-700 dark:text-gray-300">Unable to contact after multiple attempts</div>
-          </div>
+              {OUTCOME_STAT_KEYS.map((outcomeKey) => {
+                const style = PROPERTY_OUTCOME_STYLES[outcomeKey];
+                return (
+                  <div key={outcomeKey} className={style.helpPanel}>
+                    <div className={style.helpTitle}>{style.label}</div>
+                    <div className={style.helpBody}>{style.helpText}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -6380,9 +6446,9 @@ function Reports({ campaigns, onNavigateToProperty }) {
     <div className="space-y-4">
       <SectionCard title="Overview" icon={FileText}>
         <div className="grid md:grid-cols-6 gap-3">
-          <Stat icon={UploadCloud} label="Letters" value={totals.letters} />
-          <Stat icon={Check} label="Knocked" value={totals.knocked} />
-          <Stat icon={MessageSquare} label="Spoke" value={totals.spoke} />
+          <Stat icon={UploadCloud} label="Letters" value={totals.letters} accentClass={PROPERTY_PROGRESS_STYLES.dropped.icon} />
+          <Stat icon={Check} label="Knocked" value={totals.knocked} accentClass={PROPERTY_PROGRESS_STYLES.knocked.icon} />
+          <Stat icon={MessageSquare} label="Spoke" value={totals.spoke} accentClass={PROPERTY_PROGRESS_STYLES.spoke.icon} />
           <Stat icon={CheckCircle} label="Successes" value={totals.successes} />
           <Stat icon={CalendarClock} label="Total Follow‑ups" value={totals.followups} />
         </div>
@@ -6390,39 +6456,13 @@ function Reports({ campaigns, onNavigateToProperty }) {
       
       <SectionCard title="Conversation Outcomes" icon={MessageSquare}>
         <div className="grid md:grid-cols-3 gap-3">
-          <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
-            <div className="text-lg font-semibold text-green-800 dark:text-green-200">{totals.outcomes.customer_signed}</div>
-            <div className="text-sm text-green-700 dark:text-green-300">Customers Signed</div>
-          </div>
-          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500 dark:border-emerald-500">
-            <div className="text-lg font-semibold text-emerald-800 dark:text-emerald-200">{totals.outcomes.appointment_booked}</div>
-            <div className="text-sm text-emerald-700 dark:text-emerald-300">Appointment Booked</div>
-          </div>
-          <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
-            <div className="text-lg font-semibold text-green-800 dark:text-green-200">{totals.outcomes.interested}</div>
-            <div className="text-sm text-green-700 dark:text-green-300">Interested</div>
-          </div>
-          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-500 dark:border-amber-500">
-            <div className="text-lg font-semibold text-amber-800 dark:text-amber-200">{totals.outcomes.no_for_now}</div>
-            <div className="text-sm text-amber-700 dark:text-amber-300">No for Now</div>
-          </div>
-          <div className="p-3 rounded-xl bg-sky-50 dark:bg-sky-900/20 border-2 border-sky-500 dark:border-sky-500">
-            <div className="text-lg font-semibold text-sky-800 dark:text-sky-200">{totals.outcomes.already_uw}</div>
-            <div className="text-sm text-sky-700 dark:text-sky-300">Already with UW</div>
-          </div>
-          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-500">
-            <div className="text-lg font-semibold text-red-800 dark:text-red-200">{totals.outcomes.not_interested}</div>
-            <div className="text-sm text-red-700 dark:text-red-300">Not Interested</div>
-          </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/20 border-2 border-slate-500 dark:border-slate-500">
-            <div className="text-lg font-semibold text-slate-800 dark:text-slate-200">{totals.outcomes.no_answer || 0}</div>
-            <div className="text-sm text-slate-700 dark:text-slate-300">No Answer</div>
-          </div>
-          <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-500 dark:border-purple-500">
-            <div className="text-lg font-semibold text-purple-800 dark:text-purple-200">{totals.outcomes.no_cold_callers || 0}</div>
-            <div className="text-sm text-purple-700 dark:text-purple-300">No Cold Callers</div>
-          </div>
-
+          {OUTCOME_STAT_KEYS.map((outcomeKey) => (
+            <OutcomeStatCard
+              key={outcomeKey}
+              outcomeKey={outcomeKey}
+              count={totals.outcomes[outcomeKey]}
+            />
+          ))}
         </div>
       </SectionCard>
       
@@ -6589,7 +6629,7 @@ function Reports({ campaigns, onNavigateToProperty }) {
           <div className="text-xs opacity-70">
             Showing {filteredAndSortedData.length} of {flat.length} activities
             <span className="hidden sm:inline"> • Scroll horizontally to see all columns</span>
-            <span className="hidden sm:inline"> • <span className="text-orange-600 dark:text-orange-400 font-medium">D</span>=Letters dropped, <span className="text-blue-600 dark:text-blue-400 font-medium">K</span>=Doors knocked, <span className="text-green-600 dark:text-green-400 font-medium">S</span>=Conversations had</span>
+            <span className="hidden sm:inline"> • <span className={`font-medium ${PROPERTY_PROGRESS_STYLES.dropped.icon}`}>D</span>=Letters dropped, <span className={`font-medium ${PROPERTY_PROGRESS_STYLES.knocked.icon}`}>K</span>=Doors knocked, <span className={`font-medium ${PROPERTY_PROGRESS_STYLES.spoke.icon}`}>S</span>=Conversations had</span>
           </div>
         </div>
 
@@ -6711,62 +6751,16 @@ function Reports({ campaigns, onNavigateToProperty }) {
                   <td className="py-2 px-3 hidden md:table-cell">{r.street}</td>
                   <td className="py-2 px-3 text-xs max-w-24 truncate" title={r.property}>{r.property}</td>
                   <td className="py-2 px-3 hidden sm:table-cell" title={r.dropped ? "Letter dropped" : "No letter dropped"}>
-                    {r.dropped ? (
-                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 text-xs">
-                        ✓
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 dark:text-gray-600">—</span>
-                    )}
+                    <ProgressCheckBadge active={r.dropped} progressKey="dropped" />
                   </td>
                   <td className="py-2 px-3 hidden sm:table-cell" title={r.knocked ? "Door knocked" : "No door knocked"}>
-                    {r.knocked ? (
-                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs">
-                        ✓
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 dark:text-gray-600">—</span>
-                    )}
+                    <ProgressCheckBadge active={r.knocked} progressKey="knocked" />
                   </td>
                   <td className="py-2 px-3 hidden sm:table-cell" title={r.spoke ? "Conversation had" : "No conversation"}>
-                    {r.spoke ? (
-                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-xs">
-                        ✓
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 dark:text-gray-600">—</span>
-                    )}
+                    <ProgressCheckBadge active={r.spoke} progressKey="spoke" />
                   </td>
                   <td className="py-2 px-3">
-                    {r.result === 'none' ? (
-                      <span className="text-gray-500 dark:text-gray-400">—</span>
-                    ) : r.result === 'interested' || r.result === 'customer_signed' || r.result === 'appointment_booked' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300">
-                        {r.result.replace('_', ' ')}
-                      </span>
-                    ) : r.result === 'maybe' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300">
-                        maybe
-                      </span>
-                    ) : r.result === 'no_for_now' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300">
-                        no for now
-                      </span>
-                    ) : r.result === 'already_uw' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
-                        already UW
-                      </span>
-                    ) : r.result === 'not_interested' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
-                        not interested
-                      </span>
-                    ) : r.result === 'no_answer' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                        no answer
-                      </span>
-                    ) : (
-                      <span className="text-gray-600 dark:text-gray-400">{r.result}</span>
-                    )}
+                    <OutcomeResultBadge result={r.result} />
                   </td>
                   <td className="py-2 px-3 hidden xl:table-cell">
                     {r.followUpAt ? (
