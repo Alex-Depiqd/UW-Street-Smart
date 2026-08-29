@@ -88,13 +88,13 @@ const PROPERTY_OUTCOME_STYLES = {
     label: 'Customer Signed',
     statLabel: 'Customers Signed',
     helpText: 'Successfully signed up with UW',
-    chip: 'border-2 border-blue-600 bg-white dark:bg-gray-900 text-blue-800 dark:text-blue-200',
+    chip: 'border-2 border-blue-600 bg-white text-blue-800 dark:bg-white dark:text-blue-800 font-medium shadow-sm',
     legend: 'w-4 h-4 rounded border-2 border-blue-600 bg-white flex items-center justify-center text-[8px] font-bold text-blue-700 cursor-help',
     panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-blue-600',
     panelValue: 'text-base sm:text-lg font-semibold text-blue-800 dark:text-blue-200',
     panelLabel: 'text-xs sm:text-sm text-blue-700 dark:text-blue-300',
-    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-blue-600 bg-white dark:bg-gray-900 text-blue-800 dark:text-blue-200',
-    buttonActive: 'border-2 border-blue-600 bg-white dark:bg-gray-900 text-blue-800 dark:text-blue-200',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-blue-600 bg-white text-blue-800 dark:bg-white dark:text-blue-800',
+    buttonActive: 'border-2 border-blue-600 bg-white text-blue-800 dark:bg-white dark:text-blue-800',
     buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-blue-400 dark:hover:border-blue-600',
     helpPanel: 'p-3 border-2 border-blue-600 bg-white dark:bg-gray-900 rounded-xl',
     helpTitle: 'font-medium text-blue-800 dark:text-blue-200',
@@ -105,13 +105,13 @@ const PROPERTY_OUTCOME_STYLES = {
     label: 'Appointment Booked',
     statLabel: 'Appointment Booked',
     helpText: 'Meeting scheduled for follow-up',
-    chip: 'border-2 border-indigo-600 bg-white dark:bg-gray-900 text-indigo-800 dark:text-indigo-200',
+    chip: 'border-2 border-indigo-600 bg-white text-indigo-800 dark:bg-white dark:text-indigo-800 font-medium shadow-sm',
     legend: 'w-4 h-4 rounded border-2 border-indigo-600 bg-white flex items-center justify-center text-[8px] font-bold text-indigo-700 cursor-help',
     panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-indigo-600',
     panelValue: 'text-base sm:text-lg font-semibold text-indigo-800 dark:text-indigo-200',
     panelLabel: 'text-xs sm:text-sm text-indigo-700 dark:text-indigo-300',
-    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-indigo-600 bg-white dark:bg-gray-900 text-indigo-800 dark:text-indigo-200',
-    buttonActive: 'border-2 border-indigo-600 bg-white dark:bg-gray-900 text-indigo-800 dark:text-indigo-200',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-indigo-600 bg-white text-indigo-800 dark:bg-white dark:text-indigo-800',
+    buttonActive: 'border-2 border-indigo-600 bg-white text-indigo-800 dark:bg-white dark:text-indigo-800',
     buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-indigo-400 dark:hover:border-indigo-600',
     helpPanel: 'p-3 border-2 border-indigo-600 bg-white dark:bg-gray-900 rounded-xl',
     helpTitle: 'font-medium text-indigo-800 dark:text-indigo-200',
@@ -122,13 +122,13 @@ const PROPERTY_OUTCOME_STYLES = {
     label: 'Interested',
     statLabel: 'Interested',
     helpText: 'Wants to learn more about UW',
-    chip: 'border-2 border-cyan-600 bg-white dark:bg-gray-900 text-cyan-800 dark:text-cyan-200',
+    chip: 'border-2 border-cyan-600 bg-white text-cyan-800 dark:bg-white dark:text-cyan-800 font-medium shadow-sm',
     legend: 'w-4 h-4 rounded border-2 border-cyan-600 bg-white flex items-center justify-center text-[8px] font-bold text-cyan-700 cursor-help',
     panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-cyan-600',
     panelValue: 'text-base sm:text-lg font-semibold text-cyan-800 dark:text-cyan-200',
     panelLabel: 'text-xs sm:text-sm text-cyan-700 dark:text-cyan-300',
-    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-cyan-600 bg-white dark:bg-gray-900 text-cyan-800 dark:text-cyan-200',
-    buttonActive: 'border-2 border-cyan-600 bg-white dark:bg-gray-900 text-cyan-800 dark:text-cyan-200',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-cyan-600 bg-white text-cyan-800 dark:bg-white dark:text-cyan-800',
+    buttonActive: 'border-2 border-cyan-600 bg-white text-cyan-800 dark:bg-white dark:text-cyan-800',
     buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-cyan-400 dark:hover:border-cyan-600',
     helpPanel: 'p-3 border-2 border-cyan-600 bg-white dark:bg-gray-900 rounded-xl',
     helpTitle: 'font-medium text-cyan-800 dark:text-cyan-200',
@@ -139,13 +139,13 @@ const PROPERTY_OUTCOME_STYLES = {
     label: 'No for Now',
     statLabel: 'No for Now',
     helpText: 'Not interested at this time',
-    chip: 'border-2 border-fuchsia-600 bg-white dark:bg-gray-900 text-fuchsia-800 dark:text-fuchsia-200',
+    chip: 'border-2 border-fuchsia-600 bg-white text-fuchsia-800 dark:bg-white dark:text-fuchsia-800 font-medium shadow-sm',
     legend: 'w-4 h-4 rounded border-2 border-fuchsia-600 bg-white flex items-center justify-center text-[8px] font-bold text-fuchsia-700 cursor-help',
     panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-fuchsia-600',
     panelValue: 'text-base sm:text-lg font-semibold text-fuchsia-800 dark:text-fuchsia-200',
     panelLabel: 'text-xs sm:text-sm text-fuchsia-700 dark:text-fuchsia-300',
-    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-fuchsia-600 bg-white dark:bg-gray-900 text-fuchsia-800 dark:text-fuchsia-200',
-    buttonActive: 'border-2 border-fuchsia-600 bg-white dark:bg-gray-900 text-fuchsia-800 dark:text-fuchsia-200',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-fuchsia-600 bg-white text-fuchsia-800 dark:bg-white dark:text-fuchsia-800',
+    buttonActive: 'border-2 border-fuchsia-600 bg-white text-fuchsia-800 dark:bg-white dark:text-fuchsia-800',
     buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-fuchsia-400 dark:hover:border-fuchsia-600',
     helpPanel: 'p-3 border-2 border-fuchsia-600 bg-white dark:bg-gray-900 rounded-xl',
     helpTitle: 'font-medium text-fuchsia-800 dark:text-fuchsia-200',
@@ -156,13 +156,13 @@ const PROPERTY_OUTCOME_STYLES = {
     label: 'Already with UW',
     statLabel: 'Already with UW',
     helpText: 'Customer is already a UW member',
-    chip: 'border-2 border-sky-500 bg-white dark:bg-gray-900 text-sky-800 dark:text-sky-200',
+    chip: 'border-2 border-sky-500 bg-white text-sky-800 dark:bg-white dark:text-sky-800 font-medium shadow-sm',
     legend: 'w-4 h-4 rounded border-2 border-sky-500 bg-white flex items-center justify-center text-[8px] font-bold text-sky-700 cursor-help',
     panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-sky-500',
     panelValue: 'text-base sm:text-lg font-semibold text-sky-800 dark:text-sky-200',
     panelLabel: 'text-xs sm:text-sm text-sky-700 dark:text-sky-300',
-    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-sky-500 bg-white dark:bg-gray-900 text-sky-800 dark:text-sky-200',
-    buttonActive: 'border-2 border-sky-500 bg-white dark:bg-gray-900 text-sky-800 dark:text-sky-200',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-sky-500 bg-white text-sky-800 dark:bg-white dark:text-sky-800',
+    buttonActive: 'border-2 border-sky-500 bg-white text-sky-800 dark:bg-white dark:text-sky-800',
     buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-sky-400 dark:hover:border-sky-500',
     helpPanel: 'p-3 border-2 border-sky-500 bg-white dark:bg-gray-900 rounded-xl',
     helpTitle: 'font-medium text-sky-800 dark:text-sky-200',
@@ -173,13 +173,13 @@ const PROPERTY_OUTCOME_STYLES = {
     label: 'Not Interested',
     statLabel: 'Not Interested',
     helpText: 'Definitely not interested',
-    chip: 'border-2 border-stone-600 bg-white dark:bg-gray-900 text-stone-800 dark:text-stone-200',
+    chip: 'border-2 border-stone-600 bg-white text-stone-800 dark:bg-white dark:text-stone-800 font-medium shadow-sm',
     legend: 'w-4 h-4 rounded border-2 border-stone-600 bg-white flex items-center justify-center text-[8px] font-bold text-stone-700 cursor-help',
     panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-stone-600',
     panelValue: 'text-base sm:text-lg font-semibold text-stone-800 dark:text-stone-200',
     panelLabel: 'text-xs sm:text-sm text-stone-700 dark:text-stone-300',
-    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-stone-600 bg-white dark:bg-gray-900 text-stone-800 dark:text-stone-200',
-    buttonActive: 'border-2 border-stone-600 bg-white dark:bg-gray-900 text-stone-800 dark:text-stone-200',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-stone-600 bg-white text-stone-800 dark:bg-white dark:text-stone-800',
+    buttonActive: 'border-2 border-stone-600 bg-white text-stone-800 dark:bg-white dark:text-stone-800',
     buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-stone-400 dark:hover:border-stone-600',
     helpPanel: 'p-3 border-2 border-stone-600 bg-white dark:bg-gray-900 rounded-xl',
     helpTitle: 'font-medium text-stone-800 dark:text-stone-200',
@@ -190,13 +190,13 @@ const PROPERTY_OUTCOME_STYLES = {
     label: 'No Answer',
     statLabel: 'No Answer',
     helpText: 'No answer at the door',
-    chip: 'border-2 border-slate-500 bg-white dark:bg-gray-900 text-slate-800 dark:text-slate-200',
+    chip: 'border-2 border-slate-500 bg-white text-slate-800 dark:bg-white dark:text-slate-800 font-medium shadow-sm',
     legend: 'w-4 h-4 rounded border-2 border-slate-500 bg-white flex items-center justify-center text-[8px] font-bold text-slate-700 cursor-help',
     panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-slate-500',
     panelValue: 'text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-200',
     panelLabel: 'text-xs sm:text-sm text-slate-700 dark:text-slate-300',
-    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-slate-500 bg-white dark:bg-gray-900 text-slate-800 dark:text-slate-200',
-    buttonActive: 'border-2 border-slate-500 bg-white dark:bg-gray-900 text-slate-800 dark:text-slate-200',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-slate-500 bg-white text-slate-800 dark:bg-white dark:text-slate-800',
+    buttonActive: 'border-2 border-slate-500 bg-white text-slate-800 dark:bg-white dark:text-slate-800',
     buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-slate-400 dark:hover:border-slate-500',
     helpPanel: 'p-3 border-2 border-slate-500 bg-white dark:bg-gray-900 rounded-xl',
     helpTitle: 'font-medium text-slate-800 dark:text-slate-200',
@@ -207,13 +207,13 @@ const PROPERTY_OUTCOME_STYLES = {
     label: 'No Cold Callers',
     statLabel: 'No Cold Callers',
     helpText: 'Resident does not want cold callers',
-    chip: 'border-2 border-purple-500 bg-white dark:bg-gray-900 text-purple-800 dark:text-purple-200',
+    chip: 'border-2 border-purple-500 bg-white text-purple-800 dark:bg-white dark:text-purple-800 font-medium shadow-sm',
     legend: 'w-4 h-4 rounded border-2 border-purple-500 bg-white flex items-center justify-center text-[8px] font-bold text-purple-700 cursor-help',
     panel: 'p-2 sm:p-3 rounded-xl bg-white dark:bg-gray-900 border-2 border-purple-500',
     panelValue: 'text-base sm:text-lg font-semibold text-purple-800 dark:text-purple-200',
     panelLabel: 'text-xs sm:text-sm text-purple-700 dark:text-purple-300',
-    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-purple-500 bg-white dark:bg-gray-900 text-purple-800 dark:text-purple-200',
-    buttonActive: 'border-2 border-purple-500 bg-white dark:bg-gray-900 text-purple-800 dark:text-purple-200',
+    badge: 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 border-purple-500 bg-white text-purple-800 dark:bg-white dark:text-purple-800',
+    buttonActive: 'border-2 border-purple-500 bg-white text-purple-800 dark:bg-white dark:text-purple-800',
     buttonInactive: 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-purple-400 dark:hover:border-purple-500',
     helpPanel: 'p-3 border-2 border-purple-500 bg-white dark:bg-gray-900 rounded-xl',
     helpTitle: 'font-medium text-purple-800 dark:text-purple-200',
@@ -3624,12 +3624,15 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                 <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
                   {s.properties.map(p => {
                     const buttonStyle = getPropertyChipClassName(p);
+                    const outcomeStyle = p.result && p.result !== 'none'
+                      ? PROPERTY_OUTCOME_STYLES[p.result]
+                      : null;
 
                     return (
                       <button 
                         key={p.id} 
                         onClick={()=>onOpenProperty(s.id, p.id)} 
-                        className={`px-2 py-1 rounded-lg text-xs transition-colors flex-shrink-0 relative ${buttonStyle}`}
+                        className={`px-2 py-1 rounded-lg text-xs transition-colors flex-shrink-0 relative flex items-center gap-1 ${buttonStyle}`}
                         title={
                           p.result && p.result !== 'none' 
                             ? `Outcome: ${p.result.replace('_', ' ')}` 
@@ -3642,7 +3645,12 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                                   : 'No activity recorded'
                         }
                       >
-                        {p.label}
+                        {outcomeStyle && (
+                          <span className={`${outcomeStyle.legend.replace(' cursor-help', '')} shrink-0`}>
+                            {outcomeStyle.abbr}
+                          </span>
+                        )}
+                        <span>{p.label}</span>
                         {p.followUpAt && (
                           <div className="absolute top-0 right-0 w-3 h-3 bg-amber-500 rounded-full border border-white dark:border-gray-900 flex items-center justify-center transform translate-x-1 -translate-y-1">
                             <CalendarClock className="w-2 h-2 text-white" />
