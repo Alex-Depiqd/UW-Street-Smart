@@ -82,27 +82,29 @@ const FACEBOOK_REMINDER_LAST_SHOWN_KEY = 'uw_ss_facebook_reminder_last_shown';
 const FACEBOOK_REMINDER_DISMISSED_KEY = 'uw_ss_facebook_reminder_dismissed';
 
 /** Outcome colours deliberately avoid red/amber/green so progress traffic-light colours stay distinct. */
+const OUTCOME_SURFACE = 'bg-white dark:bg-gray-100';
+
 function createOutcomeStyle({ abbr, label, statLabel, helpText, border, text, labelText, hoverBorder }) {
   return {
     abbr,
     label,
     statLabel,
     helpText,
-    chip: `border-2 ${border} bg-white ${text} dark:bg-white ${text} font-medium shadow-sm`,
-    legend: `w-4 h-4 rounded border-2 ${border} bg-white flex items-center justify-center text-[8px] font-bold ${labelText} cursor-help`,
-    panel: `p-2 sm:p-3 rounded-xl bg-white dark:bg-white border-2 ${border} shadow-sm`,
+    chip: `border-2 ${border} ${OUTCOME_SURFACE} ${text} font-medium shadow-sm dark:shadow-none`,
+    legend: `w-4 h-4 rounded border-2 ${border} ${OUTCOME_SURFACE} flex items-center justify-center text-[8px] font-bold ${labelText} cursor-help`,
+    panel: `p-2 sm:p-3 rounded-xl ${OUTCOME_SURFACE} border-2 ${border} shadow-sm dark:shadow-none`,
     panelValue: `text-base sm:text-lg font-semibold ${text}`,
     panelLabel: `text-xs sm:text-sm ${labelText}`,
-    badge: `inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 ${border} bg-white ${text} dark:bg-white ${text}`,
-    buttonActive: `border-2 ${border} bg-white ${text} dark:bg-white ${text}`,
+    badge: `inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 ${border} ${OUTCOME_SURFACE} ${text}`,
+    buttonActive: `border-2 ${border} ${OUTCOME_SURFACE} ${text}`,
     buttonInactive: `border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 ${hoverBorder}`,
-    helpPanel: `p-3 border-2 ${border} bg-white dark:bg-white rounded-xl`,
+    helpPanel: `p-3 border-2 ${border} ${OUTCOME_SURFACE} rounded-xl`,
     helpTitle: `font-medium ${text}`,
     helpBody: labelText,
   };
 }
 
-/** Distinct outcome palette (avoids progress red/amber/green): CS blue, AB violet, I teal, NN pink, UW sky, NI zinc, NA slate, NC purple. */
+/** Distinct outcome palette (avoids progress red/amber/green): CS blue, AB indigo, I teal, NN pink, UW sky, NI zinc, NA slate, NC orange. */
 
 const PROPERTY_OUTCOME_STYLES = {
   customer_signed: createOutcomeStyle({
@@ -120,10 +122,10 @@ const PROPERTY_OUTCOME_STYLES = {
     label: 'Appointment Booked',
     statLabel: 'Appointment Booked',
     helpText: 'Meeting scheduled for follow-up',
-    border: 'border-violet-600',
-    text: 'text-violet-900',
-    labelText: 'text-violet-800',
-    hoverBorder: 'hover:border-violet-400 dark:hover:border-violet-600',
+    border: 'border-indigo-700',
+    text: 'text-indigo-900',
+    labelText: 'text-indigo-800',
+    hoverBorder: 'hover:border-indigo-500 dark:hover:border-indigo-700',
   }),
   interested: createOutcomeStyle({
     abbr: 'I',
@@ -180,10 +182,10 @@ const PROPERTY_OUTCOME_STYLES = {
     label: 'No Cold Callers',
     statLabel: 'No Cold Callers',
     helpText: 'Resident does not want cold callers',
-    border: 'border-purple-700',
-    text: 'text-purple-900',
-    labelText: 'text-purple-800',
-    hoverBorder: 'hover:border-purple-500 dark:hover:border-purple-700',
+    border: 'border-orange-700',
+    text: 'text-orange-900',
+    labelText: 'text-orange-800',
+    hoverBorder: 'hover:border-orange-500 dark:hover:border-orange-700',
   }),
 };
 
