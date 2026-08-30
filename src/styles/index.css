@@ -44,7 +44,7 @@
   --text-secondary: #cbd5e1;
   --text-muted: #94a3b8;
   --border-color: #334155;
-  --outcome-surface: rgb(255 255 255 / 0.5);
+  --outcome-surface: rgb(255 255 255 / 0.7);
 }
 
 /* Base styles */
@@ -63,7 +63,7 @@
   display: none;  /* Safari and Chrome */
 }
 
-/* Outcome chips/panels: solid white in light mode, 50% white tint in dark mode */
+/* Outcome chips/panels: solid white in light mode, 70% white tint in dark mode */
 .outcome-surface {
   background-color: var(--outcome-surface);
 }
