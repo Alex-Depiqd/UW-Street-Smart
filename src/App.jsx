@@ -82,7 +82,7 @@ const FACEBOOK_REMINDER_LAST_SHOWN_KEY = 'uw_ss_facebook_reminder_last_shown';
 const FACEBOOK_REMINDER_DISMISSED_KEY = 'uw_ss_facebook_reminder_dismissed';
 
 /** Outcome colours deliberately avoid red/amber/green so progress traffic-light colours stay distinct. */
-const OUTCOME_SURFACE = 'bg-white dark:bg-gray-200';
+const OUTCOME_SURFACE = 'bg-white dark:bg-white/10';
 
 function createOutcomeStyle({ abbr, label, statLabel, helpText, border, text, labelText, hoverBorder }) {
   return {
@@ -113,8 +113,8 @@ const PROPERTY_OUTCOME_STYLES = {
     statLabel: 'Customers Signed',
     helpText: 'Successfully signed up with UW',
     border: 'border-blue-600',
-    text: 'text-blue-900',
-    labelText: 'text-blue-800',
+    text: 'text-blue-900 dark:text-blue-300',
+    labelText: 'text-blue-800 dark:text-blue-400',
     hoverBorder: 'hover:border-blue-400 dark:hover:border-blue-600',
   }),
   appointment_booked: createOutcomeStyle({
@@ -123,8 +123,8 @@ const PROPERTY_OUTCOME_STYLES = {
     statLabel: 'Appointment Booked',
     helpText: 'Meeting scheduled for follow-up',
     border: 'border-violet-700',
-    text: 'text-violet-900',
-    labelText: 'text-violet-800',
+    text: 'text-violet-900 dark:text-violet-300',
+    labelText: 'text-violet-800 dark:text-violet-400',
     hoverBorder: 'hover:border-violet-500 dark:hover:border-violet-700',
   }),
   interested: createOutcomeStyle({
@@ -133,8 +133,8 @@ const PROPERTY_OUTCOME_STYLES = {
     statLabel: 'Interested',
     helpText: 'Wants to learn more about UW',
     border: 'border-teal-600',
-    text: 'text-teal-900',
-    labelText: 'text-teal-800',
+    text: 'text-teal-900 dark:text-teal-300',
+    labelText: 'text-teal-800 dark:text-teal-400',
     hoverBorder: 'hover:border-teal-400 dark:hover:border-teal-600',
   }),
   no_for_now: createOutcomeStyle({
@@ -143,8 +143,8 @@ const PROPERTY_OUTCOME_STYLES = {
     statLabel: 'No for Now',
     helpText: 'Not interested at this time',
     border: 'border-pink-600',
-    text: 'text-pink-900',
-    labelText: 'text-pink-800',
+    text: 'text-pink-900 dark:text-pink-300',
+    labelText: 'text-pink-800 dark:text-pink-400',
     hoverBorder: 'hover:border-pink-400 dark:hover:border-pink-600',
   }),
   already_uw: createOutcomeStyle({
@@ -153,8 +153,8 @@ const PROPERTY_OUTCOME_STYLES = {
     statLabel: 'Already with UW',
     helpText: 'Customer is already a UW member',
     border: 'border-sky-600',
-    text: 'text-sky-900',
-    labelText: 'text-sky-800',
+    text: 'text-sky-900 dark:text-sky-300',
+    labelText: 'text-sky-800 dark:text-sky-400',
     hoverBorder: 'hover:border-sky-400 dark:hover:border-sky-600',
   }),
   not_interested: createOutcomeStyle({
