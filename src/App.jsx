@@ -82,7 +82,7 @@ const FACEBOOK_REMINDER_LAST_SHOWN_KEY = 'uw_ss_facebook_reminder_last_shown';
 const FACEBOOK_REMINDER_DISMISSED_KEY = 'uw_ss_facebook_reminder_dismissed';
 
 /** Outcome colours deliberately avoid red/amber/green so progress traffic-light colours stay distinct. */
-const OUTCOME_SURFACE = 'bg-white dark:bg-white/10';
+const OUTCOME_SURFACE = 'outcome-surface';
 
 function createOutcomeStyle({ abbr, label, statLabel, helpText, border, text, labelText, hoverBorder }) {
   return {
@@ -163,8 +163,8 @@ const PROPERTY_OUTCOME_STYLES = {
     statLabel: 'Not Interested',
     helpText: 'Definitely not interested',
     border: 'border-zinc-700',
-    text: 'text-zinc-900',
-    labelText: 'text-zinc-800',
+    text: 'text-zinc-900 dark:text-zinc-300',
+    labelText: 'text-zinc-800 dark:text-zinc-400',
     hoverBorder: 'hover:border-zinc-500 dark:hover:border-zinc-700',
   }),
   no_answer: createOutcomeStyle({
@@ -173,8 +173,8 @@ const PROPERTY_OUTCOME_STYLES = {
     statLabel: 'No Answer',
     helpText: 'No answer at the door',
     border: 'border-slate-500',
-    text: 'text-slate-800',
-    labelText: 'text-slate-600',
+    text: 'text-slate-800 dark:text-slate-300',
+    labelText: 'text-slate-600 dark:text-slate-400',
     hoverBorder: 'hover:border-slate-400 dark:hover:border-slate-500',
   }),
   no_cold_callers: createOutcomeStyle({
@@ -183,8 +183,8 @@ const PROPERTY_OUTCOME_STYLES = {
     statLabel: 'No Cold Callers',
     helpText: 'Resident does not want cold callers',
     border: 'border-orange-700',
-    text: 'text-orange-900',
-    labelText: 'text-orange-800',
+    text: 'text-orange-900 dark:text-orange-300',
+    labelText: 'text-orange-800 dark:text-orange-400',
     hoverBorder: 'hover:border-orange-500 dark:hover:border-orange-700',
   }),
 };

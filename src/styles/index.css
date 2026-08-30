@@ -32,6 +32,7 @@
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
+  --outcome-surface: #ffffff;
 }
 
 /* Dark mode variables */
@@ -43,6 +44,7 @@
   --text-secondary: #cbd5e1;
   --text-muted: #94a3b8;
   --border-color: #334155;
+  --outcome-surface: rgb(255 255 255 / 0.1);
 }
 
 /* Base styles */
@@ -59,6 +61,11 @@
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Safari and Chrome */
+}
+
+/* Outcome chips/panels: solid white in light mode, 10% white tint in dark mode */
+.outcome-surface {
+  background-color: var(--outcome-surface);
 }
 
 /* Form controls: keep 16px so iOS/PWA does not auto-zoom on focus.
