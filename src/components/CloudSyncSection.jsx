@@ -6,6 +6,9 @@ import {
 } from "firebase/auth";
 import { Cloud, ClipboardPaste, DownloadCloud, LogOut, Mail, RefreshCw } from "lucide-react";
 import { getFirebaseAuth, isFirebaseConfigured } from "@/firebase";
+import { isSupabaseConfigured } from "@/supabase";
+import { isCloudSyncAvailable } from "@/cloudSync";
+import SupabaseCloudSyncSection from "@/components/SupabaseCloudSyncSection.jsx";
 import { EMAIL_SIGNIN_STORAGE_KEY } from "@/firebaseAuthShared";
 import {
   completeEmailLinkSignIn,
@@ -13,7 +16,27 @@ import {
 } from "@/firebaseEmailLinkComplete";
 import { isStandaloneDisplayMode } from "@/pwaUtils";
 
-export default function CloudSyncSection({
+export default function CloudSyncSection(props) {
+  if (isSupabaseConfigured()) {
+    return (
+      <SupabaseCloudSyncSection
+        accountEmail={props.accountEmail}
+        onSignOut={props.onSignOut}
+        lastCloudSyncAt={props.lastCloudSyncAt}
+        cloudSyncStatus={props.cloudSyncStatus}
+        cloudSyncMessage={props.cloudSyncMessage}
+        onSyncNow={props.onSyncNow}
+        onPullFromCloud={props.onPullFromCloud}
+        cloudPushPaused={props.cloudPushPaused}
+        cloudAutoSyncPaused={props.cloudAutoSyncPaused}
+        onCloudAutoSyncPausedChange={props.onCloudAutoSyncPausedChange}
+      />
+    );
+  }
+  return <FirebaseCloudSyncSection {...props} />;
+}
+
+function FirebaseCloudSyncSection({
   onExport,
   lastCloudSyncAt = null,
   cloudSyncStatus = "idle",
@@ -38,6 +61,20 @@ export default function CloudSyncSection({
       setUserEmail(user?.email || null);
     });
   }, []);
+
+  if (!isCloudSyncAvailable()) {
+    return (
+      <div className="space-y-2">
+        <h4 className="font-medium flex items-center gap-2">
+          <Cloud className="w-4 h-4" />
+          Account &amp; cloud sync
+        </h4>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Online sign-in is not configured in this build (missing cloud environment variables).
+        </p>
+      </div>
+    );
+  }
 
   if (!isFirebaseConfigured()) {
     return (

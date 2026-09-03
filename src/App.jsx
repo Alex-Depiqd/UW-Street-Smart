@@ -1,5 +1,4 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { onAuthStateChanged } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Check, MapPin, Home, ListChecks, CalendarClock, MessageSquare, 
@@ -11,9 +10,18 @@ import {
 } from "lucide-react";
 import { config } from './config';
 import FirebaseEmailLinkHandler from "@/components/FirebaseEmailLinkHandler.jsx";
+import SupabaseAuthScreen from "@/components/SupabaseAuthScreen.jsx";
 import CloudMergeModal from "@/components/CloudMergeModal.jsx";
+import AccountSwitchModal from "@/components/AccountSwitchModal.jsx";
 import CloudSyncSection from "@/components/CloudSyncSection.jsx";
-import { getFirebaseAuth } from "@/firebase";
+import { getSupabaseClient, isSupabaseConfigured } from "@/supabase";
+import {
+  applyPartnerNameFromUser,
+  detectAccountSwitch,
+  deviceHasLocalCampaigns,
+  recordAuthUserId,
+} from "@/supabaseAuthProfile";
+import { useCloudAuth, signOutCloudAuth } from "@/useCloudAuth";
 import {
   applyPayloadToStores,
   buildLocalPayload,
@@ -22,11 +30,280 @@ import {
   formatCloudUpdatedAt,
   getCloudUpdatedAtMs,
   saveCloudPayload,
-} from "@/cloudFirestoreSync";
+} from "@/cloudSync";
 
+/** Call Ideal Postcodes via Netlify proxy; parse body even on HTTP error statuses. */
+async function fetchIdealPostcodesProxy(url) {
+  const response = await fetch(url);
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+  return { response, data };
+}
 
+/** Friendly copy for Ideal Postcodes / proxy failures (avoid raw HTTP status text). */
+function idealPostcodesUserMessage({ response, data, postcode, query }) {
+  const code = data?.code;
+  const status = response?.status;
 
+  if (code === 4040 || status === 404) {
+    if (postcode) {
+      return `We couldn't find postcode "${postcode}". Please check it's typed correctly and try again.`;
+    }
+    if (query) {
+      return `No addresses found for "${query}". Try adding a town name (e.g. "Cross Street, Elmswell") or check the spelling.`;
+    }
+    return "No addresses found. Please check your search and try again.";
+  }
 
+  if (code === 4010 || status === 401 || status === 403) {
+    return "Address lookup is temporarily unavailable. Please try again later or enter addresses manually.";
+  }
+
+  if (status === 502 || status === 503 || status === 504) {
+    return "Address lookup is temporarily unavailable. Please try again in a moment.";
+  }
+
+  if (data?.message && typeof data.message === "string" && !/^HTTP error/i.test(data.message)) {
+    return data.message;
+  }
+
+  if (!response?.ok) {
+    return "Something went wrong looking up addresses. Please try again.";
+  }
+
+  return null;
+}
+
+const FACEBOOK_REMINDER_LAST_SHOWN_KEY = 'uw_ss_facebook_reminder_last_shown';
+const FACEBOOK_REMINDER_DISMISSED_KEY = 'uw_ss_facebook_reminder_dismissed';
+
+/** Outcome colours deliberately avoid red/amber/green so progress traffic-light colours stay distinct. */
+const OUTCOME_SURFACE = 'outcome-surface';
+
+function createOutcomeStyle({ abbr, label, statLabel, helpText, border, text, labelText, hoverBorder }) {
+  return {
+    abbr,
+    label,
+    statLabel,
+    helpText,
+    chip: `border-2 ${border} ${OUTCOME_SURFACE} ${text} font-medium shadow-sm dark:shadow-none`,
+    legend: `w-4 h-4 rounded border-2 ${border} ${OUTCOME_SURFACE} flex items-center justify-center text-[8px] font-bold ${labelText} cursor-help`,
+    panel: `p-2 sm:p-3 rounded-xl ${OUTCOME_SURFACE} border-2 ${border} shadow-sm dark:shadow-none`,
+    panelValue: `text-base sm:text-lg font-semibold ${text}`,
+    panelLabel: `text-xs sm:text-sm ${labelText}`,
+    badge: `inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border-2 ${border} ${OUTCOME_SURFACE} ${text}`,
+    buttonActive: `border-2 ${border} ${OUTCOME_SURFACE} ${text}`,
+    buttonInactive: `border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 ${hoverBorder}`,
+    helpPanel: `p-3 border-2 ${border} ${OUTCOME_SURFACE} rounded-xl`,
+    helpTitle: `font-medium ${text}`,
+    helpBody: labelText,
+  };
+}
+
+/** Distinct outcome palette (avoids progress red/amber/green): CS blue, AB violet, I teal, NN pink, UW sky, NI zinc, NA slate, NC orange. */
+
+const PROPERTY_OUTCOME_STYLES = {
+  customer_signed: createOutcomeStyle({
+    abbr: 'CS',
+    label: 'Customer Signed',
+    statLabel: 'Customers Signed',
+    helpText: 'Successfully signed up with UW',
+    border: 'border-blue-600',
+    text: 'text-blue-900 dark:text-blue-600',
+    labelText: 'text-blue-800 dark:text-blue-700',
+    hoverBorder: 'hover:border-blue-400 dark:hover:border-blue-600',
+  }),
+  appointment_booked: createOutcomeStyle({
+    abbr: 'AB',
+    label: 'Appointment Booked',
+    statLabel: 'Appointment Booked',
+    helpText: 'Meeting scheduled for follow-up',
+    border: 'border-violet-700',
+    text: 'text-violet-900 dark:text-violet-700',
+    labelText: 'text-violet-800 dark:text-violet-600',
+    hoverBorder: 'hover:border-violet-500 dark:hover:border-violet-700',
+  }),
+  interested: createOutcomeStyle({
+    abbr: 'I',
+    label: 'Interested',
+    statLabel: 'Interested',
+    helpText: 'Wants to learn more about UW',
+    border: 'border-teal-600',
+    text: 'text-teal-900 dark:text-teal-600',
+    labelText: 'text-teal-800 dark:text-teal-700',
+    hoverBorder: 'hover:border-teal-400 dark:hover:border-teal-600',
+  }),
+  no_for_now: createOutcomeStyle({
+    abbr: 'NN',
+    label: 'No for Now',
+    statLabel: 'No for Now',
+    helpText: 'Not interested at this time',
+    border: 'border-pink-600',
+    text: 'text-pink-900 dark:text-pink-600',
+    labelText: 'text-pink-800 dark:text-pink-700',
+    hoverBorder: 'hover:border-pink-400 dark:hover:border-pink-600',
+  }),
+  already_uw: createOutcomeStyle({
+    abbr: 'UW',
+    label: 'Already with UW',
+    statLabel: 'Already with UW',
+    helpText: 'Customer is already a UW member',
+    border: 'border-sky-600',
+    text: 'text-sky-900 dark:text-sky-600',
+    labelText: 'text-sky-800 dark:text-sky-700',
+    hoverBorder: 'hover:border-sky-400 dark:hover:border-sky-600',
+  }),
+  not_interested: createOutcomeStyle({
+    abbr: 'NI',
+    label: 'Not Interested',
+    statLabel: 'Not Interested',
+    helpText: 'Definitely not interested',
+    border: 'border-zinc-700',
+    text: 'text-zinc-900 dark:text-zinc-700',
+    labelText: 'text-zinc-800 dark:text-zinc-600',
+    hoverBorder: 'hover:border-zinc-500 dark:hover:border-zinc-700',
+  }),
+  no_answer: createOutcomeStyle({
+    abbr: 'NA',
+    label: 'No Answer',
+    statLabel: 'No Answer',
+    helpText: 'No answer at the door',
+    border: 'border-slate-500',
+    text: 'text-slate-800 dark:text-slate-500',
+    labelText: 'text-slate-600 dark:text-slate-600',
+    hoverBorder: 'hover:border-slate-400 dark:hover:border-slate-500',
+  }),
+  no_cold_callers: createOutcomeStyle({
+    abbr: 'NC',
+    label: 'No Cold Callers',
+    statLabel: 'No Cold Callers',
+    helpText: 'Resident does not want cold callers',
+    border: 'border-orange-700',
+    text: 'text-orange-900 dark:text-orange-700',
+    labelText: 'text-orange-800 dark:text-orange-600',
+    hoverBorder: 'hover:border-orange-500 dark:hover:border-orange-700',
+  }),
+};
+
+const PROPERTY_PROGRESS_STYLES = {
+  dropped: {
+    abbr: 'D',
+    label: 'Dropped',
+    helpText: 'Letter delivered through letterbox',
+    chip: 'border border-red-400 bg-red-50/60 dark:bg-red-900/10 text-red-700 dark:text-red-300',
+    legend: 'w-4 h-4 rounded border border-red-400 bg-red-50/60 flex items-center justify-center text-[8px] font-bold text-red-700 cursor-help',
+    icon: 'text-red-600 dark:text-red-400',
+    checkBadge: 'inline-flex items-center justify-center w-5 h-5 rounded-full border border-red-400 bg-red-50/60 dark:bg-red-900/10 text-red-700 dark:text-red-300 text-xs',
+    helpPanel: 'p-3 border border-red-400 bg-red-50/60 dark:bg-red-900/10 rounded-xl',
+    helpTitle: 'font-medium text-red-800 dark:text-red-200',
+    helpBody: 'text-red-700 dark:text-red-300',
+  },
+  knocked: {
+    abbr: 'K',
+    label: 'Knocked',
+    helpText: 'Door knocked, no answer or brief interaction',
+    chip: 'border border-amber-400 bg-amber-50/60 dark:bg-amber-900/10 text-amber-700 dark:text-amber-300',
+    legend: 'w-4 h-4 rounded border border-amber-400 bg-amber-50/60 flex items-center justify-center text-[8px] font-bold text-amber-700 cursor-help',
+    icon: 'text-amber-600 dark:text-amber-400',
+    checkBadge: 'inline-flex items-center justify-center w-5 h-5 rounded-full border border-amber-400 bg-amber-50/60 dark:bg-amber-900/10 text-amber-700 dark:text-amber-300 text-xs',
+    helpPanel: 'p-3 border border-amber-400 bg-amber-50/60 dark:bg-amber-900/10 rounded-xl',
+    helpTitle: 'font-medium text-amber-800 dark:text-amber-200',
+    helpBody: 'text-amber-700 dark:text-amber-300',
+  },
+  spoke: {
+    abbr: 'S',
+    label: 'Spoke',
+    helpText: 'Full conversation had with resident',
+    chip: 'border border-green-500 bg-green-50/60 dark:bg-green-900/10 text-green-700 dark:text-green-300',
+    legend: 'w-4 h-4 rounded border border-green-500 bg-green-50/60 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help',
+    icon: 'text-green-600 dark:text-green-400',
+    checkBadge: 'inline-flex items-center justify-center w-5 h-5 rounded-full border border-green-500 bg-green-50/60 dark:bg-green-900/10 text-green-700 dark:text-green-300 text-xs',
+    helpPanel: 'p-3 border border-green-500 bg-green-50/60 dark:bg-green-900/10 rounded-xl',
+    helpTitle: 'font-medium text-green-800 dark:text-green-200',
+    helpBody: 'text-green-700 dark:text-green-300',
+  },
+};
+
+const OUTCOME_STAT_KEYS = [
+  'customer_signed',
+  'appointment_booked',
+  'interested',
+  'no_for_now',
+  'already_uw',
+  'not_interested',
+  'no_answer',
+  'no_cold_callers',
+];
+
+const PROPERTY_OUTCOME_LEGEND = Object.values(PROPERTY_OUTCOME_STYLES);
+const PROPERTY_PROGRESS_LEGEND = Object.values(PROPERTY_PROGRESS_STYLES);
+
+function getPropertyChipClassName(property) {
+  const defaultStyle = 'border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-600';
+
+  if (property.result && property.result !== 'none') {
+    return PROPERTY_OUTCOME_STYLES[property.result]?.chip ?? defaultStyle;
+  }
+  if (property.spoke) return PROPERTY_PROGRESS_STYLES.spoke.chip;
+  if (property.knocked) return PROPERTY_PROGRESS_STYLES.knocked.chip;
+  if (property.dropped) return PROPERTY_PROGRESS_STYLES.dropped.chip;
+  return defaultStyle;
+}
+
+function OutcomeStatCard({ outcomeKey, count }) {
+  const style = PROPERTY_OUTCOME_STYLES[outcomeKey];
+  if (!style) return null;
+
+  return (
+    <div className={style.panel}>
+      <div className={style.panelValue}>{count || 0}</div>
+      <div className={style.panelLabel}>{style.statLabel}</div>
+    </div>
+  );
+}
+
+function OutcomeResultBadge({ result }) {
+  if (!result || result === 'none') {
+    return <span className="text-gray-500 dark:text-gray-400">—</span>;
+  }
+
+  const style = PROPERTY_OUTCOME_STYLES[result];
+  if (style?.badge) {
+    return (
+      <span className={style.badge}>
+        {result.replace(/_/g, ' ')}
+      </span>
+    );
+  }
+
+  return <span className="text-gray-600 dark:text-gray-400">{result.replace(/_/g, ' ')}</span>;
+}
+
+function ProgressCheckBadge({ active, progressKey }) {
+  if (!active) {
+    return <span className="text-gray-400 dark:text-gray-600">—</span>;
+  }
+
+  const style = PROPERTY_PROGRESS_STYLES[progressKey];
+  return <span className={style.checkBadge}>✓</span>;
+}
+
+function PropertyStatusLegendSwatch({ entry, onShowTooltip, onHoverTooltip, useHover = true }) {
+  return (
+    <span
+      className={entry.legend}
+      onMouseEnter={useHover ? () => onHoverTooltip(entry.label) : undefined}
+      onMouseLeave={useHover ? () => onHoverTooltip(null) : undefined}
+      onClick={() => onShowTooltip(entry.label)}
+    >
+      {entry.abbr}
+    </span>
+  );
+}
 
 // --- Mock Seed Data ---
 const seedScripts = {
@@ -87,59 +364,6 @@ const seedScripts = {
     },
   ],
 };
-
-const seedCampaigns = [
-  {
-    id: "c1",
-    name: "Elmswell NL – Aug 2025",
-    area: "IP30",
-    status: "active",
-    created_at: "2025-08-01",
-    links: {
-      connector: "https://example.com/connector",
-      quote: "https://example.com/quote",
-      booking: "https://example.com/book",
-      faq: "https://example.com/faq",
-    },
-    streets: [
-      {
-        id: "s1",
-        name: "Orchard Way",
-        postcode: "IP30 9XX",
-        status: "in_progress",
-        properties: [
-          { id: "p1", label: "1", dropped: true, knocked: true, spoke: false, result: "no_answer", photo: null },
-          { id: "p2", label: "3", dropped: true, knocked: true, spoke: true, result: "maybe", followUpAt: "2025-08-16T18:00:00", photo: null },
-          { id: "p3", label: "5", dropped: true, knocked: false, spoke: false, result: "none", photo: null },
-        ],
-      },
-      {
-        id: "s2",
-        name: "Station Road",
-        postcode: "IP30 9YY",
-        status: "not_started",
-        properties: [
-          { id: "p4", label: "12", dropped: false, knocked: false, spoke: false, result: "none", photo: null },
-          { id: "p5", label: "14", dropped: false, knocked: false, spoke: false, result: "none", photo: null },
-        ],
-      },
-    ],
-  },
-  {
-    id: "c2",
-    name: "Stowmarket NL – Sept 2025",
-    area: "IP14",
-          status: "planned",
-    created_at: "2025-08-15",
-    links: {
-      connector: "https://example.com/connector",
-      quote: "https://example.com/quote",
-      booking: "https://example.com/book",
-      faq: "https://example.com/faq",
-    },
-    streets: [],
-  },
-];
 
 // Utility components
 const Chip = ({ children, variant = "default", className = "" }) => {
@@ -254,24 +478,6 @@ export default function App() {
     })();
   }, []);
 
-  // Facebook group reminder - show every 3 days
-  useEffect(() => {
-    const FACEBOOK_REMINDER_KEY = 'uw_ss_facebook_reminder_last_shown';
-    const now = Date.now();
-    const lastShown = localStorage.getItem(FACEBOOK_REMINDER_KEY);
-    const threeDays = 3 * 24 * 60 * 60 * 1000; // 3 days in milliseconds
-    
-    if (!lastShown || (now - parseInt(lastShown)) > threeDays) {
-      // Show reminder after a short delay
-      const timer = setTimeout(() => {
-        setShowFacebookReminder(true);
-        localStorage.setItem(FACEBOOK_REMINDER_KEY, now.toString());
-      }, 2000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
   // Version update check - show when new version is available
   useEffect(() => {
     const VERSION_KEY = 'uw_ss_app_version';
@@ -310,15 +516,46 @@ export default function App() {
   
   // Facebook group reminder state
   const [showFacebookReminder, setShowFacebookReminder] = useState(false);
+
+  // Facebook group reminder - show every 7 days unless permanently dismissed
+  useEffect(() => {
+    if (localStorage.getItem(FACEBOOK_REMINDER_DISMISSED_KEY)) return;
+
+    const now = Date.now();
+    const lastShown = localStorage.getItem(FACEBOOK_REMINDER_LAST_SHOWN_KEY);
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+
+    if (!lastShown || (now - parseInt(lastShown, 10)) > sevenDays) {
+      const timer = setTimeout(() => {
+        setShowFacebookReminder(true);
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const dismissFacebookReminderLater = useCallback(() => {
+    localStorage.setItem(FACEBOOK_REMINDER_LAST_SHOWN_KEY, Date.now().toString());
+    setShowFacebookReminder(false);
+  }, []);
+
+  const dismissFacebookReminderForever = useCallback(() => {
+    localStorage.setItem(FACEBOOK_REMINDER_DISMISSED_KEY, '1');
+    setShowFacebookReminder(false);
+  }, []);
   
   // Version update notification state
   const [showVersionUpdate, setShowVersionUpdate] = useState(false);
   const [currentVersion, setCurrentVersion] = useState('1.0.0');
   
-  // Load campaigns from localStorage or use seed data only on first run
+  // Load campaigns from localStorage; first install starts with no campaigns
   const [campaigns, setCampaigns] = useState(() => {
-    const saved = localStorage.getItem('uw_streetsmart_campaigns');
-    return saved ? JSON.parse(saved) : seedCampaigns;
+    try {
+      const saved = localStorage.getItem('uw_streetsmart_campaigns');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
   // Wrapper function to save campaigns to localStorage whenever they change
@@ -335,9 +572,9 @@ export default function App() {
     });
   };
   
-  const [activeCampaignId, setActiveCampaignId] = useState("c1");
-  const [activeStreetId, setActiveStreetId] = useState("s1");
-  const [activePropertyId, setActivePropertyId] = useState("p2");
+  const [activeCampaignId, setActiveCampaignId] = useState("");
+  const [activeStreetId, setActiveStreetId] = useState("");
+  const [activePropertyId, setActivePropertyId] = useState("");
   const [showScripts, setShowScripts] = useState(false);
   const [showLinks, setShowLinks] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -380,9 +617,9 @@ export default function App() {
   const [addressLookupStep, setAddressLookupStep] = useState("search"); // search, select, import
   const [searchTimeout, setSearchTimeout] = useState(null);
   const mainContentRef = useRef(null);
-  const firebaseUidRef = useRef(null);
+  const cloudUidRef = useRef(null);
 
-  const [firebaseUser, setFirebaseUser] = useState(null);
+  const { user: authUser, loading: authLoading, authRequired, passwordRecovery, completePasswordRecovery } = useCloudAuth();
   const [cloudMergeOpen, setCloudMergeOpen] = useState(false);
   const [cloudMergeRemote, setCloudMergeRemote] = useState(null);
   const [lastCloudSyncAt, setLastCloudSyncAt] = useState(null);
@@ -390,6 +627,30 @@ export default function App() {
   const [cloudSyncMessage, setCloudSyncMessage] = useState("");
   /** True after user taps "Decide later" on merge modal — blocks auto-upload until they resolve or use "Save to cloud now". */
   const [cloudPushPaused, setCloudPushPaused] = useState(false);
+  /** User-controlled pause for automatic cloud upload (Settings toggle). */
+  const [cloudAutoSyncPaused, setCloudAutoSyncPaused] = useState(() => {
+    try {
+      return localStorage.getItem("uw_ss_cloud_auto_sync_paused") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const cloudUploadBlocked = cloudPushPaused || cloudAutoSyncPaused;
+
+  const setCloudAutoSyncPausedPersisted = useCallback((paused) => {
+    setCloudAutoSyncPaused(paused);
+    try {
+      if (paused) {
+        localStorage.setItem("uw_ss_cloud_auto_sync_paused", "1");
+      } else {
+        localStorage.removeItem("uw_ss_cloud_auto_sync_paused");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  /** Shown when a different account signs in but this device still has prior user's local data. */
+  const [accountSwitchOpen, setAccountSwitchOpen] = useState(false);
   /** Shown when cloud backup `updatedAt` is newer than last successful sync on this device. */
   const [cloudNewerHint, setCloudNewerHint] = useState(null);
   const cloudBannerDismissedRemoteMsRef = useRef(0);
@@ -1619,43 +1880,98 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const auth = getFirebaseAuth();
-    if (!auth) return () => {};
-    return onAuthStateChanged(auth, async (user) => {
-      const prevUid = firebaseUidRef.current;
-      const newUid = user?.uid ?? null;
-      firebaseUidRef.current = newUid;
-      setFirebaseUser(user);
-      if (!user) {
-        firebaseUidRef.current = null;
-        setCloudMergeOpen(false);
-        setCloudMergeRemote(null);
-        setCloudPushPaused(false);
-        setCloudNewerHint(null);
-        return;
-      }
-      if (prevUid !== newUid) {
-        setCloudPushPaused(false);
-      }
+    const newUid = authUser?.id ?? null;
+    cloudUidRef.current = newUid;
+    if (!newUid) {
+      cloudUidRef.current = null;
+      setCloudMergeOpen(false);
+      setCloudMergeRemote(null);
+      setCloudPushPaused(false);
+      setCloudNewerHint(null);
+      setAccountSwitchOpen(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const accountSwitched = detectAccountSwitch(newUid);
+      recordAuthUserId(newUid);
+
       try {
-        const remote = await fetchCloudPayload(user.uid);
-        const done = localStorage.getItem(mergeDoneStorageKey(user.uid));
+        const remote = await fetchCloudPayload(newUid);
+        if (cancelled) return;
+
+        const supabase = getSupabaseClient();
+        const applyAuthPartnerName = async (force = false) => {
+          if (!supabase) return;
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!cancelled && user) {
+            applyPartnerNameFromUser(user, { accountSwitched: force || accountSwitched });
+          }
+        };
+
+        if (accountSwitched) {
+          setCloudPushPaused(true);
+          sessionStorage.removeItem("uw_ss_merge_snooze");
+
+          if (remote && cloudPayloadHasCampaigns(remote)) {
+            applyPayloadToStores(remote, {
+              updateCampaigns,
+              setDark,
+              setActiveCampaignId,
+              setActiveStreetId,
+              setActivePropertyId,
+            });
+            localStorage.setItem(mergeDoneStorageKey(newUid), "1");
+            const remoteMs = getCloudUpdatedAtMs(remote);
+            cloudBannerDismissedRemoteMsRef.current = Math.max(
+              cloudBannerDismissedRemoteMsRef.current,
+              remoteMs,
+              Date.now()
+            );
+            setLastCloudSyncAt(remoteMs || Date.now());
+            setCloudNewerHint(null);
+            setCloudPushPaused(false);
+            setCloudSyncStatus("ok");
+            setCloudSyncMessage("");
+            if (!remote.partner_name) await applyAuthPartnerName(true);
+            return;
+          }
+
+          if (deviceHasLocalCampaigns()) {
+            await applyAuthPartnerName(true);
+            setAccountSwitchOpen(true);
+            return;
+          }
+
+          await applyAuthPartnerName(true);
+          setCloudPushPaused(false);
+          return;
+        }
+
+        await applyAuthPartnerName(false);
+
+        const done = localStorage.getItem(mergeDoneStorageKey(newUid));
         const snooze = sessionStorage.getItem("uw_ss_merge_snooze");
         if (remote && cloudPayloadHasCampaigns(remote) && !done && !snooze) {
           setCloudMergeRemote(remote);
           setCloudMergeOpen(true);
+          setAccountSwitchOpen(false);
         }
       } catch (e) {
+        if (cancelled) return;
         console.error("Cloud pull failed", e);
         setCloudSyncStatus("error");
         setCloudSyncMessage(e.message || "Could not load cloud data");
       }
-    });
-  }, []);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser?.id]);
 
   useEffect(() => {
-    if (!firebaseUser?.uid || cloudMergeOpen || cloudPushPaused) return () => {};
-    const uid = firebaseUser.uid;
+    if (!authUser?.id || cloudMergeOpen || cloudUploadBlocked || accountSwitchOpen) return () => {};
+    const uid = authUser.id;
     const t = setTimeout(async () => {
       try {
         setCloudSyncStatus("syncing");
@@ -1670,11 +1986,11 @@ export default function App() {
       }
     }, 4000);
     return () => clearTimeout(t);
-  }, [campaigns, dark, firebaseUser?.uid, cloudMergeOpen, cloudPushPaused]);
+  }, [campaigns, dark, authUser?.id, cloudMergeOpen, cloudUploadBlocked, accountSwitchOpen]);
 
   useEffect(() => {
-    if (!firebaseUser?.uid || cloudMergeOpen || cloudPushPaused) return () => {};
-    const uid = firebaseUser.uid;
+    if (!authUser?.id || cloudMergeOpen || cloudUploadBlocked || accountSwitchOpen) return () => {};
+    const uid = authUser.id;
     const id = setInterval(async () => {
       try {
         setCloudSyncStatus("syncing");
@@ -1687,14 +2003,66 @@ export default function App() {
       }
     }, 120000);
     return () => clearInterval(id);
-  }, [firebaseUser?.uid, cloudMergeOpen, cloudPushPaused, campaigns, dark]);
+  }, [authUser?.id, cloudMergeOpen, cloudUploadBlocked, accountSwitchOpen, campaigns, dark]);
 
-  const handleCloudSyncNow = useCallback(async () => {
-    if (!firebaseUser?.uid) return;
+  const handleAccountSwitchUseLocal = useCallback(() => {
+    const user = authUser;
+    if (!user?.id) return;
+    localStorage.setItem(mergeDoneStorageKey(user.id), "1");
+    setAccountSwitchOpen(false);
+    setCloudPushPaused(false);
+  }, [authUser]);
+
+  const handleAccountSwitchStartFresh = useCallback(async () => {
+    const user = authUser;
+    if (!user?.id) return;
+    const emptyCampaigns = [
+      {
+        id: "new-campaign",
+        name: "New Campaign",
+        area: "",
+        status: "planned",
+        created_at: new Date().toISOString().split("T")[0],
+        links: { connector: "", quote: "", booking: "", faq: "" },
+        streets: [],
+      },
+    ];
+    updateCampaigns(emptyCampaigns);
+    setActiveCampaignId("new-campaign");
+    setActiveStreetId("");
+    setActivePropertyId("");
+    localStorage.removeItem("partner_scripts");
+    localStorage.removeItem("partner_script_order");
+    localStorage.removeItem("partner_documents");
+    localStorage.setItem(mergeDoneStorageKey(user.id), "1");
+    setAccountSwitchOpen(false);
     setCloudPushPaused(false);
     try {
       setCloudSyncStatus("syncing");
-      await saveCloudPayload(firebaseUser.uid, buildLocalPayload(campaigns, dark));
+      await saveCloudPayload(user.id, buildLocalPayload(emptyCampaigns, dark));
+      setLastCloudSyncAt(Date.now());
+      setCloudSyncStatus("ok");
+      setCloudSyncMessage("");
+    } catch (e) {
+      console.error(e);
+      setCloudSyncStatus("error");
+      setCloudSyncMessage(e.message || "Could not save to cloud");
+    }
+  }, [
+    authUser,
+    dark,
+    updateCampaigns,
+    setActiveCampaignId,
+    setActiveStreetId,
+    setActivePropertyId,
+  ]);
+
+  const handleCloudSyncNow = useCallback(async () => {
+    if (!authUser?.id) return;
+    setCloudPushPaused(false);
+    try {
+      setCloudSyncStatus("syncing");
+      await saveCloudPayload(authUser.id, buildLocalPayload(campaigns, dark));
       setLastCloudSyncAt(Date.now());
       setCloudSyncStatus("ok");
       setCloudSyncMessage("");
@@ -1704,17 +2072,17 @@ export default function App() {
       setCloudSyncStatus("error");
       setCloudSyncMessage(e.message || "Sync failed");
     }
-  }, [firebaseUser, campaigns, dark]);
+  }, [authUser, campaigns, dark]);
 
   const handlePullFromCloud = useCallback(async () => {
-    if (!firebaseUser?.uid) return;
+    if (!authUser?.id) return;
     if (!window.confirm("Replace this device with the latest cloud backup? Export a backup from Settings first if you are unsure.")) {
       return;
     }
     try {
       setCloudSyncStatus("syncing");
       setCloudSyncMessage("");
-      const remote = await fetchCloudPayload(firebaseUser.uid);
+      const remote = await fetchCloudPayload(authUser.id);
       if (!remote || !cloudPayloadHasCampaigns(remote)) {
         window.alert("No cloud backup found yet.");
         setCloudSyncStatus("idle");
@@ -1736,7 +2104,7 @@ export default function App() {
         partner_script_order: remote.partner_script_order,
         partner_documents: remote.partner_documents,
       };
-      await saveCloudPayload(firebaseUser.uid, payload);
+      await saveCloudPayload(authUser.id, payload);
       const remoteMs = getCloudUpdatedAtMs(remote);
       cloudBannerDismissedRemoteMsRef.current = Math.max(cloudBannerDismissedRemoteMsRef.current, remoteMs, Date.now());
       setLastCloudSyncAt(Date.now());
@@ -1748,7 +2116,7 @@ export default function App() {
       setCloudSyncMessage(e.message || "Could not load cloud data");
     }
   }, [
-    firebaseUser,
+    authUser,
     updateCampaigns,
     setDark,
     setActiveCampaignId,
@@ -1769,11 +2137,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!firebaseUser?.uid || cloudMergeOpen) return () => {};
+    if (!authUser?.id || cloudMergeOpen) return () => {};
     let cancelled = false;
     const run = async () => {
       try {
-        const remote = await fetchCloudPayload(firebaseUser.uid);
+        const remote = await fetchCloudPayload(authUser.id);
         if (cancelled || !remote) return;
         const remoteMs = getCloudUpdatedAtMs(remote);
         if (!remoteMs) return;
@@ -1802,12 +2170,12 @@ export default function App() {
       clearInterval(iv);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [firebaseUser?.uid, lastCloudSyncAt, cloudMergeOpen]);
+  }, [authUser?.id, lastCloudSyncAt, cloudMergeOpen]);
 
   const handleMergeUseCloud = useCallback(async () => {
-    const user = firebaseUser;
+    const user = authUser;
     const remote = cloudMergeRemote;
-    if (!user?.uid || !remote) return;
+    if (!user?.id || !remote) return;
     try {
       applyPayloadToStores(remote, {
         updateCampaigns,
@@ -1816,7 +2184,7 @@ export default function App() {
         setActiveStreetId,
         setActivePropertyId,
       });
-      localStorage.setItem(mergeDoneStorageKey(user.uid), "1");
+      localStorage.setItem(mergeDoneStorageKey(user.id), "1");
       setCloudPushPaused(false);
       setCloudMergeOpen(false);
       setCloudMergeRemote(null);
@@ -1829,7 +2197,7 @@ export default function App() {
         partner_script_order: remote.partner_script_order,
         partner_documents: remote.partner_documents,
       };
-      await saveCloudPayload(user.uid, payload);
+      await saveCloudPayload(user.id, payload);
       setLastCloudSyncAt(Date.now());
       setCloudNewerHint(null);
       setCloudSyncStatus("ok");
@@ -1840,7 +2208,7 @@ export default function App() {
       setCloudSyncMessage(e.message || "Could not apply cloud data");
     }
   }, [
-    firebaseUser,
+    authUser,
     cloudMergeRemote,
     updateCampaigns,
     setDark,
@@ -1850,14 +2218,14 @@ export default function App() {
   ]);
 
   const handleMergeKeepDevice = useCallback(async () => {
-    const user = firebaseUser;
-    if (!user?.uid) return;
+    const user = authUser;
+    if (!user?.id) return;
     try {
-      localStorage.setItem(mergeDoneStorageKey(user.uid), "1");
+      localStorage.setItem(mergeDoneStorageKey(user.id), "1");
       setCloudPushPaused(false);
       setCloudMergeOpen(false);
       setCloudMergeRemote(null);
-      await saveCloudPayload(user.uid, buildLocalPayload(campaigns, dark));
+      await saveCloudPayload(user.id, buildLocalPayload(campaigns, dark));
       setLastCloudSyncAt(Date.now());
       setCloudNewerHint(null);
       setCloudSyncStatus("ok");
@@ -1867,7 +2235,7 @@ export default function App() {
       setCloudSyncStatus("error");
       setCloudSyncMessage(e.message || "Could not upload to cloud");
     }
-  }, [firebaseUser, campaigns, dark]);
+  }, [authUser, campaigns, dark]);
 
   const handleMergeLater = useCallback(() => {
     sessionStorage.setItem("uw_ss_merge_snooze", "1");
@@ -1892,10 +2260,45 @@ export default function App() {
     setShowUpdateModal(false);
   };
 
+  const handleSignOut = useCallback(async () => {
+    try {
+      await signOutCloudAuth();
+    } catch (e) {
+      console.error(e);
+      window.alert(e?.message || "Could not sign out.");
+    }
+  }, []);
+
+  if (authRequired && authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 text-gray-600 dark:text-gray-300">
+        Loading…
+      </div>
+    );
+  }
+
+  if (authRequired && !authUser && !passwordRecovery) {
+    return <SupabaseAuthScreen />;
+  }
+
+  if (authRequired && passwordRecovery) {
+    return (
+      <SupabaseAuthScreen
+        recoveryMode
+        onRecoveryComplete={() => {
+          completePasswordRecovery();
+          if (typeof window !== "undefined" && window.location.hash) {
+            window.history.replaceState(null, "", window.location.pathname + window.location.search);
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 text-gray-900 dark:text-gray-50 overflow-x-hidden">
-      <FirebaseEmailLinkHandler />
-      {cloudNewerHint && firebaseUser && (
+      {!isSupabaseConfigured() && <FirebaseEmailLinkHandler />}
+      {cloudNewerHint && authUser && (
         <div
           role="status"
           className="bg-amber-100 dark:bg-amber-900/35 border-b border-amber-300 dark:border-amber-700 px-3 py-2.5 text-sm flex flex-wrap items-center gap-2 justify-between"
@@ -1929,6 +2332,13 @@ export default function App() {
         onUseCloud={handleMergeUseCloud}
         onKeepDevice={handleMergeKeepDevice}
         onDecideLater={handleMergeLater}
+      />
+      <AccountSwitchModal
+        open={accountSwitchOpen}
+        userEmail={authUser?.email}
+        onUseLocalForAccount={handleAccountSwitchUseLocal}
+        onStartFresh={handleAccountSwitchStartFresh}
+        onSignOut={handleSignOut}
       />
       {/* Top Bar */}
       <div className="sticky top-0 z-40 backdrop-blur bg-white/60 dark:bg-gray-950/60 border-b border-gray-200/50 dark:border-gray-800/50">
@@ -2000,16 +2410,16 @@ export default function App() {
               {view === "dashboard" && activeCampaign && (
                 <div className="flex items-center gap-2 text-xs">
                   <div className="flex items-center gap-1">
-                    <UploadCloud className="w-3 h-3 text-green-600" />
-                    <span className="text-green-600 font-medium">{stats.letters}</span>
+                    <UploadCloud className={`w-3 h-3 ${PROPERTY_PROGRESS_STYLES.dropped.icon}`} />
+                    <span className={`font-medium ${PROPERTY_PROGRESS_STYLES.dropped.icon}`}>{stats.letters}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Check className="w-3 h-3 text-indigo-600" />
-                    <span className="text-indigo-600 font-medium">{stats.knocked}</span>
+                    <Check className={`w-3 h-3 ${PROPERTY_PROGRESS_STYLES.knocked.icon}`} />
+                    <span className={`font-medium ${PROPERTY_PROGRESS_STYLES.knocked.icon}`}>{stats.knocked}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <MessageSquare className="w-3 h-3 text-blue-600" />
-                    <span className="text-blue-600 font-medium">{stats.convos}</span>
+                    <MessageSquare className={`w-3 h-3 ${PROPERTY_PROGRESS_STYLES.spoke.icon}`} />
+                    <span className={`font-medium ${PROPERTY_PROGRESS_STYLES.spoke.icon}`}>{stats.convos}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <CheckCircle className="w-3 h-3 text-primary-600" />
@@ -2208,7 +2618,7 @@ export default function App() {
         />
       </Drawer>
       <Drawer open={showPdfViewer} onClose={()=>setShowPdfViewer(false)} title={currentPdfTitle} size="full">
-        <PdfViewer url={currentPdfUrl} title={currentPdfTitle} />
+        <PdfViewer url={currentPdfUrl} title={currentPdfTitle} onClose={() => setShowPdfViewer(false)} />
       </Drawer>
       <Drawer open={showImageViewer} onClose={()=>setShowImageViewer(false)} title={currentImageTitle} size="large">
         <ImageViewer url={currentImageUrl} title={currentImageTitle} onClose={()=>setShowImageViewer(false)} />
@@ -2228,6 +2638,10 @@ export default function App() {
           onCloudSyncNow={handleCloudSyncNow}
           onPullFromCloud={handlePullFromCloud}
           cloudPushPaused={cloudPushPaused}
+          cloudAutoSyncPaused={cloudAutoSyncPaused}
+          onCloudAutoSyncPausedChange={setCloudAutoSyncPausedPersisted}
+          accountEmail={authUser?.email ?? null}
+          onSignOut={handleSignOut}
         />
       </Drawer>
 
@@ -2485,21 +2899,32 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex gap-3">
-              <a
-                href="https://www.facebook.com/groups/24642395235425303/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm font-medium text-center"
-              >
-                Join Facebook Group
-              </a>
+            <div className="space-y-2">
+              <div className="flex flex-col sm:flex-row gap-2">
+                <a
+                  href="https://www.facebook.com/groups/24642395235425303/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm font-medium text-center"
+                >
+                  Join Facebook Group
+                </a>
+                <button
+                  onClick={dismissFacebookReminderLater}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm"
+                >
+                  Maybe Later
+                </button>
+              </div>
               <button
-                onClick={() => setShowFacebookReminder(false)}
-                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm"
+                onClick={dismissFacebookReminderForever}
+                className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
               >
-                Maybe Later
+                Got it. Don&apos;t show this again
               </button>
+              <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+                You can always find the group link in Settings.
+              </p>
             </div>
           </div>
         </div>
@@ -2597,11 +3022,11 @@ function NavButton({ icon, label, active, onClick }) {
   );
 }
 
-function Stat({ icon: Icon, label, value, sub }) {
+function Stat({ icon: Icon, label, value, sub, accentClass = 'text-primary-600' }) {
   return (
     <div className="rounded-2xl p-3 sm:p-4 bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 shadow-soft flex items-center gap-2 sm:gap-3 min-w-0">
       <div className="p-1.5 sm:p-2 rounded-xl bg-gray-100 dark:bg-gray-800 flex-shrink-0">
-        <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
+        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${accentClass}`} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-xl sm:text-2xl font-semibold leading-none">{value}</div>
@@ -2691,9 +3116,9 @@ function Dashboard({ stats, activeCampaign, onGoStreets, onGoToCampaigns, onCrea
       >
         {hasData ? (
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
-            <Stat icon={UploadCloud} label="Letters dropped" value={stats.letters} />
-            <Stat icon={Check} label="Knocked" value={stats.knocked} />
-            <Stat icon={MessageSquare} label="Conversations" value={stats.convos} />
+            <Stat icon={UploadCloud} label="Letters dropped" value={stats.letters} accentClass={PROPERTY_PROGRESS_STYLES.dropped.icon} />
+            <Stat icon={Check} label="Knocked" value={stats.knocked} accentClass={PROPERTY_PROGRESS_STYLES.knocked.icon} />
+            <Stat icon={MessageSquare} label="Conversations" value={stats.convos} accentClass={PROPERTY_PROGRESS_STYLES.spoke.icon} />
             <Stat icon={CheckCircle} label="Successes" value={stats.interested} />
             <Stat icon={CalendarClock} label="Follow Ups Due" value={stats.followups} />
           </div>
@@ -2710,39 +3135,13 @@ function Dashboard({ stats, activeCampaign, onGoStreets, onGoToCampaigns, onCrea
       {hasData && stats.outcomes && (
         <SectionCard title="Conversation Outcomes" icon={MessageSquare}>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-            <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
-              <div className="text-base sm:text-lg font-semibold text-green-800 dark:text-green-200">{stats.outcomes.customer_signed}</div>
-              <div className="text-xs sm:text-sm text-green-700 dark:text-green-300">Customers Signed</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500 dark:border-emerald-500">
-              <div className="text-base sm:text-lg font-semibold text-emerald-800 dark:text-emerald-200">{stats.outcomes.appointment_booked}</div>
-              <div className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-300">Appointment Booked</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
-              <div className="text-base sm:text-lg font-semibold text-green-800 dark:text-green-200">{stats.outcomes.interested}</div>
-              <div className="text-xs sm:text-sm text-green-700 dark:text-green-300">Interested</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-500 dark:border-amber-500">
-              <div className="text-base sm:text-lg font-semibold text-amber-800 dark:text-amber-200">{stats.outcomes.no_for_now}</div>
-              <div className="text-xs sm:text-sm text-amber-700 dark:text-amber-300">No for Now</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-sky-50 dark:bg-sky-900/20 border-2 border-sky-500 dark:border-sky-500">
-              <div className="text-base sm:text-lg font-semibold text-sky-800 dark:text-sky-200">{stats.outcomes.already_uw}</div>
-              <div className="text-xs sm:text-sm text-sky-700 dark:text-sky-300">Already with UW</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-500">
-              <div className="text-base sm:text-lg font-semibold text-red-800 dark:text-red-200">{stats.outcomes.not_interested}</div>
-              <div className="text-xs sm:text-sm text-red-700 dark:text-red-300">Not Interested</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-slate-50 dark:bg-slate-900/20 border-2 border-slate-500 dark:border-slate-500">
-              <div className="text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-200">{stats.outcomes.no_answer || 0}</div>
-              <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">No Answer</div>
-            </div>
-            <div className="p-2 sm:p-3 rounded-xl bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-500 dark:border-purple-500">
-              <div className="text-base sm:text-lg font-semibold text-purple-800 dark:text-purple-200">{stats.outcomes.no_cold_callers || 0}</div>
-              <div className="text-xs sm:text-sm text-purple-700 dark:text-purple-300">No Cold Callers</div>
-            </div>
-
+            {OUTCOME_STAT_KEYS.map((outcomeKey) => (
+              <OutcomeStatCard
+                key={outcomeKey}
+                outcomeKey={outcomeKey}
+                count={stats.outcomes[outcomeKey]}
+              />
+            ))}
           </div>
         </SectionCard>
       )}
@@ -2874,6 +3273,14 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
         )}
       </SectionCard>
       
+      {filteredCampaigns.length === 0 && campaigns.length === 0 && (
+        <div className="rounded-2xl p-6 text-center bg-white/70 dark:bg-gray-900/70 border border-dashed border-gray-300 dark:border-gray-700">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            No campaigns yet. Create your first neighbourhood letters campaign to get started.
+          </p>
+        </div>
+      )}
+
       {filteredCampaigns.map(c => (
         <SectionCard key={c.id} title={c.name} icon={MapPin        } actions={
           <div className="flex flex-wrap gap-2 min-w-0">
@@ -2934,9 +3341,26 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
   );
 }
 
+function propertyMatchesProgress(property, progressFilter) {
+  if (progressFilter === "all") return true;
+  if (progressFilter === "none") return !property.dropped && !property.knocked && !property.spoke;
+  if (progressFilter === "dropped") return !!property.dropped;
+  if (progressFilter === "knocked") return !!property.knocked;
+  if (progressFilter === "spoke") return !!property.spoke;
+  return true;
+}
+
+function propertyMatchesOutcome(property, outcomeFilter) {
+  if (outcomeFilter === "all") return true;
+  if (outcomeFilter === "none") return !property.result || property.result === "none";
+  return property.result === outcomeFilter;
+}
+
 function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onAddStreet, onEditStreet, onDeleteStreet, onManageProperties, onImportStreets }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [progressFilter, setProgressFilter] = useState("all");
+  const [outcomeFilter, setOutcomeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("name");
   const [showFilters, setShowFilters] = useState(false);
   const [showMobileKey, setShowMobileKey] = useState(false);
@@ -2960,16 +3384,62 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
     setTooltipTimeout(timeout);
   };
 
-  // Filter and sort streets
-  const filteredStreets = useMemo(() => {
-    let filtered = campaign.streets.filter(s => {
-      const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           s.postcode.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === "all" || s.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() ||
+    statusFilter !== "all" ||
+    progressFilter !== "all" ||
+    outcomeFilter !== "all"
+  );
 
-    // Sort streets
+  const clearStreetFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setProgressFilter("all");
+    setOutcomeFilter("all");
+  };
+
+  // Filter and sort streets; optionally narrow visible property chips
+  const filteredStreets = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const propertyFiltersActive = progressFilter !== "all" || outcomeFilter !== "all";
+
+    let filtered = campaign.streets
+      .map((s) => {
+        const matchesStreetStatus = statusFilter === "all" || s.status === statusFilter;
+        if (!matchesStreetStatus) return null;
+
+        const streetMatchesSearch =
+          !term ||
+          s.name.toLowerCase().includes(term) ||
+          (s.postcode || "").toLowerCase().includes(term);
+
+        const visibleProperties = s.properties.filter((p) => {
+          if (!propertyMatchesProgress(p, progressFilter)) return false;
+          if (!propertyMatchesOutcome(p, outcomeFilter)) return false;
+
+          if (!term) return true;
+          if (streetMatchesSearch) return true;
+          return (p.label || "").toLowerCase().includes(term);
+        });
+
+        // Keep street if its name/postcode matches, or any property matches the active filters/search
+        if (!streetMatchesSearch && visibleProperties.length === 0) {
+          return null;
+        }
+        if (propertyFiltersActive && visibleProperties.length === 0) {
+          return null;
+        }
+
+        const shouldNarrowChips = propertyFiltersActive || (Boolean(term) && !streetMatchesSearch);
+
+        return {
+          ...s,
+          visibleProperties: shouldNarrowChips ? visibleProperties : s.properties,
+          matchedPropertyCount: visibleProperties.length,
+        };
+      })
+      .filter(Boolean);
+
     filtered.sort((a, b) => {
       switch (sortBy) {
         case "name":
@@ -2986,7 +3456,12 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
     });
 
     return filtered;
-  }, [campaign.streets, searchTerm, statusFilter, sortBy]);
+  }, [campaign.streets, searchTerm, statusFilter, progressFilter, outcomeFilter, sortBy]);
+
+  const matchedPropertyTotal = useMemo(
+    () => filteredStreets.reduce((sum, s) => sum + (s.matchedPropertyCount ?? s.properties.length), 0),
+    [filteredStreets]
+  );
 
   return (
     <div className="space-y-4">
@@ -3020,99 +3495,27 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
             <div className="flex items-center gap-2">
               <span className="font-medium">🎯 Outcomes:</span>
               <div className="flex items-center gap-1">
-                <span 
-                  className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Customer Signed')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Customer Signed')}
-                >
-                  CS
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Appointment Booked')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Appointment Booked')}
-                >
-                  AB
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Interested')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Interested')}
-                >
-                  I
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('No for Now')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('No for Now')}
-                >
-                  NN
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Already with UW')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Already with UW')}
-                >
-                  UW
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Not Interested')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Not Interested')}
-                >
-                  NI
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-slate-500 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('No Answer')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => setActiveTooltip(activeTooltip === 'No Answer' ? null : 'No Answer')}
-                >
-                  NA
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('No Cold Callers')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('No Cold Callers')}
-                >
-                  NC
-                </span>
+                {PROPERTY_OUTCOME_LEGEND.map((entry) => (
+                  <PropertyStatusLegendSwatch
+                    key={entry.abbr}
+                    entry={entry}
+                    onShowTooltip={showTooltip}
+                    onHoverTooltip={setActiveTooltip}
+                  />
+                ))}
               </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="font-medium">📊 Progress:</span>
               <div className="flex items-center gap-1">
-                <span 
-                  className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Dropped')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Dropped')}
-                >
-                  D
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Knocked')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Knocked')}
-                >
-                  K
-                </span>
-                <span 
-                  className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700 cursor-help" 
-                  onMouseEnter={() => setActiveTooltip('Spoke')}
-                  onMouseLeave={() => setActiveTooltip(null)}
-                  onClick={() => showTooltip('Spoke')}
-                >
-                  S
-                </span>
+                {PROPERTY_PROGRESS_LEGEND.map((entry) => (
+                  <PropertyStatusLegendSwatch
+                    key={entry.abbr}
+                    entry={entry}
+                    onShowTooltip={showTooltip}
+                    onHoverTooltip={setActiveTooltip}
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -3134,77 +3537,29 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
               <div className="flex items-center gap-2">
                 <span className="font-medium">🎯 Outcomes:</span>
                 <div className="flex items-center gap-1 flex-wrap">
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
-                    onClick={() => showTooltip('Customer Signed')}
-                  >
-                    CS
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center text-[8px] font-bold text-emerald-700 cursor-help" 
-                    onClick={() => showTooltip('Appointment Booked')}
-                  >
-                    AB
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-green-500 bg-green-50 flex items-center justify-center text-[8px] font-bold text-green-700 cursor-help" 
-                    onClick={() => showTooltip('Interested')}
-                  >
-                    I
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-amber-500 bg-amber-50 flex items-center justify-center text-[8px] font-bold text-amber-700 cursor-help" 
-                    onClick={() => showTooltip('No for Now')}
-                  >
-                    NN
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-sky-500 bg-sky-50 flex items-center justify-center text-[8px] font-bold text-sky-700 cursor-help" 
-                    onClick={() => showTooltip('Already with UW')}
-                  >
-                    UW
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-red-500 bg-red-50 flex items-center justify-center text-[8px] font-bold text-red-700 cursor-help" 
-                    onClick={() => showTooltip('Not Interested')}
-                  >
-                    NI
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-slate-500 bg-slate-50 flex items-center justify-center text-[8px] font-bold text-slate-700 cursor-help" 
-                    onClick={() => showTooltip('No Answer')}
-                  >
-                    NA
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border-2 border-purple-500 bg-purple-50 flex items-center justify-center text-[8px] font-bold text-purple-700 cursor-help" 
-                    onClick={() => showTooltip('No Cold Callers')}
-                  >
-                    NC
-                  </span>
+                  {PROPERTY_OUTCOME_LEGEND.map((entry) => (
+                    <PropertyStatusLegendSwatch
+                      key={entry.abbr}
+                      entry={entry}
+                      onShowTooltip={showTooltip}
+                      onHoverTooltip={setActiveTooltip}
+                      useHover={false}
+                    />
+                  ))}
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-medium">📊 Progress:</span>
                 <div className="flex items-center gap-1">
-                  <span 
-                    className="w-4 h-4 rounded border border-orange-300 bg-orange-50/50 flex items-center justify-center text-[8px] font-bold text-orange-700 cursor-help" 
-                    onClick={() => showTooltip('Dropped')}
-                  >
-                    D
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border border-indigo-300 bg-indigo-50/50 flex items-center justify-center text-[8px] font-bold text-indigo-700 cursor-help" 
-                    onClick={() => showTooltip('Knocked')}
-                  >
-                    K
-                  </span>
-                  <span 
-                    className="w-4 h-4 rounded border border-teal-300 bg-teal-50/50 flex items-center justify-center text-[8px] font-bold text-teal-700 cursor-help" 
-                    onClick={() => showTooltip('Spoke')}
-                  >
-                    S
-                  </span>
+                  {PROPERTY_PROGRESS_LEGEND.map((entry) => (
+                    <PropertyStatusLegendSwatch
+                      key={entry.abbr}
+                      entry={entry}
+                      onShowTooltip={showTooltip}
+                      onHoverTooltip={setActiveTooltip}
+                      useHover={false}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
@@ -3228,26 +3583,26 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
             <div className="space-y-3">
               {/* Search */}
               <div>
-                <label className="text-xs opacity-70">Search streets</label>
+                <label className="text-xs opacity-70">Search streets or properties</label>
                 <input 
                   type="text" 
                   value={searchTerm} 
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by street name or postcode..."
+                  placeholder="Street name, postcode, or property label..."
                   className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
                 />
               </div>
               
               <div className="grid grid-cols-2 gap-3">
-                {/* Status Filter */}
+                {/* Street Status Filter */}
                 <div>
-                  <label className="text-xs opacity-70">Status</label>
+                  <label className="text-xs opacity-70">Street status</label>
                   <select 
                     value={statusFilter} 
                     onChange={(e) => setStatusFilter(e.target.value)}
                     className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
                   >
-                    <option value="all">All Status</option>
+                    <option value="all">All streets</option>
                     <option value="not_started">Not Started</option>
                     <option value="in_progress">In Progress</option>
                     <option value="completed">Completed</option>
@@ -3269,16 +3624,71 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   </select>
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Property Progress Filter */}
+                <div>
+                  <label className="text-xs opacity-70">Property progress</label>
+                  <select 
+                    value={progressFilter} 
+                    onChange={(e) => setProgressFilter(e.target.value)}
+                    className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                  >
+                    <option value="all">All progress</option>
+                    <option value="dropped">Dropped (D)</option>
+                    <option value="knocked">Knocked (K)</option>
+                    <option value="spoke">Spoke (S)</option>
+                    <option value="none">No progress yet</option>
+                  </select>
+                </div>
+
+                {/* Property Outcome Filter */}
+                <div>
+                  <label className="text-xs opacity-70">Property outcome</label>
+                  <select 
+                    value={outcomeFilter} 
+                    onChange={(e) => setOutcomeFilter(e.target.value)}
+                    className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                  >
+                    <option value="all">All outcomes</option>
+                    <option value="none">No outcome yet</option>
+                    {OUTCOME_STAT_KEYS.map((key) => (
+                      <option key={key} value={key}>
+                        {PROPERTY_OUTCOME_STYLES[key].abbr} — {PROPERTY_OUTCOME_STYLES[key].label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               
-              <div className="text-xs opacity-70">
-                Showing {filteredStreets.length} of {campaign.streets.length} streets
+              <div className="flex items-center justify-between gap-2 text-xs opacity-70">
+                <span>
+                  Showing {filteredStreets.length} of {campaign.streets.length} streets
+                  {(progressFilter !== "all" || outcomeFilter !== "all" || searchTerm.trim()) && (
+                    <> · {matchedPropertyTotal} matching properties</>
+                  )}
+                </span>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearStreetFilters}
+                    className="text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0"
+                  >
+                    Clear filters
+                  </button>
+                )}
               </div>
             </div>
           )}
         </SectionCard>
         {filteredStreets.length > 0 ? (
           <div className="grid md:grid-cols-2 gap-3">
-            {filteredStreets.map(s => (
+            {filteredStreets.map(s => {
+              const chips = s.visibleProperties ?? s.properties;
+              const totalCount = s.properties.length;
+              const showingNarrowed = chips.length !== totalCount;
+
+              return (
             <div 
               key={s.id} 
               className={`rounded-2xl border p-4 bg-white/70 dark:bg-gray-900/70 transition-all ${
@@ -3298,45 +3708,26 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   {s.status.replace('_',' ')}
                 </Chip>
               </div>
-              <div className="text-xs opacity-70 mb-3">{s.properties.length} properties</div>
+              <div className="text-xs opacity-70 mb-3">
+                {showingNarrowed
+                  ? `${chips.length} of ${totalCount} properties match filters`
+                  : `${totalCount} properties`}
+              </div>
               
               {/* Property buttons with better layout */}
               <div className="mb-3">
                 <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
-                  {s.properties.map(p => {
-                    // Determine button styling based on progression and outcome
-                    let buttonStyle = 'border border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600';
-                    
-                    // OUTCOMES (Final Results) - Bold borders (2px) + Saturated colors
-                    if (p.result === 'customer_signed') {
-                      buttonStyle = 'border-2 border-green-500 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200';
-                    } else if (p.result === 'appointment_booked') {
-                      buttonStyle = 'border-2 border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-200';
-                    } else if (p.result === 'no_for_now') {
-                      buttonStyle = 'border-2 border-amber-500 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200';
-                    } else if (p.result === 'already_uw') {
-                      buttonStyle = 'border-2 border-sky-500 bg-sky-50 dark:bg-sky-900/20 text-sky-800 dark:text-sky-200';
-                    } else if (p.result === 'not_interested') {
-                      buttonStyle = 'border-2 border-red-500 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200';
-                    } else if (p.result === 'no_answer') {
-                      buttonStyle = 'border-2 border-slate-500 bg-slate-50 dark:bg-slate-900/20 text-slate-800 dark:text-slate-200';
-                    } else if (p.result === 'no_cold_callers') {
-                      buttonStyle = 'border-2 border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200';
-                    } 
-                    // STATUS STATES (Activity Progress) - Thin borders (1px) + Muted colors
-                    else if (p.spoke) {
-                      buttonStyle = 'border border-teal-300 bg-teal-50/50 dark:bg-teal-900/10 text-teal-600 dark:text-teal-400';
-                    } else if (p.knocked) {
-                      buttonStyle = 'border border-indigo-300 bg-indigo-50/50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400';
-                    } else if (p.dropped) {
-                      buttonStyle = 'border border-orange-300 bg-orange-50/50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400';
-                    }
-                    
+                  {chips.map(p => {
+                    const buttonStyle = getPropertyChipClassName(p);
+                    const outcomeStyle = p.result && p.result !== 'none'
+                      ? PROPERTY_OUTCOME_STYLES[p.result]
+                      : null;
+
                     return (
                       <button 
                         key={p.id} 
                         onClick={()=>onOpenProperty(s.id, p.id)} 
-                        className={`px-2 py-1 rounded-lg text-xs transition-colors flex-shrink-0 relative ${buttonStyle}`}
+                        className={`px-2 py-1 rounded-lg text-xs transition-colors flex-shrink-0 relative flex items-center gap-1 ${buttonStyle}`}
                         title={
                           p.result && p.result !== 'none' 
                             ? `Outcome: ${p.result.replace('_', ' ')}` 
@@ -3349,7 +3740,12 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                                   : 'No activity recorded'
                         }
                       >
-                        {p.label}
+                        {outcomeStyle && (
+                          <span className={`${outcomeStyle.legend.replace(' cursor-help', '')} shrink-0`}>
+                            {outcomeStyle.abbr}
+                          </span>
+                        )}
+                        <span>{p.label}</span>
                         {p.followUpAt && (
                           <div className="absolute top-0 right-0 w-3 h-3 bg-amber-500 rounded-full border border-white dark:border-gray-900 flex items-center justify-center transform translate-x-1 -translate-y-1">
                             <CalendarClock className="w-2 h-2 text-white" />
@@ -3382,9 +3778,10 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                 </button>
               </div>
             </div>
-          ))}
-        </div>
-        ) : searchTerm || statusFilter !== "all" ? (
+              );
+            })}
+          </div>
+        ) : hasActiveFilters ? (
           <div className="text-center py-8">
             <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
               <Search className="w-8 h-8 text-gray-400" />
@@ -3392,7 +3789,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
             <h3 className="text-lg font-medium mb-2">No streets found</h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">Try adjusting your search or filter criteria</p>
             <button 
-              onClick={() => { setSearchTerm(""); setStatusFilter("all"); }}
+              onClick={clearStreetFilters}
               className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               Clear Filters
@@ -3539,18 +3936,21 @@ function PropertyView({ street, property, onBack, onNavigateProperty, onUpdate, 
             active={property.dropped} 
             icon={UploadCloud} 
             label="Dropped" 
+            progressKey="dropped"
             onClick={() => onToggleStatus(property.id, 'dropped')} 
           />
           <ActionButton 
             active={property.knocked} 
             icon={Check} 
             label="Knocked" 
+            progressKey="knocked"
             onClick={() => onToggleStatus(property.id, 'knocked')} 
           />
           <ActionButton 
             active={property.spoke} 
             icon={MessageSquare} 
             label="Spoke" 
+            progressKey="spoke"
             onClick={() => onToggleStatus(property.id, 'spoke')} 
           />
         </div>
@@ -3672,56 +4072,48 @@ function PropertyView({ street, property, onBack, onNavigateProperty, onUpdate, 
                 value="customer_signed" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'customer_signed' })}
-                variant="success"
               />
               <OutcomeButton 
                 label="Appointment Booked" 
                 value="appointment_booked" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'appointment_booked' })}
-                variant="success"
               />
               <OutcomeButton 
                 label="Interested" 
                 value="interested" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'interested' })}
-                variant="success"
               />
               <OutcomeButton 
                 label="No for Now" 
                 value="no_for_now" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'no_for_now' })}
-                variant="warning"
               />
               <OutcomeButton 
                 label="Already with UW" 
                 value="already_uw" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'already_uw' })}
-                variant="info"
               />
               <OutcomeButton 
                 label="Not Interested" 
                 value="not_interested" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'not_interested' })}
-                variant="error"
               />
               <OutcomeButton 
                 label="No Answer" 
                 value="no_answer" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'no_answer' })}
-                variant="default"
               />
               <OutcomeButton 
                 label="No Cold Callers" 
                 value="no_cold_callers" 
                 current={property.result} 
                 onClick={() => onUpdate({ result: 'no_cold_callers' })}
-                variant="purple"
               />
             </div>
           </div>
@@ -3866,14 +4258,18 @@ function PropertyView({ street, property, onBack, onNavigateProperty, onUpdate, 
   );
 }
 
-function ActionButton({ icon: Icon, label, active, onClick }) {
+function ActionButton({ icon: Icon, label, active, onClick, progressKey }) {
+  const progressStyle = progressKey ? PROPERTY_PROGRESS_STYLES[progressKey] : null;
+
   return (
     <button 
       onClick={onClick} 
       className={`px-3 py-3 rounded-2xl border shadow-sm flex items-center justify-center gap-2 text-sm transition-all ${
-        active 
-          ? 'bg-secondary-50 dark:bg-secondary-900/20 border-secondary-400 text-secondary-700 dark:text-secondary-300' 
-          : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
+        active && progressStyle
+          ? `${progressStyle.chip} shadow-sm`
+          : active 
+            ? 'bg-secondary-50 dark:bg-secondary-900/20 border-secondary-400 text-secondary-700 dark:text-secondary-300' 
+            : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
       }`}
     >
       <Icon className="w-4 h-4" /> {label}
@@ -3881,34 +4277,16 @@ function ActionButton({ icon: Icon, label, active, onClick }) {
   );
 }
 
-function OutcomeButton({ label, value, current, onClick, variant = "default" }) {
+function OutcomeButton({ label, value, current, onClick }) {
   const isActive = current === value;
-  
-  const variantStyles = {
-    success: isActive 
-      ? 'bg-green-50 dark:bg-green-900/20 border-green-400 text-green-700 dark:text-green-300' 
-      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-green-300 dark:hover:border-green-700',
-    warning: isActive 
-      ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400 text-yellow-700 dark:text-yellow-300' 
-      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-yellow-300 dark:hover:border-yellow-700',
-    error: isActive 
-      ? 'bg-red-50 dark:bg-red-900/20 border-red-400 text-red-700 dark:text-red-300' 
-      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-red-300 dark:hover:border-red-700',
-    info: isActive 
-      ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 text-blue-700 dark:text-blue-300' 
-      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-blue-300 dark:hover:border-blue-700',
-    purple: isActive 
-      ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400 text-purple-700 dark:text-purple-300' 
-      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-purple-300 dark:hover:border-purple-700',
-    default: isActive 
-      ? 'bg-gray-50 dark:bg-gray-800/60 border-gray-400 text-gray-700 dark:text-gray-300' 
-      : 'bg-white/70 dark:bg-gray-900/70 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
-  };
+  const style = PROPERTY_OUTCOME_STYLES[value];
+  const activeClass = style?.buttonActive ?? 'border-2 border-gray-400 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300';
+  const inactiveClass = style?.buttonInactive ?? 'border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 hover:border-gray-300 dark:hover:border-gray-700';
 
   return (
     <button 
       onClick={onClick} 
-      className={`px-3 py-2 rounded-xl border text-sm transition-all ${variantStyles[variant]}`}
+      className={`px-3 py-2 rounded-xl text-sm transition-all ${isActive ? activeClass : inactiveClass}`}
     >
       {label}
     </button>
@@ -4670,7 +5048,7 @@ function DocumentsPanel({ onViewPdf, onViewImage }) {
       title: "UW Presenter",
       description: "Official UW presenter document for doorstep conversations",
       type: "link",
-      url: "https://assets.ctfassets.net/ihl5uj459rzx/6UbKQzbKP2sHmMz3fEn648/93f3b2fb3b047f63d0005181c62535dc/UW_Presenter.pdf",
+      url: "/documents/UW_Presenter.pdf",
       icon: FileText,
       category: "Tools",
       isDefault: true
@@ -5056,18 +5434,33 @@ function ImageViewer({ url, title, onClose }) {
   );
 }
 
-function PdfViewer({ url, title }) {
+function PdfViewer({ url, title, onClose }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [useFallback, setUseFallback] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     setIsLoading(true);
     setError(null);
     setUseFallback(false);
+    setIsFullScreen(false);
   }, [url]);
+
+  const handleClose = () => {
+    setIsFullScreen(false);
+    onClose?.();
+  };
 
   const handleLoad = () => {
     setIsLoading(false);
@@ -5103,14 +5496,32 @@ function PdfViewer({ url, title }) {
   };
 
   return (
-    <div className={`${isFullScreen ? 'fixed inset-0 z-50 bg-white dark:bg-gray-900' : 'h-full'} flex flex-col`}>
-      {/* Document Controls - Mobile Optimized */}
-      <div className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
-        <div className="text-xs sm:text-sm font-medium truncate flex-1 mr-2">{title}</div>
+    <div
+      className={`${
+        isFullScreen ? "fixed inset-0 z-[60] bg-white dark:bg-gray-900" : "h-full"
+      } flex flex-col`}
+      style={isFullScreen ? { paddingTop: "env(safe-area-inset-top)" } : undefined}
+    >
+      {/* Document Controls - sticky so Close stays visible above PDF on mobile */}
+      <div className="flex-shrink-0 sticky top-0 z-10 flex items-center justify-between gap-2 p-2 sm:p-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {onClose && (
+            <button
+              type="button"
+              onClick={handleClose}
+              className="shrink-0 px-3 py-2 rounded-xl bg-gray-200 dark:bg-gray-700 text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5"
+              style={{ touchAction: "manipulation" }}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Done</span>
+            </button>
+          )}
+          <div className="text-xs sm:text-sm font-medium truncate">{title}</div>
+        </div>
         <div className="flex gap-1 sm:gap-2 flex-shrink-0">
           {isPdf && (
             <>
-              <div className="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl px-1 sm:px-2">
+              <div className="hidden sm:flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg sm:rounded-xl px-1 sm:px-2">
                 <button
                   onClick={() => setZoomLevel(Math.max(50, zoomLevel - 25))}
                   className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -5127,13 +5538,16 @@ function PdfViewer({ url, title }) {
                   <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
                 </button>
               </div>
-              <button
-                onClick={() => setIsFullScreen(!isFullScreen)}
-                className="px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-blue-600 text-white text-xs sm:text-sm hover:bg-blue-700 transition-colors flex items-center gap-1 sm:gap-2"
-              >
-                {isFullScreen ? <X className="w-3 h-3 sm:w-4 sm:h-4" /> : <Maximize className="w-3 h-3 sm:w-4 sm:h-4" />}
-                <span className="hidden sm:inline">{isFullScreen ? 'Exit Full Screen' : 'Full Screen'}</span>
-              </button>
+              {!isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setIsFullScreen(!isFullScreen)}
+                  className="px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-blue-600 text-white text-xs sm:text-sm hover:bg-blue-700 transition-colors flex items-center gap-1 sm:gap-2"
+                >
+                  {isFullScreen ? <X className="w-3 h-3 sm:w-4 sm:h-4" /> : <Maximize className="w-3 h-3 sm:w-4 sm:h-4" />}
+                  <span>{isFullScreen ? "Exit Full Screen" : "Full Screen"}</span>
+                </button>
+              )}
             </>
           )}
           <a
@@ -5149,17 +5563,17 @@ function PdfViewer({ url, title }) {
             <a
               href={displayUrl}
               download
-              className="px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1 sm:gap-2"
+              className="hidden sm:flex px-2 py-1.5 sm:px-3 rounded-lg sm:rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors items-center gap-1 sm:gap-2"
             >
               <Download className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Download</span>
+              <span>Download</span>
             </a>
           )}
         </div>
       </div>
 
       {/* Document Viewer */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative min-h-0">
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
             <div className="text-center">
@@ -5204,7 +5618,7 @@ function PdfViewer({ url, title }) {
   );
 }
 
-function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShowAbout, lastCloudSyncAt, cloudSyncStatus, cloudSyncMessage, onCloudSyncNow, onPullFromCloud, cloudPushPaused }) {
+function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShowAbout, lastCloudSyncAt, cloudSyncStatus, cloudSyncMessage, onCloudSyncNow, onPullFromCloud, cloudPushPaused, cloudAutoSyncPaused, onCloudAutoSyncPausedChange, accountEmail, onSignOut }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [apiKey, setApiKey] = useState(localStorage.getItem('google_places_api_key') || '');
   const [partnerName, setPartnerName] = useState(() => {
@@ -5212,6 +5626,11 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShow
     return saved || 'Your Name';
   });
   const [showNameModal, setShowNameModal] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('partner_name');
+    setPartnerName(saved || 'Your Name');
+  }, [accountEmail]);
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -5247,12 +5666,16 @@ function SettingsPanel({ dark, onToggleDark, onExport, onImport, onReset, onShow
 
       <CloudSyncSection
         onExport={onExport}
+        accountEmail={accountEmail}
+        onSignOut={onSignOut}
         lastCloudSyncAt={lastCloudSyncAt}
         cloudSyncStatus={cloudSyncStatus}
         cloudSyncMessage={cloudSyncMessage}
         onSyncNow={onCloudSyncNow}
         onPullFromCloud={onPullFromCloud}
         cloudPushPaused={cloudPushPaused}
+        cloudAutoSyncPaused={cloudAutoSyncPaused}
+        onCloudAutoSyncPausedChange={onCloudAutoSyncPausedChange}
       />
 
       <div className="space-y-2">
@@ -5560,18 +5983,15 @@ function HelpPanel() {
         {expandedSections.status && (
           <div className="p-4">
             <div className="grid md:grid-cols-2 gap-3 text-sm">
-              <div className="p-3 border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
-                <div className="font-medium text-orange-800 dark:text-orange-200">Dropped</div>
-                <div className="text-orange-700 dark:text-orange-300">Letter delivered through letterbox</div>
-              </div>
-              <div className="p-3 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-                <div className="font-medium text-blue-800 dark:text-blue-200">Knocked</div>
-                <div className="text-blue-700 dark:text-blue-300">Door knocked, no answer or brief interaction</div>
-              </div>
-              <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                <div className="font-medium text-green-800 dark:text-green-200">Spoke</div>
-                <div className="text-green-700 dark:text-green-300">Full conversation had with resident</div>
-              </div>
+              {['dropped', 'knocked', 'spoke'].map((progressKey) => {
+                const style = PROPERTY_PROGRESS_STYLES[progressKey];
+                return (
+                  <div key={progressKey} className={style.helpPanel}>
+                    <div className={style.helpTitle}>{style.label}</div>
+                    <div className={style.helpBody}>{style.helpText}</div>
+                  </div>
+                );
+              })}
               <div className="p-3 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/20 rounded-xl">
                 <div className="font-medium text-gray-800 dark:text-gray-200">Not Started</div>
                 <div className="text-gray-700 dark:text-gray-300">No activity recorded yet</div>
@@ -5596,34 +6016,15 @@ function HelpPanel() {
         {expandedSections.outcomes && (
           <div className="p-4">
             <div className="grid md:grid-cols-2 gap-3 text-sm">
-              <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                <div className="font-medium text-green-800 dark:text-green-200">Interested</div>
-                <div className="text-green-700 dark:text-green-300">Wants to learn more about UW</div>
-              </div>
-              <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                <div className="font-medium text-green-800 dark:text-green-200">Customers Signed</div>
-                <div className="text-green-700 dark:text-green-300">Successfully signed up with UW</div>
-              </div>
-              <div className="p-3 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-xl">
-                <div className="font-medium text-green-800 dark:text-green-200">Appointment Booked</div>
-                <div className="text-green-700 dark:text-green-300">Meeting scheduled for follow-up</div>
-              </div>
-              <div className="p-3 border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl">
-                <div className="font-medium text-yellow-800 dark:text-yellow-200">No for Now</div>
-                <div className="text-yellow-700 dark:text-yellow-300">Not interested at this time</div>
-              </div>
-              <div className="p-3 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-                <div className="font-medium text-blue-800 dark:text-blue-200">Already with UW</div>
-                <div className="text-blue-700 dark:text-blue-300">Customer is already a UW member</div>
-              </div>
-                        <div className="p-3 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 rounded-xl">
-            <div className="font-medium text-red-800 dark:text-red-200">Not Interested</div>
-            <div className="text-red-700 dark:text-red-300">Definitely not interested</div>
-          </div>
-          <div className="p-3 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/20 rounded-xl">
-            <div className="font-medium text-gray-800 dark:text-gray-200">Unreachable</div>
-            <div className="text-gray-700 dark:text-gray-300">Unable to contact after multiple attempts</div>
-          </div>
+              {OUTCOME_STAT_KEYS.map((outcomeKey) => {
+                const style = PROPERTY_OUTCOME_STYLES[outcomeKey];
+                return (
+                  <div key={outcomeKey} className={style.helpPanel}>
+                    <div className={style.helpTitle}>{style.label}</div>
+                    <div className={style.helpBody}>{style.helpText}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -5702,7 +6103,7 @@ function HelpPanel() {
             
             <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
               <div className="p-3 bg-gray-50 dark:bg-gray-900/20 font-medium">How do I search and filter campaigns/streets?</div>
-              <div className="p-3">Use the "Search & Filter" section in Campaigns and Streets tabs. You can search by name, filter by status, and sort by different criteria.</div>
+              <div className="p-3">Use the "Search & Filter" section in Campaigns and Streets tabs. On Streets you can search by street, postcode, or property label, and filter by street status, property progress (D/K/S), and conversation outcome.</div>
             </div>
             
             <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
@@ -6149,9 +6550,9 @@ function Reports({ campaigns, onNavigateToProperty }) {
     <div className="space-y-4">
       <SectionCard title="Overview" icon={FileText}>
         <div className="grid md:grid-cols-6 gap-3">
-          <Stat icon={UploadCloud} label="Letters" value={totals.letters} />
-          <Stat icon={Check} label="Knocked" value={totals.knocked} />
-          <Stat icon={MessageSquare} label="Spoke" value={totals.spoke} />
+          <Stat icon={UploadCloud} label="Letters" value={totals.letters} accentClass={PROPERTY_PROGRESS_STYLES.dropped.icon} />
+          <Stat icon={Check} label="Knocked" value={totals.knocked} accentClass={PROPERTY_PROGRESS_STYLES.knocked.icon} />
+          <Stat icon={MessageSquare} label="Spoke" value={totals.spoke} accentClass={PROPERTY_PROGRESS_STYLES.spoke.icon} />
           <Stat icon={CheckCircle} label="Successes" value={totals.successes} />
           <Stat icon={CalendarClock} label="Total Follow‑ups" value={totals.followups} />
         </div>
@@ -6159,39 +6560,13 @@ function Reports({ campaigns, onNavigateToProperty }) {
       
       <SectionCard title="Conversation Outcomes" icon={MessageSquare}>
         <div className="grid md:grid-cols-3 gap-3">
-          <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
-            <div className="text-lg font-semibold text-green-800 dark:text-green-200">{totals.outcomes.customer_signed}</div>
-            <div className="text-sm text-green-700 dark:text-green-300">Customers Signed</div>
-          </div>
-          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500 dark:border-emerald-500">
-            <div className="text-lg font-semibold text-emerald-800 dark:text-emerald-200">{totals.outcomes.appointment_booked}</div>
-            <div className="text-sm text-emerald-700 dark:text-emerald-300">Appointment Booked</div>
-          </div>
-          <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-500">
-            <div className="text-lg font-semibold text-green-800 dark:text-green-200">{totals.outcomes.interested}</div>
-            <div className="text-sm text-green-700 dark:text-green-300">Interested</div>
-          </div>
-          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-500 dark:border-amber-500">
-            <div className="text-lg font-semibold text-amber-800 dark:text-amber-200">{totals.outcomes.no_for_now}</div>
-            <div className="text-sm text-amber-700 dark:text-amber-300">No for Now</div>
-          </div>
-          <div className="p-3 rounded-xl bg-sky-50 dark:bg-sky-900/20 border-2 border-sky-500 dark:border-sky-500">
-            <div className="text-lg font-semibold text-sky-800 dark:text-sky-200">{totals.outcomes.already_uw}</div>
-            <div className="text-sm text-sky-700 dark:text-sky-300">Already with UW</div>
-          </div>
-          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-500">
-            <div className="text-lg font-semibold text-red-800 dark:text-red-200">{totals.outcomes.not_interested}</div>
-            <div className="text-sm text-red-700 dark:text-red-300">Not Interested</div>
-          </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/20 border-2 border-slate-500 dark:border-slate-500">
-            <div className="text-lg font-semibold text-slate-800 dark:text-slate-200">{totals.outcomes.no_answer || 0}</div>
-            <div className="text-sm text-slate-700 dark:text-slate-300">No Answer</div>
-          </div>
-          <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-500 dark:border-purple-500">
-            <div className="text-lg font-semibold text-purple-800 dark:text-purple-200">{totals.outcomes.no_cold_callers || 0}</div>
-            <div className="text-sm text-purple-700 dark:text-purple-300">No Cold Callers</div>
-          </div>
-
+          {OUTCOME_STAT_KEYS.map((outcomeKey) => (
+            <OutcomeStatCard
+              key={outcomeKey}
+              outcomeKey={outcomeKey}
+              count={totals.outcomes[outcomeKey]}
+            />
+          ))}
         </div>
       </SectionCard>
       
@@ -6358,7 +6733,7 @@ function Reports({ campaigns, onNavigateToProperty }) {
           <div className="text-xs opacity-70">
             Showing {filteredAndSortedData.length} of {flat.length} activities
             <span className="hidden sm:inline"> • Scroll horizontally to see all columns</span>
-            <span className="hidden sm:inline"> • <span className="text-orange-600 dark:text-orange-400 font-medium">D</span>=Letters dropped, <span className="text-blue-600 dark:text-blue-400 font-medium">K</span>=Doors knocked, <span className="text-green-600 dark:text-green-400 font-medium">S</span>=Conversations had</span>
+            <span className="hidden sm:inline"> • <span className={`font-medium ${PROPERTY_PROGRESS_STYLES.dropped.icon}`}>D</span>=Letters dropped, <span className={`font-medium ${PROPERTY_PROGRESS_STYLES.knocked.icon}`}>K</span>=Doors knocked, <span className={`font-medium ${PROPERTY_PROGRESS_STYLES.spoke.icon}`}>S</span>=Conversations had</span>
           </div>
         </div>
 
@@ -6480,62 +6855,16 @@ function Reports({ campaigns, onNavigateToProperty }) {
                   <td className="py-2 px-3 hidden md:table-cell">{r.street}</td>
                   <td className="py-2 px-3 text-xs max-w-24 truncate" title={r.property}>{r.property}</td>
                   <td className="py-2 px-3 hidden sm:table-cell" title={r.dropped ? "Letter dropped" : "No letter dropped"}>
-                    {r.dropped ? (
-                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 text-xs">
-                        ✓
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 dark:text-gray-600">—</span>
-                    )}
+                    <ProgressCheckBadge active={r.dropped} progressKey="dropped" />
                   </td>
                   <td className="py-2 px-3 hidden sm:table-cell" title={r.knocked ? "Door knocked" : "No door knocked"}>
-                    {r.knocked ? (
-                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-xs">
-                        ✓
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 dark:text-gray-600">—</span>
-                    )}
+                    <ProgressCheckBadge active={r.knocked} progressKey="knocked" />
                   </td>
                   <td className="py-2 px-3 hidden sm:table-cell" title={r.spoke ? "Conversation had" : "No conversation"}>
-                    {r.spoke ? (
-                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-xs">
-                        ✓
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 dark:text-gray-600">—</span>
-                    )}
+                    <ProgressCheckBadge active={r.spoke} progressKey="spoke" />
                   </td>
                   <td className="py-2 px-3">
-                    {r.result === 'none' ? (
-                      <span className="text-gray-500 dark:text-gray-400">—</span>
-                    ) : r.result === 'interested' || r.result === 'customer_signed' || r.result === 'appointment_booked' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300">
-                        {r.result.replace('_', ' ')}
-                      </span>
-                    ) : r.result === 'maybe' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300">
-                        maybe
-                      </span>
-                    ) : r.result === 'no_for_now' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300">
-                        no for now
-                      </span>
-                    ) : r.result === 'already_uw' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
-                        already UW
-                      </span>
-                    ) : r.result === 'not_interested' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300">
-                        not interested
-                      </span>
-                    ) : r.result === 'no_answer' ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                        no answer
-                      </span>
-                    ) : (
-                      <span className="text-gray-600 dark:text-gray-400">{r.result}</span>
-                    )}
+                    <OutcomeResultBadge result={r.result} />
                   </td>
                   <td className="py-2 px-3 hidden xl:table-cell">
                     {r.followUpAt ? (
@@ -7753,29 +8082,21 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
       const encodedPostcode = encodeURIComponent(postcode.trim());
       // Use Netlify function as proxy to avoid CORS issues
       const url = `/.netlify/functions/postcode-lookup?postcode=${encodedPostcode}`;
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.code === 2000 && data.result && data.result.length > 0) {
+      const { response, data } = await fetchIdealPostcodesProxy(url);
+      const friendlyError = idealPostcodesUserMessage({ response, data, postcode: postcode.trim() });
+
+      if (data?.code === 2000 && data.result && data.result.length > 0) {
         setResultsTruncated({ truncated: false, total: 0, shown: 0 });
         setIdealAddresses(data.result);
         setSelectedIdealAddresses([]);
         setStep('ideal-select');
-      } else if (data.code === 4040) {
-        setIdealPostcodeError(`No addresses found for postcode "${postcode}". Please check the postcode and try again.`);
-      } else if (data.code === 4010) {
-        setIdealPostcodeError('Invalid API key. Please check your Ideal Postcodes API key in config.js');
+      } else if (friendlyError) {
+        setIdealPostcodeError(friendlyError);
       } else {
-        setIdealPostcodeError(data.message || 'An error occurred while looking up addresses.');
+        setIdealPostcodeError('An error occurred while looking up addresses.');
       }
     } catch (error) {
-      setIdealPostcodeError(`Network error: ${error.message}. Please check your internet connection.`);
+      setIdealPostcodeError('Could not reach address lookup. Please check your internet connection and try again.');
     } finally {
       setIsLoadingIdealAddresses(false);
     }
@@ -7802,27 +8123,29 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
       const encodedQuery = encodeURIComponent(streetName.trim());
       // Use Netlify function as proxy to avoid CORS issues
       const url = `/.netlify/functions/postcode-lookup?query=${encodedQuery}`;
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
+      const { response, data } = await fetchIdealPostcodesProxy(url);
+      const friendlyError = idealPostcodesUserMessage({
+        response,
+        data,
+        query: streetName.trim(),
+      });
+
       // Debug logging
       console.log('Address search response:', data);
-      console.log('Result structure:', data.result);
-      console.log('Result type:', typeof data.result, Array.isArray(data.result));
-      if (data.result && typeof data.result === 'object') {
+      console.log('Result structure:', data?.result);
+      console.log('Result type:', typeof data?.result, Array.isArray(data?.result));
+      if (data?.result && typeof data.result === 'object') {
         console.log('Result keys:', Object.keys(data.result));
         console.log('Result.total:', data.result.total);
         console.log('Result.length:', data.result.length);
       }
       
       // Check for error response
-      if (data.error) {
+      if (friendlyError && !(data?.code === 2000)) {
+        setIdealPostcodeError(friendlyError);
+        return;
+      }
+      if (data?.error && !(data?.code === 2000)) {
         setIdealPostcodeError(data.error || 'An error occurred while searching for addresses.');
         return;
       }
@@ -7959,18 +8282,18 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
         setStep('ideal-select');
       } else if (data.code === 2000) {
         setIdealPostcodeError(`No addresses found for "${streetName}". Try adding a town name (e.g., "Cross Street, Elmswell") or check the spelling.`);
+      } else if (friendlyError) {
+        setIdealPostcodeError(friendlyError);
       } else if (data.code === 4040) {
         setIdealPostcodeError(`No addresses found for "${streetName}". Try adding a town name (e.g., "Cross Street, Elmswell") or check the spelling.`);
-      } else if (data.code === 4010) {
-        setIdealPostcodeError('Invalid API key. Please check your Ideal Postcodes API key in config.js');
       } else {
         // Show the actual error for debugging
-        const errorMsg = data.message || data.error || `Unexpected response. Code: ${data.code || 'unknown'}`;
+        const errorMsg = data?.message || data?.error || `Unexpected response. Code: ${data?.code || 'unknown'}`;
         setIdealPostcodeError(errorMsg);
         console.error('Address search error:', data);
       }
     } catch (error) {
-      setIdealPostcodeError(`Network error: ${error.message}. Please check your internet connection.`);
+      setIdealPostcodeError('Could not reach address lookup. Please check your internet connection and try again.');
     } finally {
       setIsLoadingIdealAddresses(false);
     }
@@ -8828,16 +9151,10 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
       const encodedPostcode = encodeURIComponent(postcode.trim());
       // Use Netlify function as proxy to avoid CORS issues
       const url = `/.netlify/functions/postcode-lookup?postcode=${encodedPostcode}`;
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.code === 2000 && data.result && data.result.length > 0) {
+      const { response, data } = await fetchIdealPostcodesProxy(url);
+      const friendlyError = idealPostcodesUserMessage({ response, data, postcode: postcode.trim() });
+
+      if (data?.code === 2000 && data.result && data.result.length > 0) {
         // Filter addresses to match current street if street name exists
         let filteredAddresses = data.result;
         if (street?.name) {
@@ -8848,15 +9165,13 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
         
         setIdealAddresses(filteredAddresses);
         setSelectedIdealAddresses([]);
-      } else if (data.code === 4040) {
-        setIdealPostcodeError(`No addresses found for postcode "${postcode}". Please check the postcode and try again.`);
-      } else if (data.code === 4010) {
-        setIdealPostcodeError('Invalid API key. Please check your Ideal Postcodes API key in config.js');
+      } else if (friendlyError) {
+        setIdealPostcodeError(friendlyError);
       } else {
-        setIdealPostcodeError(data.message || 'An error occurred while looking up addresses.');
+        setIdealPostcodeError('An error occurred while looking up addresses.');
       }
     } catch (error) {
-      setIdealPostcodeError(`Network error: ${error.message}. Please check your internet connection.`);
+      setIdealPostcodeError('Could not reach address lookup. Please check your internet connection and try again.');
     } finally {
       setIsLoadingIdealAddresses(false);
     }
