@@ -3341,9 +3341,26 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
   );
 }
 
+function propertyMatchesProgress(property, progressFilter) {
+  if (progressFilter === "all") return true;
+  if (progressFilter === "none") return !property.dropped && !property.knocked && !property.spoke;
+  if (progressFilter === "dropped") return !!property.dropped;
+  if (progressFilter === "knocked") return !!property.knocked;
+  if (progressFilter === "spoke") return !!property.spoke;
+  return true;
+}
+
+function propertyMatchesOutcome(property, outcomeFilter) {
+  if (outcomeFilter === "all") return true;
+  if (outcomeFilter === "none") return !property.result || property.result === "none";
+  return property.result === outcomeFilter;
+}
+
 function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onAddStreet, onEditStreet, onDeleteStreet, onManageProperties, onImportStreets }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [progressFilter, setProgressFilter] = useState("all");
+  const [outcomeFilter, setOutcomeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("name");
   const [showFilters, setShowFilters] = useState(false);
   const [showMobileKey, setShowMobileKey] = useState(false);
@@ -3367,16 +3384,62 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
     setTooltipTimeout(timeout);
   };
 
-  // Filter and sort streets
-  const filteredStreets = useMemo(() => {
-    let filtered = campaign.streets.filter(s => {
-      const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           s.postcode.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === "all" || s.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
+  const hasActiveFilters = Boolean(
+    searchTerm.trim() ||
+    statusFilter !== "all" ||
+    progressFilter !== "all" ||
+    outcomeFilter !== "all"
+  );
 
-    // Sort streets
+  const clearStreetFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setProgressFilter("all");
+    setOutcomeFilter("all");
+  };
+
+  // Filter and sort streets; optionally narrow visible property chips
+  const filteredStreets = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const propertyFiltersActive = progressFilter !== "all" || outcomeFilter !== "all";
+
+    let filtered = campaign.streets
+      .map((s) => {
+        const matchesStreetStatus = statusFilter === "all" || s.status === statusFilter;
+        if (!matchesStreetStatus) return null;
+
+        const streetMatchesSearch =
+          !term ||
+          s.name.toLowerCase().includes(term) ||
+          (s.postcode || "").toLowerCase().includes(term);
+
+        const visibleProperties = s.properties.filter((p) => {
+          if (!propertyMatchesProgress(p, progressFilter)) return false;
+          if (!propertyMatchesOutcome(p, outcomeFilter)) return false;
+
+          if (!term) return true;
+          if (streetMatchesSearch) return true;
+          return (p.label || "").toLowerCase().includes(term);
+        });
+
+        // Keep street if its name/postcode matches, or any property matches the active filters/search
+        if (!streetMatchesSearch && visibleProperties.length === 0) {
+          return null;
+        }
+        if (propertyFiltersActive && visibleProperties.length === 0) {
+          return null;
+        }
+
+        const shouldNarrowChips = propertyFiltersActive || (Boolean(term) && !streetMatchesSearch);
+
+        return {
+          ...s,
+          visibleProperties: shouldNarrowChips ? visibleProperties : s.properties,
+          matchedPropertyCount: visibleProperties.length,
+        };
+      })
+      .filter(Boolean);
+
     filtered.sort((a, b) => {
       switch (sortBy) {
         case "name":
@@ -3393,7 +3456,12 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
     });
 
     return filtered;
-  }, [campaign.streets, searchTerm, statusFilter, sortBy]);
+  }, [campaign.streets, searchTerm, statusFilter, progressFilter, outcomeFilter, sortBy]);
+
+  const matchedPropertyTotal = useMemo(
+    () => filteredStreets.reduce((sum, s) => sum + (s.matchedPropertyCount ?? s.properties.length), 0),
+    [filteredStreets]
+  );
 
   return (
     <div className="space-y-4">
@@ -3515,26 +3583,26 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
             <div className="space-y-3">
               {/* Search */}
               <div>
-                <label className="text-xs opacity-70">Search streets</label>
+                <label className="text-xs opacity-70">Search streets or properties</label>
                 <input 
                   type="text" 
                   value={searchTerm} 
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by street name or postcode..."
+                  placeholder="Street name, postcode, or property label..."
                   className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
                 />
               </div>
               
               <div className="grid grid-cols-2 gap-3">
-                {/* Status Filter */}
+                {/* Street Status Filter */}
                 <div>
-                  <label className="text-xs opacity-70">Status</label>
+                  <label className="text-xs opacity-70">Street status</label>
                   <select 
                     value={statusFilter} 
                     onChange={(e) => setStatusFilter(e.target.value)}
                     className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
                   >
-                    <option value="all">All Status</option>
+                    <option value="all">All streets</option>
                     <option value="not_started">Not Started</option>
                     <option value="in_progress">In Progress</option>
                     <option value="completed">Completed</option>
@@ -3556,16 +3624,71 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   </select>
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Property Progress Filter */}
+                <div>
+                  <label className="text-xs opacity-70">Property progress</label>
+                  <select 
+                    value={progressFilter} 
+                    onChange={(e) => setProgressFilter(e.target.value)}
+                    className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                  >
+                    <option value="all">All progress</option>
+                    <option value="dropped">Dropped (D)</option>
+                    <option value="knocked">Knocked (K)</option>
+                    <option value="spoke">Spoke (S)</option>
+                    <option value="none">No progress yet</option>
+                  </select>
+                </div>
+
+                {/* Property Outcome Filter */}
+                <div>
+                  <label className="text-xs opacity-70">Property outcome</label>
+                  <select 
+                    value={outcomeFilter} 
+                    onChange={(e) => setOutcomeFilter(e.target.value)}
+                    className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                  >
+                    <option value="all">All outcomes</option>
+                    <option value="none">No outcome yet</option>
+                    {OUTCOME_STAT_KEYS.map((key) => (
+                      <option key={key} value={key}>
+                        {PROPERTY_OUTCOME_STYLES[key].abbr} — {PROPERTY_OUTCOME_STYLES[key].label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               
-              <div className="text-xs opacity-70">
-                Showing {filteredStreets.length} of {campaign.streets.length} streets
+              <div className="flex items-center justify-between gap-2 text-xs opacity-70">
+                <span>
+                  Showing {filteredStreets.length} of {campaign.streets.length} streets
+                  {(progressFilter !== "all" || outcomeFilter !== "all" || searchTerm.trim()) && (
+                    <> · {matchedPropertyTotal} matching properties</>
+                  )}
+                </span>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearStreetFilters}
+                    className="text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0"
+                  >
+                    Clear filters
+                  </button>
+                )}
               </div>
             </div>
           )}
         </SectionCard>
         {filteredStreets.length > 0 ? (
           <div className="grid md:grid-cols-2 gap-3">
-            {filteredStreets.map(s => (
+            {filteredStreets.map(s => {
+              const chips = s.visibleProperties ?? s.properties;
+              const totalCount = s.properties.length;
+              const showingNarrowed = chips.length !== totalCount;
+
+              return (
             <div 
               key={s.id} 
               className={`rounded-2xl border p-4 bg-white/70 dark:bg-gray-900/70 transition-all ${
@@ -3585,12 +3708,16 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                   {s.status.replace('_',' ')}
                 </Chip>
               </div>
-              <div className="text-xs opacity-70 mb-3">{s.properties.length} properties</div>
+              <div className="text-xs opacity-70 mb-3">
+                {showingNarrowed
+                  ? `${chips.length} of ${totalCount} properties match filters`
+                  : `${totalCount} properties`}
+              </div>
               
               {/* Property buttons with better layout */}
               <div className="mb-3">
                 <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
-                  {s.properties.map(p => {
+                  {chips.map(p => {
                     const buttonStyle = getPropertyChipClassName(p);
                     const outcomeStyle = p.result && p.result !== 'none'
                       ? PROPERTY_OUTCOME_STYLES[p.result]
@@ -3651,9 +3778,10 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                 </button>
               </div>
             </div>
-          ))}
-        </div>
-        ) : searchTerm || statusFilter !== "all" ? (
+              );
+            })}
+          </div>
+        ) : hasActiveFilters ? (
           <div className="text-center py-8">
             <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
               <Search className="w-8 h-8 text-gray-400" />
@@ -3661,7 +3789,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
             <h3 className="text-lg font-medium mb-2">No streets found</h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">Try adjusting your search or filter criteria</p>
             <button 
-              onClick={() => { setSearchTerm(""); setStatusFilter("all"); }}
+              onClick={clearStreetFilters}
               className="px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               Clear Filters
@@ -5975,7 +6103,7 @@ function HelpPanel() {
             
             <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
               <div className="p-3 bg-gray-50 dark:bg-gray-900/20 font-medium">How do I search and filter campaigns/streets?</div>
-              <div className="p-3">Use the "Search & Filter" section in Campaigns and Streets tabs. You can search by name, filter by status, and sort by different criteria.</div>
+              <div className="p-3">Use the "Search & Filter" section in Campaigns and Streets tabs. On Streets you can search by street, postcode, or property label, and filter by street status, property progress (D/K/S), and conversation outcome.</div>
             </div>
             
             <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
