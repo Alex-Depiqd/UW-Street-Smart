@@ -44,6 +44,26 @@ async function fetchIdealPostcodesProxy(url) {
   return { response, data };
 }
 
+/** Ideal Postcodes returns up to 100 premises per postcode page. */
+const IDEAL_POSTCODE_PAGE_SIZE = 100;
+
+function idealAddressKey(address) {
+  return `${(address.line_1 || "").toLowerCase().trim()}|${(address.postcode || "").toLowerCase().trim()}`;
+}
+
+function mergeIdealAddresses(existing, incoming) {
+  const seen = new Set(existing.map(idealAddressKey));
+  const added = [];
+  for (const addr of incoming) {
+    const key = idealAddressKey(addr);
+    if (!seen.has(key)) {
+      seen.add(key);
+      added.push(addr);
+    }
+  }
+  return { merged: [...existing, ...added], addedCount: added.length };
+}
+
 /** Friendly copy for Ideal Postcodes / proxy failures (avoid raw HTTP status text). */
 function idealPostcodesUserMessage({ response, data, postcode, query }) {
   const code = data?.code;
@@ -76,6 +96,16 @@ function idealPostcodesUserMessage({ response, data, postcode, query }) {
   }
 
   return null;
+}
+
+async function fetchIdealPostcodePage(postcode, page = 0) {
+  const encodedPostcode = encodeURIComponent(postcode.trim());
+  const pageQuery = page > 0 ? `&page=${page}` : "";
+  const url = `/.netlify/functions/postcode-lookup?postcode=${encodedPostcode}${pageQuery}`;
+  const { response, data } = await fetchIdealPostcodesProxy(url);
+  const friendlyError = idealPostcodesUserMessage({ response, data, postcode: postcode.trim() });
+  const results = data?.code === 2000 && Array.isArray(data.result) ? data.result : [];
+  return { response, data, friendlyError, results };
 }
 
 const FACEBOOK_REMINDER_LAST_SHOWN_KEY = 'uw_ss_facebook_reminder_last_shown';
@@ -7260,6 +7290,10 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
   const [idealAddresses, setIdealAddresses] = useState([]);
   const [selectedIdealAddresses, setSelectedIdealAddresses] = useState([]);
   const [isLoadingIdealAddresses, setIsLoadingIdealAddresses] = useState(false);
+  const [isLoadingMoreIdealAddresses, setIsLoadingMoreIdealAddresses] = useState(false);
+  const [idealPostcodePage, setIdealPostcodePage] = useState(0);
+  const [idealPostcodeHasMore, setIdealPostcodeHasMore] = useState(false);
+  const [idealPostcodeMoreMessage, setIdealPostcodeMoreMessage] = useState('');
   const [idealPostcodeError, setIdealPostcodeError] = useState('');
   const [resultsTruncated, setResultsTruncated] = useState({ truncated: false, total: 0, shown: 0 });
 
@@ -8068,6 +8102,21 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
     );
   }
 
+  const isIdealAddressImported = (address) => {
+    const propertyLabel = (address.premise || address.line_1?.split(',')[0]?.trim() || '').toLowerCase().trim();
+    const streetName = (address.thoroughfare || '').toLowerCase().trim();
+    const postcode = (address.postcode || '').toLowerCase().trim();
+    return existingStreets.some((s) => {
+      if (
+        s.name.toLowerCase().trim() === streetName ||
+        (s.postcode && postcode && s.postcode.toLowerCase().trim() === postcode)
+      ) {
+        return s.properties.some((p) => p.label.toLowerCase().trim() === propertyLabel);
+      }
+      return false;
+    });
+  };
+
   // Ideal Postcodes lookup function
   const lookupIdealPostcode = async (postcode) => {
     if (!config.idealPostcodes.apiKey) {
@@ -8077,18 +8126,19 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
 
     setIsLoadingIdealAddresses(true);
     setIdealPostcodeError('');
+    setIdealPostcodeHasMore(false);
+    setIdealPostcodePage(0);
+    setIdealPostcodeMoreMessage('');
     
     try {
-      const encodedPostcode = encodeURIComponent(postcode.trim());
-      // Use Netlify function as proxy to avoid CORS issues
-      const url = `/.netlify/functions/postcode-lookup?postcode=${encodedPostcode}`;
-      const { response, data } = await fetchIdealPostcodesProxy(url);
-      const friendlyError = idealPostcodesUserMessage({ response, data, postcode: postcode.trim() });
+      const { friendlyError, results } = await fetchIdealPostcodePage(postcode, 0);
 
-      if (data?.code === 2000 && data.result && data.result.length > 0) {
+      if (results.length > 0) {
         setResultsTruncated({ truncated: false, total: 0, shown: 0 });
-        setIdealAddresses(data.result);
+        setIdealAddresses(results);
         setSelectedIdealAddresses([]);
+        setIdealPostcodePage(0);
+        setIdealPostcodeHasMore(results.length >= IDEAL_POSTCODE_PAGE_SIZE);
         setStep('ideal-select');
       } else if (friendlyError) {
         setIdealPostcodeError(friendlyError);
@@ -8099,6 +8149,48 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
       setIdealPostcodeError('Could not reach address lookup. Please check your internet connection and try again.');
     } finally {
       setIsLoadingIdealAddresses(false);
+    }
+  };
+
+  const loadMoreIdealPostcode = async () => {
+    if (!idealPostcodeInput.trim() || isLoadingMoreIdealAddresses || !idealPostcodeHasMore) {
+      return;
+    }
+
+    setIsLoadingMoreIdealAddresses(true);
+    setIdealPostcodeError('');
+    setIdealPostcodeMoreMessage('');
+
+    try {
+      const nextPage = idealPostcodePage + 1;
+      const { friendlyError, results } = await fetchIdealPostcodePage(idealPostcodeInput, nextPage);
+
+      if (results.length === 0) {
+        setIdealPostcodeHasMore(false);
+        setIdealPostcodeMoreMessage(
+          friendlyError && !/couldn['’]t find postcode/i.test(friendlyError)
+            ? friendlyError
+            : 'No further addresses at this postcode.'
+        );
+        return;
+      }
+
+      const { merged, addedCount } = mergeIdealAddresses(idealAddresses, results);
+      setIdealAddresses(merged);
+      setIdealPostcodePage(nextPage);
+      setIdealPostcodeHasMore(results.length >= IDEAL_POSTCODE_PAGE_SIZE);
+      if (addedCount === 0) {
+        setIdealPostcodeHasMore(false);
+        setIdealPostcodeMoreMessage('No further addresses at this postcode.');
+      } else {
+        setIdealPostcodeMoreMessage(
+          `Loaded ${addedCount} more address${addedCount === 1 ? '' : 'es'}.`
+        );
+      }
+    } catch (error) {
+      setIdealPostcodeError('Could not reach address lookup. Please check your internet connection and try again.');
+    } finally {
+      setIsLoadingMoreIdealAddresses(false);
     }
   };
 
@@ -8117,6 +8209,8 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
 
     setIsLoadingIdealAddresses(true);
     setIdealPostcodeError('');
+    setIdealPostcodeHasMore(false);
+    setIdealPostcodeMoreMessage('');
     setResultsTruncated({ truncated: false, total: 0, shown: 0 });
     
     try {
@@ -8557,6 +8651,14 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
   if (step === 'ideal-select') {
     const selectedCount = selectedIdealAddresses.length;
     const streets = parseIdealAddresses(idealAddresses);
+    const importableAddresses = idealAddresses.filter((address) => !isIdealAddressImported(address));
+    const allImportableSelected =
+      importableAddresses.length > 0 &&
+      importableAddresses.every((addr) =>
+        selectedIdealAddresses.some(
+          (a) => a.line_1 === addr.line_1 && a.postcode === addr.postcode
+        )
+      );
     
     return (
       <div className="space-y-4">
@@ -8573,7 +8675,7 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
           <div>
             <h3 className="font-medium">Select Addresses to Import</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {idealAddresses.length} address{idealAddresses.length !== 1 ? 'es' : ''} found for {idealPostcodeInput}
+              {idealAddresses.length} address{idealAddresses.length !== 1 ? 'es' : ''} found for {idealPostcodeInput || idealStreetNameInput}
             </p>
           </div>
         </div>
@@ -8582,18 +8684,24 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
           <div className="flex items-center justify-between p-3 rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
             <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
               {selectedCount} address{selectedCount !== 1 ? 'es' : ''} selected
+              {importableAddresses.length < idealAddresses.length && (
+                <span className="text-xs text-gray-500 ml-1">
+                  ({idealAddresses.length - importableAddresses.length} already imported)
+                </span>
+              )}
             </span>
             <button
               onClick={() => {
-                if (selectedIdealAddresses.length === idealAddresses.length) {
+                if (allImportableSelected) {
                   setSelectedIdealAddresses([]);
                 } else {
-                  setSelectedIdealAddresses([...idealAddresses]);
+                  setSelectedIdealAddresses([...importableAddresses]);
                 }
               }}
-              className="px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 transition-colors"
+              disabled={importableAddresses.length === 0}
+              className="px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {selectedIdealAddresses.length === idealAddresses.length ? 'Deselect All' : 'Select All'}
+              {allImportableSelected ? 'Deselect All' : 'Select All'}
             </button>
           </div>
           
@@ -8632,19 +8740,7 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
               a.line_1 === address.line_1 && a.postcode === address.postcode
             );
             
-            // Check if this address is already imported in any existing street
-            const propertyLabel = address.premise || address.line_1?.split(',')[0]?.trim() || '';
-            const streetName = address.thoroughfare || '';
-            const isAlreadyImported = existingStreets.some(s => {
-              // Check if street name matches and property exists
-              if (s.name.toLowerCase().trim() === streetName.toLowerCase().trim() ||
-                  (s.postcode && address.postcode && s.postcode.toLowerCase().trim() === address.postcode.toLowerCase().trim())) {
-                return s.properties.some(p => 
-                  p.label.toLowerCase().trim() === propertyLabel.toLowerCase().trim()
-                );
-              }
-              return false;
-            });
+            const isAlreadyImported = isIdealAddressImported(address);
             
             return (
               <button
@@ -8693,6 +8789,27 @@ function NewStreetForm({ onSubmit, onCancel, existingStreets = [] }) {
             );
           })}
         </div>
+
+        {idealPostcodeHasMore && (
+          <button
+            type="button"
+            onClick={loadMoreIdealPostcode}
+            disabled={isLoadingMoreIdealAddresses}
+            className="w-full px-4 py-2 rounded-xl border-2 border-dashed border-secondary-300 dark:border-secondary-700 text-secondary-700 dark:text-secondary-300 text-sm hover:border-secondary-400 dark:hover:border-secondary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isLoadingMoreIdealAddresses ? 'Loading more addresses...' : 'Load more addresses'}
+          </button>
+        )}
+        {idealPostcodeMoreMessage && (
+          <p className="text-xs text-gray-600 dark:text-gray-400 text-center">
+            {idealPostcodeMoreMessage}
+          </p>
+        )}
+        {idealPostcodeHasMore && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            Uses 1 extra lookup credit. Addresses already in the campaign stay marked as imported.
+          </p>
+        )}
 
         {resultsTruncated.truncated && (
           <div className="p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
@@ -9099,6 +9216,10 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
   const [idealAddresses, setIdealAddresses] = useState([]);
   const [selectedIdealAddresses, setSelectedIdealAddresses] = useState([]);
   const [isLoadingIdealAddresses, setIsLoadingIdealAddresses] = useState(false);
+  const [isLoadingMoreIdealAddresses, setIsLoadingMoreIdealAddresses] = useState(false);
+  const [idealPostcodePage, setIdealPostcodePage] = useState(0);
+  const [idealPostcodeHasMore, setIdealPostcodeHasMore] = useState(false);
+  const [idealPostcodeMoreMessage, setIdealPostcodeMoreMessage] = useState('');
   const [idealPostcodeError, setIdealPostcodeError] = useState('');
 
   const handleAddProperty = (e) => {
@@ -9146,25 +9267,32 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
 
     setIsLoadingIdealAddresses(true);
     setIdealPostcodeError('');
+    setIdealPostcodeHasMore(false);
+    setIdealPostcodePage(0);
+    setIdealPostcodeMoreMessage('');
     
     try {
-      const encodedPostcode = encodeURIComponent(postcode.trim());
-      // Use Netlify function as proxy to avoid CORS issues
-      const url = `/.netlify/functions/postcode-lookup?postcode=${encodedPostcode}`;
-      const { response, data } = await fetchIdealPostcodesProxy(url);
-      const friendlyError = idealPostcodesUserMessage({ response, data, postcode: postcode.trim() });
+      const { friendlyError, results } = await fetchIdealPostcodePage(postcode, 0);
 
-      if (data?.code === 2000 && data.result && data.result.length > 0) {
-        // Filter addresses to match current street if street name exists
-        let filteredAddresses = data.result;
+      if (results.length > 0) {
+        let filteredAddresses = results;
         if (street?.name) {
-          filteredAddresses = data.result.filter(addr => 
+          filteredAddresses = results.filter(addr => 
             addr.thoroughfare?.toLowerCase().trim() === street.name.toLowerCase().trim()
           );
         }
         
         setIdealAddresses(filteredAddresses);
         setSelectedIdealAddresses([]);
+        setIdealPostcodePage(0);
+        setIdealPostcodeHasMore(results.length >= IDEAL_POSTCODE_PAGE_SIZE);
+        if (filteredAddresses.length === 0) {
+          setIdealPostcodeError(
+            street?.name
+              ? `No addresses found for ${street.name} at this postcode.`
+              : 'No addresses found for this postcode.'
+          );
+        }
       } else if (friendlyError) {
         setIdealPostcodeError(friendlyError);
       } else {
@@ -9174,6 +9302,59 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
       setIdealPostcodeError('Could not reach address lookup. Please check your internet connection and try again.');
     } finally {
       setIsLoadingIdealAddresses(false);
+    }
+  };
+
+  const loadMoreIdealPostcode = async () => {
+    if (!idealPostcodeInput.trim() || isLoadingMoreIdealAddresses || !idealPostcodeHasMore) {
+      return;
+    }
+
+    setIsLoadingMoreIdealAddresses(true);
+    setIdealPostcodeError('');
+    setIdealPostcodeMoreMessage('');
+
+    try {
+      const nextPage = idealPostcodePage + 1;
+      const { friendlyError, results } = await fetchIdealPostcodePage(idealPostcodeInput, nextPage);
+
+      if (results.length === 0) {
+        setIdealPostcodeHasMore(false);
+        setIdealPostcodeMoreMessage(
+          friendlyError && !/couldn['’]t find postcode/i.test(friendlyError)
+            ? friendlyError
+            : 'No further addresses at this postcode.'
+        );
+        return;
+      }
+
+      let incoming = results;
+      if (street?.name) {
+        incoming = results.filter(addr =>
+          addr.thoroughfare?.toLowerCase().trim() === street.name.toLowerCase().trim()
+        );
+      }
+
+      const { merged, addedCount } = mergeIdealAddresses(idealAddresses, incoming);
+      setIdealAddresses(merged);
+      setIdealPostcodePage(nextPage);
+      setIdealPostcodeHasMore(results.length >= IDEAL_POSTCODE_PAGE_SIZE);
+      if (addedCount === 0) {
+        if (results.length < IDEAL_POSTCODE_PAGE_SIZE) {
+          setIdealPostcodeHasMore(false);
+          setIdealPostcodeMoreMessage('No further addresses at this postcode.');
+        } else {
+          setIdealPostcodeMoreMessage('No more addresses for this street on that page. You can load more if needed.');
+        }
+      } else {
+        setIdealPostcodeMoreMessage(
+          `Loaded ${addedCount} more address${addedCount === 1 ? '' : 'es'}.`
+        );
+      }
+    } catch (error) {
+      setIdealPostcodeError('Could not reach address lookup. Please check your internet connection and try again.');
+    } finally {
+      setIsLoadingMoreIdealAddresses(false);
     }
   };
 
@@ -9210,6 +9391,9 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
     setIdealPostcodeInput(street?.postcode || '');
     setIdealAddresses([]);
     setSelectedIdealAddresses([]);
+    setIdealPostcodeHasMore(false);
+    setIdealPostcodeMoreMessage('');
+    setIdealPostcodePage(0);
     
     const skipped = propertyLabels.length - newProperties.length;
     if (skipped > 0) {
@@ -9245,6 +9429,11 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
               setShowPostcodeLookup(false);
               setIdealPostcodeInput(street?.postcode || '');
               setIdealPostcodeError('');
+              setIdealAddresses([]);
+              setSelectedIdealAddresses([]);
+              setIdealPostcodeHasMore(false);
+              setIdealPostcodeMoreMessage('');
+              setIdealPostcodePage(0);
             }}
             className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           >
@@ -9286,13 +9475,13 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
 
         <button
           onClick={() => lookupIdealPostcode(idealPostcodeInput)}
-          disabled={!idealPostcodeInput.trim() || isLoadingIdealAddresses}
+          disabled={!idealPostcodeInput.trim() || isLoadingIdealAddresses || isLoadingMoreIdealAddresses}
           className="w-full px-4 py-2 rounded-xl bg-secondary-600 text-white text-sm hover:bg-secondary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isLoadingIdealAddresses ? 'Looking up addresses...' : 'Lookup Addresses'}
         </button>
 
-        {idealAddresses.length > 0 && (() => {
+        {(idealAddresses.length > 0 || idealPostcodeHasMore) && (() => {
           // Filter out addresses that are already added to the street
           const availableAddresses = idealAddresses.filter(address => {
             const propertyLabel = address.premise || address.line_1?.split(',')[0]?.trim() || '';
@@ -9344,6 +9533,9 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
                       setIdealPostcodeInput(street?.postcode || '');
                       setIdealAddresses([]);
                       setSelectedIdealAddresses([]);
+                      setIdealPostcodeHasMore(false);
+                      setIdealPostcodeMoreMessage('');
+                      setIdealPostcodePage(0);
                     }}
                     className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                   >
@@ -9422,6 +9614,27 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
               })}
             </div>
 
+            {idealPostcodeHasMore && (
+              <button
+                type="button"
+                onClick={loadMoreIdealPostcode}
+                disabled={isLoadingMoreIdealAddresses}
+                className="w-full px-4 py-2 rounded-xl border-2 border-dashed border-secondary-300 dark:border-secondary-700 text-secondary-700 dark:text-secondary-300 text-sm hover:border-secondary-400 dark:hover:border-secondary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isLoadingMoreIdealAddresses ? 'Loading more addresses...' : 'Load more addresses'}
+              </button>
+            )}
+            {idealPostcodeMoreMessage && (
+              <p className="text-xs text-gray-600 dark:text-gray-400 text-center">
+                {idealPostcodeMoreMessage}
+              </p>
+            )}
+            {idealPostcodeHasMore && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                Uses 1 extra lookup credit. Properties already on this street stay marked as added.
+              </p>
+            )}
+
             <div className="flex gap-3 pt-4">
               <button
                 onClick={() => {
@@ -9429,6 +9642,9 @@ function PropertyManager({ street, onAddProperty, onRemoveProperty, onEditProper
                   setIdealPostcodeInput(street?.postcode || '');
                   setIdealAddresses([]);
                   setSelectedIdealAddresses([]);
+                  setIdealPostcodeHasMore(false);
+                  setIdealPostcodeMoreMessage('');
+                  setIdealPostcodePage(0);
                 }}
                 className="flex-1 px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               >

@@ -37,9 +37,14 @@ export const handler = async (event) => {
     let url;
 
     if (postcode) {
-      // Postcode lookup
+      // Postcode lookup (page 0 is the first 100 premises; rare Multiple Residence
+      // postcodes need page=1+ for the rest — each extra page is another credit)
       const encodedPostcode = encodeURIComponent(postcode.trim());
       url = `https://api.ideal-postcodes.co.uk/v1/postcodes/${encodedPostcode}?api_key=${apiKey}`;
+      const pageNum = Number.parseInt(String(page ?? ""), 10);
+      if (Number.isInteger(pageNum) && pageNum > 0) {
+        url += `&page=${pageNum}`;
+      }
     } else {
       // Address/street name search
       const encodedQuery = encodeURIComponent(query.trim());
