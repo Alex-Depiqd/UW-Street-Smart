@@ -3043,32 +3043,28 @@ export default function App() {
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                   <div className="text-sm">
-                    <div className="font-medium text-amber-800 dark:text-amber-200 mb-2">Important: Backup Your Data First!</div>
-                    <p className="text-amber-700 dark:text-amber-300 mb-3">
-                      To get the latest features and fixes, you'll need to update the app. This requires backing up your data first.
+                    <div className="font-medium text-amber-800 dark:text-amber-200 mb-2">Your streets are still on this phone</div>
+                    <p className="text-amber-700 dark:text-amber-300">
+                      Street Smart 2.0 uses an account so your work can back up to the cloud. Stay on this same app — do not delete it from your home screen, or you can lose the copy stored here.
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <div className="text-sm font-medium text-gray-800 dark:text-gray-200">Update Steps:</div>
+                <div className="text-sm font-medium text-gray-800 dark:text-gray-200">What to do:</div>
                 <ol className="text-sm text-gray-700 dark:text-gray-300 space-y-2 ml-4">
                   <li className="flex items-start gap-2">
                     <span className="bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium flex-shrink-0 mt-0.5">1</span>
-                    <span>Go to Settings → Export all data (save the file)</span>
+                    <span>Sign in or create an account on this phone (that keeps your local streets and then backs them up)</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium flex-shrink-0 mt-0.5">2</span>
-                    <span>Remove the app from your home screen</span>
+                    <span>Optional extra safety: Settings → Export all data, and save the file</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium flex-shrink-0 mt-0.5">3</span>
-                    <span>Visit the website again and reinstall</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 rounded-full w-5 h-5 flex items-center justify-center text-xs font-medium flex-shrink-0 mt-0.5">4</span>
-                    <span>Go to Settings → Import data (select your backup file)</span>
+                    <span>Do not remove the app from your home screen</span>
                   </li>
                 </ol>
               </div>
