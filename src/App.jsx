@@ -5,7 +5,7 @@ import {
   Download, QrCode, Link2, Plus, ChevronRight, ChevronLeft, ChevronUp, ChevronDown, X, CheckCircle, 
   Clock, Phone, FileText, FolderOpen, Share2, UploadCloud, 
   Moon, Sun, Settings, Bell, Search, Filter, MoreVertical,
-  User, HelpCircle, Info, Shield, Database, BarChart3, Target,
+  User, HelpCircle, Info, Shield, BarChart3, Target,
   Upload, Trash2, AlertTriangle, Camera, Globe, File, ExternalLink, Eye, Maximize, Menu, Edit, Copy, Minus
 } from "lucide-react";
 import { config } from './config';
@@ -3481,21 +3481,33 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
         title={`Streets in ${campaign.name}`} 
         icon={MapPin} 
         actions={
-          <div className="flex items-center gap-2">
-            {/* Mobile Key Button */}
+          <div className="flex items-center flex-wrap gap-2">
             <button 
+              type="button"
               onClick={() => setShowMobileKey(!showMobileKey)}
-              className="block lg:hidden px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+              className="lg:hidden inline-flex items-center justify-center h-9 px-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
             >
               {showMobileKey ? <X className="w-4 h-4"/> : <span className="text-sm font-bold">KEY</span>}
             </button>
-            
-            {/* Add Street Button - Right aligned on mobile */}
             <button 
-              onClick={onAddStreet}
-              className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex-shrink-0"
+              type="button"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm whitespace-nowrap transition-colors flex-shrink-0 ${
+                hasActiveFilters
+                  ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:bg-primary-200 dark:hover:bg-primary-900/60'
+                  : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
             >
-              <Plus className="w-4 h-4"/> Add street
+              {showFilters ? <ChevronRight className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+              {showFilters ? 'Hide' : 'Filters'}
+            </button>
+            <button 
+              type="button"
+              onClick={onAddStreet}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors flex-shrink-0 whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4"/>
+              Add street
             </button>
           </div>
         }
@@ -3578,122 +3590,119 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
           </div>
         )}
         
-        <div className="space-y-3">
-        <SectionCard 
-          title="Search & Filter" 
-          icon={Search}
-          actions={
-            <button 
-              onClick={() => setShowFilters(!showFilters)}
-              className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-            >
-              {showFilters ? <ChevronRight className="w-4 h-4" /> : <Search className="w-4 h-4" />}
-              {showFilters ? 'Hide' : 'Show'} Filters
-            </button>
-          }
-        >
-          {showFilters && (
-            <div className="space-y-3">
-              {/* Search */}
+        {showFilters && (
+          <div className="space-y-3 mb-3">
+            <div>
+              <label className="text-xs opacity-70">Search streets or properties</label>
+              <input 
+                type="text" 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Street name, postcode, or property label..."
+                className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs opacity-70">Search streets or properties</label>
-                <input 
-                  type="text" 
-                  value={searchTerm} 
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Street name, postcode, or property label..."
+                <label className="text-xs opacity-70">Street status</label>
+                <select 
+                  value={statusFilter} 
+                  onChange={(e) => setStatusFilter(e.target.value)}
                   className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-                />
+                >
+                  <option value="all">All streets</option>
+                  <option value="not_started">Not Started</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                </select>
               </div>
               
-              <div className="grid grid-cols-2 gap-3">
-                {/* Street Status Filter */}
-                <div>
-                  <label className="text-xs opacity-70">Street status</label>
-                  <select 
-                    value={statusFilter} 
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-                  >
-                    <option value="all">All streets</option>
-                    <option value="not_started">Not Started</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                </div>
-                
-                {/* Sort By */}
-                <div>
-                  <label className="text-xs opacity-70">Sort by</label>
-                  <select 
-                    value={sortBy} 
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-                  >
-                    <option value="name">Street Name</option>
-                    <option value="properties">Number of Properties</option>
-                    <option value="status">Status</option>
-                    <option value="postcode">Postcode</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {/* Property Progress Filter */}
-                <div>
-                  <label className="text-xs opacity-70">Property progress</label>
-                  <select 
-                    value={progressFilter} 
-                    onChange={(e) => setProgressFilter(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-                  >
-                    <option value="all">All progress</option>
-                    <option value="dropped">Dropped (D)</option>
-                    <option value="knocked">Knocked (K)</option>
-                    <option value="spoke">Spoke (S)</option>
-                    <option value="none">No progress yet</option>
-                  </select>
-                </div>
-
-                {/* Property Outcome Filter */}
-                <div>
-                  <label className="text-xs opacity-70">Property outcome</label>
-                  <select 
-                    value={outcomeFilter} 
-                    onChange={(e) => setOutcomeFilter(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
-                  >
-                    <option value="all">All outcomes</option>
-                    <option value="none">No outcome yet</option>
-                    {OUTCOME_STAT_KEYS.map((key) => (
-                      <option key={key} value={key}>
-                        {PROPERTY_OUTCOME_STYLES[key].abbr} — {PROPERTY_OUTCOME_STYLES[key].label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between gap-2 text-xs opacity-70">
-                <span>
-                  Showing {filteredStreets.length} of {campaign.streets.length} streets
-                  {(progressFilter !== "all" || outcomeFilter !== "all" || searchTerm.trim()) && (
-                    <> · {matchedPropertyTotal} matching properties</>
-                  )}
-                </span>
-                {hasActiveFilters && (
-                  <button
-                    type="button"
-                    onClick={clearStreetFilters}
-                    className="text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0"
-                  >
-                    Clear filters
-                  </button>
-                )}
+              <div>
+                <label className="text-xs opacity-70">Sort by</label>
+                <select 
+                  value={sortBy} 
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                >
+                  <option value="name">Street Name</option>
+                  <option value="properties">Number of Properties</option>
+                  <option value="status">Status</option>
+                  <option value="postcode">Postcode</option>
+                </select>
               </div>
             </div>
-          )}
-        </SectionCard>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs opacity-70">Property progress</label>
+                <select 
+                  value={progressFilter} 
+                  onChange={(e) => setProgressFilter(e.target.value)}
+                  className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                >
+                  <option value="all">All progress</option>
+                  <option value="dropped">Dropped (D)</option>
+                  <option value="knocked">Knocked (K)</option>
+                  <option value="spoke">Spoke (S)</option>
+                  <option value="none">No progress yet</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs opacity-70">Property outcome</label>
+                <select 
+                  value={outcomeFilter} 
+                  onChange={(e) => setOutcomeFilter(e.target.value)}
+                  className="w-full mt-1 p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 dark:focus:ring-primary-900/20 transition-colors"
+                >
+                  <option value="all">All outcomes</option>
+                  <option value="none">No outcome yet</option>
+                  {OUTCOME_STAT_KEYS.map((key) => (
+                    <option key={key} value={key}>
+                      {PROPERTY_OUTCOME_STYLES[key].abbr} — {PROPERTY_OUTCOME_STYLES[key].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between gap-2 text-xs opacity-70">
+              <span>
+                Showing {filteredStreets.length} of {campaign.streets.length} streets
+                {(progressFilter !== "all" || outcomeFilter !== "all" || searchTerm.trim()) && (
+                  <> · {matchedPropertyTotal} matching properties</>
+                )}
+              </span>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearStreetFilters}
+                  className="text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        {!showFilters && hasActiveFilters && (
+          <div className="flex items-center justify-between gap-2 text-xs opacity-70 mb-3">
+            <span>
+              Showing {filteredStreets.length} of {campaign.streets.length} streets
+              {(progressFilter !== "all" || outcomeFilter !== "all" || searchTerm.trim()) && (
+                <> · {matchedPropertyTotal} matching properties</>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={clearStreetFilters}
+              className="text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
         {filteredStreets.length > 0 ? (
           <div className="grid md:grid-cols-2 gap-3">
             {filteredStreets.map(s => {
@@ -3823,7 +3832,6 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
             </button>
           </div>
         )}
-        </div>
       </SectionCard>
       
       {/* Tooltip Display */}
@@ -6117,7 +6125,7 @@ function HelpPanel() {
             
             <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
               <div className="p-3 bg-gray-50 dark:bg-gray-900/20 font-medium">How do I search and filter campaigns/streets?</div>
-              <div className="p-3">Use the "Search & Filter" section in Campaigns and Streets tabs. On Streets you can search by street, postcode, or property label, and filter by street status, property progress (D/K/S), and conversation outcome.</div>
+              <div className="p-3">Use the Filters button in Campaigns and Streets tabs. On Streets you can search by street, postcode, or property label, and filter by street status, property progress (D/K/S), and conversation outcome.</div>
             </div>
             
             <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
