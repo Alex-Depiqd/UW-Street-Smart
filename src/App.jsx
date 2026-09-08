@@ -3209,37 +3209,26 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
 
   return (
     <div className="space-y-3">
-      {/* Create New Campaign - Restructured for clarity */}
-      <div className="rounded-2xl shadow-soft p-4 bg-white/70 dark:bg-gray-900/70 backdrop-blur border border-gray-200/50 dark:border-gray-800/50">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/20 rounded-lg flex items-center justify-center">
-            <Plus className="w-4 h-4 text-primary-600 dark:text-primary-400" />
-          </div>
-          <h3 className="text-lg font-semibold">Create New Campaign</h3>
-        </div>
-        <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Create a new neighbourhood letters campaign to start tracking activity.
-        </div>
-        <button 
-          onClick={onCreateNew}
-          className="w-full px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors flex items-center justify-center gap-2 font-medium"
-        >
-          <Plus className="w-4 h-4"/>
-          Create New Campaign
-        </button>
-      </div>
-
       <SectionCard 
-        title="Search & Filter" 
-        icon={Search}
+        title="Campaigns" 
+        icon={Target}
         actions={
-          <button 
-            onClick={() => setShowFilters(!showFilters)}
-            className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-          >
-            {showFilters ? <ChevronRight className="w-4 h-4" /> : <Search className="w-4 h-4" />}
-            {showFilters ? 'Hide' : 'Show'} Filters
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+            >
+              {showFilters ? <ChevronRight className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+              {showFilters ? 'Hide' : 'Filters'}
+            </button>
+            <button 
+              onClick={onCreateNew}
+              className="px-3 py-1.5 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors flex items-center gap-1.5 font-medium"
+            >
+              <Plus className="w-4 h-4"/>
+              New
+            </button>
+          </div>
         }
       >
         {showFilters && (
@@ -3291,6 +3280,11 @@ function Campaigns({ campaigns, activeId, onSelect, onCreateNew, onEdit, onDelet
             <div className="text-xs opacity-70">
               Showing {filteredCampaigns.length} of {campaigns.length} campaigns
             </div>
+          </div>
+        )}
+        {!showFilters && (
+          <div className="text-xs opacity-70">
+            {filteredCampaigns.length} campaign{filteredCampaigns.length !== 1 ? 's' : ''}
           </div>
         )}
       </SectionCard>
@@ -3588,6 +3582,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
           </div>
         )}
         
+        <div className="space-y-3">
         <SectionCard 
           title="Search & Filter" 
           icon={Search}
@@ -3832,6 +3827,7 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
             </button>
           </div>
         )}
+        </div>
       </SectionCard>
       
       {/* Tooltip Display */}
