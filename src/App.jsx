@@ -517,8 +517,10 @@ export default function App() {
     })();
   }, []);
 
-  // Version update check - show when new version is available
+  // Version update check — production only, so preview testers are not told to reinstall yet
   useEffect(() => {
+    if (APP_CHANNEL !== "production") return;
+
     const VERSION_KEY = 'uw_ss_app_version';
     const VERSION_UPDATE_DISMISSED_KEY = 'uw_ss_version_update_dismissed';
     const storedVersion = localStorage.getItem(VERSION_KEY);
@@ -537,7 +539,6 @@ export default function App() {
       return () => clearTimeout(timer);
     }
     
-    // Always update stored version (for first time users and existing users)
     localStorage.setItem(VERSION_KEY, APP_VERSION);
   }, []);
 
