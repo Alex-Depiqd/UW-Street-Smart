@@ -3523,9 +3523,9 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
         <div className="hidden lg:block mb-4">
           <div className="flex items-center gap-4 text-xs opacity-70">
             <div className="flex items-center gap-2">
-              <span className="font-medium">🎯 Outcomes:</span>
+              <span className="font-medium">📊 Progress:</span>
               <div className="flex items-center gap-1">
-                {PROPERTY_OUTCOME_LEGEND.map((entry) => (
+                {PROPERTY_PROGRESS_LEGEND.map((entry) => (
                   <PropertyStatusLegendSwatch
                     key={entry.abbr}
                     entry={entry}
@@ -3536,9 +3536,9 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-medium">📊 Progress:</span>
+              <span className="font-medium">🎯 Outcomes:</span>
               <div className="flex items-center gap-1">
-                {PROPERTY_PROGRESS_LEGEND.map((entry) => (
+                {PROPERTY_OUTCOME_LEGEND.map((entry) => (
                   <PropertyStatusLegendSwatch
                     key={entry.abbr}
                     entry={entry}
@@ -3565,9 +3565,9 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
             </div>
             <div className="space-y-2 text-xs">
               <div className="flex items-center gap-2">
-                <span className="font-medium">🎯 Outcomes:</span>
-                <div className="flex items-center gap-1 flex-wrap">
-                  {PROPERTY_OUTCOME_LEGEND.map((entry) => (
+                <span className="font-medium">📊 Progress:</span>
+                <div className="flex items-center gap-1">
+                  {PROPERTY_PROGRESS_LEGEND.map((entry) => (
                     <PropertyStatusLegendSwatch
                       key={entry.abbr}
                       entry={entry}
@@ -3579,9 +3579,9 @@ function Streets({ campaign, activeStreetId, onSelectStreet, onOpenProperty, onA
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-medium">📊 Progress:</span>
-                <div className="flex items-center gap-1">
-                  {PROPERTY_PROGRESS_LEGEND.map((entry) => (
+                <span className="font-medium">🎯 Outcomes:</span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  {PROPERTY_OUTCOME_LEGEND.map((entry) => (
                     <PropertyStatusLegendSwatch
                       key={entry.abbr}
                       entry={entry}
