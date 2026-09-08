@@ -8,10 +8,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 /**
  * Versioning (shown in the app footer / About, tagged on GitHub as vX.Y.Z):
  *
- *   PATCH  1.1.0 → 1.1.1  Bug fixes, copy, layout tidy-ups
- *   MINOR  1.1.0 → 1.2.0  New features that keep existing data working
+ *   PATCH  2.0.0 → 2.0.1  Bug fixes, copy, layout tidy-ups
+ *   MINOR  2.0.0 → 2.1.0  New features that keep existing data working
  *                          Mark a merge with [minor] or feat: in the commit/PR title
- *   MAJOR  1.1.0 → 2.0.0  Breaking changes or data-format changes
+ *   MAJOR  2.0.0 → 3.0.0  Breaking changes or data-format changes
  *                          Mark a merge with [major] or BREAKING CHANGE
  *
  * Merges to main without a marker bump the PATCH automatically.
