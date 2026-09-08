@@ -110,6 +110,14 @@ async function fetchIdealPostcodePage(postcode, page = 0) {
 
 const FACEBOOK_REMINDER_LAST_SHOWN_KEY = 'uw_ss_facebook_reminder_last_shown';
 const FACEBOOK_REMINDER_DISMISSED_KEY = 'uw_ss_facebook_reminder_dismissed';
+const ACTIVE_CAMPAIGN_KEY = 'uw_streetsmart_active_campaign';
+
+function resolveActiveCampaignId(campaigns, preferredId) {
+  if (!Array.isArray(campaigns) || campaigns.length === 0) return "";
+  if (preferredId && campaigns.some((c) => c.id === preferredId)) return preferredId;
+  const active = campaigns.find((c) => c.status === "active");
+  return (active || campaigns[0]).id;
+}
 
 /** Outcome colours deliberately avoid red/amber/green so progress traffic-light colours stay distinct. */
 const OUTCOME_SURFACE = 'outcome-surface';
@@ -602,7 +610,22 @@ export default function App() {
     });
   };
   
-  const [activeCampaignId, setActiveCampaignId] = useState("");
+  const [activeCampaignId, setActiveCampaignId] = useState(() => {
+    let list = [];
+    try {
+      const saved = localStorage.getItem('uw_streetsmart_campaigns');
+      list = saved ? JSON.parse(saved) : [];
+    } catch {
+      list = [];
+    }
+    let preferred = "";
+    try {
+      preferred = localStorage.getItem(ACTIVE_CAMPAIGN_KEY) || "";
+    } catch {
+      preferred = "";
+    }
+    return resolveActiveCampaignId(list, preferred);
+  });
   const [activeStreetId, setActiveStreetId] = useState("");
   const [activePropertyId, setActivePropertyId] = useState("");
   const [showScripts, setShowScripts] = useState(false);
@@ -688,6 +711,28 @@ export default function App() {
   const activeCampaign = useMemo(() => campaigns.find(c => c.id === activeCampaignId), [campaigns, activeCampaignId]);
   const activeStreet = useMemo(() => activeCampaign?.streets.find(s => s.id === activeStreetId), [activeCampaign, activeStreetId]);
   const activeProperty = useMemo(() => activeStreet?.properties.find(p => p.id === activePropertyId), [activeStreet, activePropertyId]);
+
+  useEffect(() => {
+    const nextId = resolveActiveCampaignId(campaigns, activeCampaignId);
+    if (nextId !== activeCampaignId) setActiveCampaignId(nextId);
+  }, [campaigns, activeCampaignId]);
+
+  useEffect(() => {
+    try {
+      if (activeCampaignId) localStorage.setItem(ACTIVE_CAMPAIGN_KEY, activeCampaignId);
+      else localStorage.removeItem(ACTIVE_CAMPAIGN_KEY);
+    } catch {
+      // ignore quota / private mode
+    }
+  }, [activeCampaignId]);
+
+  const goToStreets = useCallback(() => {
+    const nextId = resolveActiveCampaignId(campaigns, activeCampaignId);
+    if (nextId && nextId !== activeCampaignId) setActiveCampaignId(nextId);
+    setView("streets");
+  }, [campaigns, activeCampaignId]);
+
+  const goToCampaigns = useCallback(() => setView("campaigns"), []);
 
 
 
@@ -2463,7 +2508,7 @@ export default function App() {
             <div className="grid grid-cols-2 gap-3 min-w-0 nav-grid-vertical-tablet">
               <NavButton icon={<BarChart3 className="w-4 h-4 flex-shrink-0"/>} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
               <NavButton icon={<Target className="w-4 h-4 flex-shrink-0"/>} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
-              <NavButton icon={<MapPin className="w-4 h-4 flex-shrink-0"/>} label="Streets" active={view === "streets"} onClick={() => setView("streets")} />
+              <NavButton icon={<MapPin className="w-4 h-4 flex-shrink-0"/>} label="Streets" active={view === "streets"} onClick={goToStreets} />
               <NavButton icon={<FileText className="w-4 h-4 flex-shrink-0"/>} label="Reports" active={view === "reports"} onClick={() => setView("reports")} />
             </div>
             <div className="mt-3 text-xs opacity-70">
@@ -2514,7 +2559,7 @@ export default function App() {
 
         {/* Main Panel */}
         <div className="col-span-1 lg:col-span-3 space-y-3 lg:space-y-4">
-          {view === "dashboard" && <Dashboard stats={stats} activeCampaign={activeCampaign} onGoStreets={() => setView("streets")} onGoToCampaigns={() => setView("campaigns")} onCreateCampaign={() => setShowNewCampaignModal(true)} />}
+          {view === "dashboard" && <Dashboard stats={stats} activeCampaign={activeCampaign} onGoStreets={goToStreets} onGoToCampaigns={goToCampaigns} onCreateCampaign={() => setShowNewCampaignModal(true)} />}
           {view === "campaigns" && (
             <Campaigns 
               campaigns={campaigns} 
@@ -2586,6 +2631,37 @@ export default function App() {
                 setShowImportStreetsModal(true);
               }}
             />
+          )}
+          {view === "streets" && !activeCampaign && (
+            <SectionCard title="Streets" icon={MapPin}>
+              <div className="text-center py-6">
+                <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
+                  <MapPin className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium mb-2">No active campaign</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  {campaigns.length === 0
+                    ? "Create a campaign first, then add streets to it."
+                    : "Open a campaign from the Campaigns tab to see its streets."}
+                </p>
+                <div className="flex gap-2 justify-center flex-wrap">
+                  <button
+                    type="button"
+                    onClick={goToCampaigns}
+                    className="px-4 py-2 rounded-xl bg-gray-600 text-white text-sm hover:bg-gray-700 transition-colors"
+                  >
+                    Go to Campaigns
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewCampaignModal(true)}
+                    className="px-4 py-2 rounded-xl bg-primary-600 text-white text-sm hover:bg-primary-700 transition-colors"
+                  >
+                    Create Campaign
+                  </button>
+                </div>
+              </div>
+            </SectionCard>
           )}
           {view === "property" && activeStreet && activeProperty && (
             <PropertyView
@@ -2857,7 +2933,7 @@ export default function App() {
           </button>
           
           <button
-            onClick={() => setView("streets")}
+            onClick={goToStreets}
             className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
               view === "streets"
                 ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20"
