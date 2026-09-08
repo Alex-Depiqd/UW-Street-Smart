@@ -1,0 +1,61 @@
+name: Release
+
+# Creates a GitHub tag + release for production builds on main.
+# Patch bumps happen automatically; use [minor] / [major] in the merge commit or PR title for larger jumps.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Decide version
+        id: ver
+        run: node scripts/ci-release.mjs
+
+      - name: Tag current package version
+        if: steps.ver.outputs.action == 'tag'
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${VERSION}" -m "release: ${VERSION}"
+          git push origin "v${VERSION}"
+
+      - name: Bump, commit, and tag
+        if: steps.ver.outputs.action == 'bump'
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          npm version "${VERSION}" -m "release: %s"
+          git push origin HEAD --follow-tags
+
+      - name: GitHub Release
+        if: steps.ver.outputs.action != 'skip'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: v${{ steps.ver.outputs.version }}
+          generate_release_notes: true
+          make_latest: true

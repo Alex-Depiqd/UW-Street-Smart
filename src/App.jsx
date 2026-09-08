@@ -9,6 +9,7 @@ import {
   Upload, Trash2, AlertTriangle, Camera, Globe, File, ExternalLink, Eye, Maximize, Menu, Edit, Copy, Minus
 } from "lucide-react";
 import { config } from './config';
+import { APP_CHANNEL, APP_COPYRIGHT_YEAR, APP_GIT_SHA, APP_VERSION, APP_VERSION_LABEL, channelLabel } from './appVersion';
 import FirebaseEmailLinkHandler from "@/components/FirebaseEmailLinkHandler.jsx";
 import SupabaseAuthScreen from "@/components/SupabaseAuthScreen.jsx";
 import CloudMergeModal from "@/components/CloudMergeModal.jsx";
@@ -520,8 +521,6 @@ export default function App() {
   useEffect(() => {
     const VERSION_KEY = 'uw_ss_app_version';
     const VERSION_UPDATE_DISMISSED_KEY = 'uw_ss_version_update_dismissed';
-    const APP_VERSION = '1.0.0'; // Update this when you release a new version
-    
     const storedVersion = localStorage.getItem(VERSION_KEY);
     const dismissedVersion = localStorage.getItem(VERSION_UPDATE_DISMISSED_KEY);
     
@@ -584,7 +583,7 @@ export default function App() {
   
   // Version update notification state
   const [showVersionUpdate, setShowVersionUpdate] = useState(false);
-  const [currentVersion, setCurrentVersion] = useState('1.0.0');
+  const [currentVersion, setCurrentVersion] = useState(APP_VERSION);
   
   // Load campaigns from localStorage; first install starts with no campaigns
   const [campaigns, setCampaigns] = useState(() => {
@@ -926,7 +925,7 @@ export default function App() {
       campaigns,
       settings: { dark },
       exportDate: new Date().toISOString(),
-      version: '1.0.0',
+      version: APP_VERSION,
       backupInfo: {
         totalCampaigns: campaigns.length,
         totalStreets: campaigns.reduce((sum, c) => sum + c.streets.length, 0),
@@ -2962,7 +2961,7 @@ export default function App() {
 
       {/* Footer Hint */}
       <div className="max-w-6xl mx-auto px-4 pb-20 lg:pb-8 text-xs opacity-70">
-        UW Street Smart - NL Activity Tracker v1.0.0 | Built for UW partners making a difference in their communities. | © 2025 Alex Cameron. All rights reserved.
+        UW Street Smart - NL Activity Tracker {APP_VERSION_LABEL} | Built for UW partners making a difference in their communities. | © {APP_COPYRIGHT_YEAR} Alex Cameron. All rights reserved.
       </div>
 
       {/* Facebook Group Reminder Modal */}
@@ -6231,7 +6230,12 @@ function AboutPanel() {
       <div className="space-y-3 text-sm">
         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
           <div className="font-medium text-blue-800 dark:text-blue-200 mb-1">Version</div>
-          <div className="text-blue-700 dark:text-blue-300">1.0.0</div>
+          <div className="text-blue-700 dark:text-blue-300">{APP_VERSION_LABEL}</div>
+          <div className="text-xs text-blue-700/80 dark:text-blue-300/80 mt-1">
+            {channelLabel()}
+            {APP_GIT_SHA ? ` · ${APP_GIT_SHA}` : ""}
+            {APP_CHANNEL === "preview" ? " · deploy preview" : ""}
+          </div>
         </div>
 
         <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
