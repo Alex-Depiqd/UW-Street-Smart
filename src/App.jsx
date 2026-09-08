@@ -2388,7 +2388,7 @@ export default function App() {
               )}
             </div>
             
-            {/* Desktop: Full status chips */}
+            {/* Desktop: Offline status */}
             <div className="hidden lg:flex items-center gap-2">
               {!isOnline && (
                 <Chip variant="warning" className="text-xs">
@@ -2396,10 +2396,6 @@ export default function App() {
                   Offline
                 </Chip>
               )}
-              <Chip variant="success" className="text-xs">
-                <Database className="w-3 h-3 mr-1" />
-                Local storage
-              </Chip>
             </div>
             
             <button 
