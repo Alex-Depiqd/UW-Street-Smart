@@ -3,7 +3,6 @@ import { KeyRound, LogIn, Mail, UserPlus } from "lucide-react";
 import { getAuthRedirectUrl, getSupabaseClient } from "@/supabase";
 import {
   applyPartnerNameFromUser,
-  deviceHasLocalCampaigns,
   formatDisplayName,
   savePartnerName,
   stashPendingProfile,
@@ -19,7 +18,6 @@ export default function SupabaseAuthScreen({ recoveryMode = false, onRecoveryCom
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [hasLocalCampaigns] = useState(() => deviceHasLocalCampaigns());
 
   useEffect(() => {
     if (recoveryMode) setMode("resetPassword");
@@ -221,16 +219,6 @@ export default function SupabaseAuthScreen({ recoveryMode = false, onRecoveryCom
           <h1 className="text-xl font-semibold">{title}</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">{subtitle}</p>
         </div>
-
-        {hasLocalCampaigns && mode !== "resetPassword" && (
-          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-900 dark:text-amber-100 space-y-1">
-            <div className="font-medium">Your streets are still on this phone</div>
-            <p>
-              Sign in or create an account here to keep them and back them up to the cloud.
-              Do not delete Street Smart from your home screen — that can wipe the copy on this device.
-            </p>
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {mode === "signUp" && (
