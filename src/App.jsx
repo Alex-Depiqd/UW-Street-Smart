@@ -2370,8 +2370,8 @@ export default function App() {
         onStartFresh={handleAccountSwitchStartFresh}
         onSignOut={handleSignOut}
       />
-      {/* Top Bar */}
-      <div className="sticky top-0 z-40 backdrop-blur bg-white/60 dark:bg-gray-950/60 border-b border-gray-200/50 dark:border-gray-800/50">
+      {/* Top Bar + mobile page bar as one sticky stack (no gap for content to show through) */}
+      <div className="sticky top-0 z-40 bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-2xl bg-primary-600 flex items-center justify-center shadow text-white font-bold">UW</div>
@@ -2422,21 +2422,18 @@ export default function App() {
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Mobile Header - Simple */}
-      <div className="lg:hidden sticky top-16 z-30 bg-white/80 dark:bg-gray-950/80 backdrop-blur border-b border-gray-200/50 dark:border-gray-800/50">
-        <div className="max-w-6xl mx-auto px-3 sm:px-4">
-          <div className="flex items-center justify-between py-2">
-            <div className="text-sm font-medium">
-              {view === "dashboard" && "Dashboard"}
-              {view === "campaigns" && "Campaigns"}
-              {view === "streets" && "Streets"}
-              {view === "reports" && "Reports"}
-              {view === "property" && "Property"}
-            </div>
-            <div className="flex items-center gap-3">
-              {/* Quick Stats Summary */}
+        {/* Mobile page bar — sits in the same header so content cannot scroll between them */}
+        <div className="lg:hidden border-t border-gray-200 dark:border-gray-800">
+          <div className="max-w-6xl mx-auto px-3 sm:px-4">
+            <div className="flex items-center justify-between py-2">
+              <div className="text-sm font-medium">
+                {view === "dashboard" && "Dashboard"}
+                {view === "campaigns" && "Campaigns"}
+                {view === "streets" && "Streets"}
+                {view === "reports" && "Reports"}
+                {view === "property" && "Property"}
+              </div>
               {view === "dashboard" && activeCampaign && (
                 <div className="flex items-center gap-2 text-xs">
                   <div className="flex items-center gap-1">
@@ -2455,11 +2452,6 @@ export default function App() {
                     <CheckCircle className="w-3 h-3 text-primary-600" />
                     <span className="text-primary-600 font-medium">{stats.interested}</span>
                   </div>
-                </div>
-              )}
-              {activeCampaign && (
-                <div className="text-xs opacity-70 truncate max-w-24">
-                  {activeCampaign.name}
                 </div>
               )}
             </div>
