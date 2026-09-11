@@ -11,8 +11,10 @@ from public.user_app_state s
 join auth.users u on u.id = s.user_id
 order by s.updated_at desc;
 
--- 2) Copy/paste this JSON result into the production insert below.
---    In the SQL editor, run the query, then copy the single json value.
+-- 2) Copy this JSON into the production import.
+--    Run the query, then click the SINGLE result cell and copy that cell only.
+--    Do not copy the whole results table — that wraps the array in
+--    [{"coalesce": [...]}] and the import has to unwrap it.
 
 select coalesce(json_agg(json_build_object(
   'email', lower(u.email),

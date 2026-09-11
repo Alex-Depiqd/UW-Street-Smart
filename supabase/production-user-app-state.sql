@@ -1,5 +1,7 @@
--- Street Smart: cloud backup table (one row per signed-in user).
--- Run once in Supabase → SQL Editor (StreetSmart Staging project).
+-- StreetSmart PRODUCTION → SQL Editor.
+-- Cloud table for signed-in users. Run once. Includes table grants
+-- (RLS policies alone are not enough — without GRANT the app gets
+-- "permission denied for table user_app_state").
 
 create table if not exists public.user_app_state (
   user_id uuid primary key references auth.users (id) on delete cascade,
