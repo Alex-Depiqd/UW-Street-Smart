@@ -37,3 +37,9 @@ export async function saveCloudPayload(userId, payload) {
   if (backend === "supabase") return supabase.saveCloudPayload(userId, payload);
   if (backend === "firebase") return firestore.saveCloudPayload(userId, payload);
 }
+
+export async function fetchPreviewUserBackup(email) {
+  const backend = getCloudSyncBackend();
+  if (backend === "supabase") return supabase.fetchPreviewUserBackup(email);
+  return null;
+}

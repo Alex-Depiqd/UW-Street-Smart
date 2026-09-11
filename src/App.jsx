@@ -28,6 +28,7 @@ import {
   buildLocalPayload,
   cloudPayloadHasCampaigns,
   fetchCloudPayload,
+  fetchPreviewUserBackup,
   formatCloudUpdatedAt,
   getCloudUpdatedAtMs,
   saveCloudPayload,
@@ -1938,6 +1939,46 @@ export default function App() {
       return;
     }
     let cancelled = false;
+    const storeHandlers = {
+      updateCampaigns,
+      setDark,
+      setActiveCampaignId,
+      setActiveStreetId,
+      setActivePropertyId,
+    };
+    const persistSnapshot = async (snapshot) => {
+      applyPayloadToStores(snapshot, storeHandlers);
+      localStorage.setItem(mergeDoneStorageKey(newUid), "1");
+      const remoteMs = getCloudUpdatedAtMs(snapshot);
+      cloudBannerDismissedRemoteMsRef.current = Math.max(
+        cloudBannerDismissedRemoteMsRef.current,
+        remoteMs,
+        Date.now()
+      );
+      setLastCloudSyncAt(remoteMs || Date.now());
+      setCloudNewerHint(null);
+      setCloudPushPaused(false);
+      setCloudSyncStatus("ok");
+      setCloudSyncMessage("");
+    };
+    const restorePreviewBackupIfNeeded = async (remote) => {
+      if (remote && cloudPayloadHasCampaigns(remote)) return false;
+      if (deviceHasLocalCampaigns()) return false;
+      const preview = await fetchPreviewUserBackup(authUser?.email);
+      if (cancelled || !preview || !cloudPayloadHasCampaigns(preview)) return false;
+      await persistSnapshot(preview);
+      await saveCloudPayload(newUid, {
+        schemaVersion: preview.schemaVersion || 1,
+        campaigns: preview.campaigns,
+        settings: preview.settings,
+        partner_name: preview.partner_name,
+        partner_scripts: preview.partner_scripts,
+        partner_script_order: preview.partner_script_order,
+        partner_documents: preview.partner_documents,
+      });
+      return true;
+    };
+
     (async () => {
       const accountSwitched = detectAccountSwitch(newUid);
       recordAuthUserId(newUid);
@@ -1960,25 +2001,7 @@ export default function App() {
           sessionStorage.removeItem("uw_ss_merge_snooze");
 
           if (remote && cloudPayloadHasCampaigns(remote)) {
-            applyPayloadToStores(remote, {
-              updateCampaigns,
-              setDark,
-              setActiveCampaignId,
-              setActiveStreetId,
-              setActivePropertyId,
-            });
-            localStorage.setItem(mergeDoneStorageKey(newUid), "1");
-            const remoteMs = getCloudUpdatedAtMs(remote);
-            cloudBannerDismissedRemoteMsRef.current = Math.max(
-              cloudBannerDismissedRemoteMsRef.current,
-              remoteMs,
-              Date.now()
-            );
-            setLastCloudSyncAt(remoteMs || Date.now());
-            setCloudNewerHint(null);
-            setCloudPushPaused(false);
-            setCloudSyncStatus("ok");
-            setCloudSyncMessage("");
+            await persistSnapshot(remote);
             if (!remote.partner_name) await applyAuthPartnerName(true);
             return;
           }
@@ -1989,12 +2012,17 @@ export default function App() {
             return;
           }
 
+          const restored = await restorePreviewBackupIfNeeded(remote);
+          if (cancelled) return;
           await applyAuthPartnerName(true);
-          setCloudPushPaused(false);
+          if (!restored) setCloudPushPaused(false);
           return;
         }
 
         await applyAuthPartnerName(false);
+
+        const restored = await restorePreviewBackupIfNeeded(remote);
+        if (cancelled || restored) return;
 
         const done = localStorage.getItem(mergeDoneStorageKey(newUid));
         const snooze = sessionStorage.getItem("uw_ss_merge_snooze");
@@ -2013,7 +2041,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [authUser?.id]);
+  }, [authUser?.id, authUser?.email]);
 
   useEffect(() => {
     if (!authUser?.id || cloudMergeOpen || cloudUploadBlocked || accountSwitchOpen) return () => {};
