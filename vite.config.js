@@ -1,9 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { resolveAppVersion } from './scripts/app-version.mjs'
+
+const appVersion = resolveAppVersion()
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion.version),
+    'import.meta.env.VITE_APP_VERSION_LABEL': JSON.stringify(appVersion.label),
+    'import.meta.env.VITE_APP_GIT_SHA': JSON.stringify(appVersion.sha),
+    'import.meta.env.VITE_APP_CHANNEL': JSON.stringify(appVersion.channel),
+  },
   plugins: [
     react(),
     VitePWA({

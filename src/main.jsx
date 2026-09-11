@@ -7,8 +7,11 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './styles/index.css'
 import { isFirebaseConfigured, getFirebaseApp } from './firebase.js'
+import { isSupabaseConfigured, getSupabaseClient } from './supabase.js'
 
-if (isFirebaseConfigured()) {
+if (isSupabaseConfigured()) {
+  getSupabaseClient()
+} else if (isFirebaseConfigured()) {
   getFirebaseApp()
 }
 

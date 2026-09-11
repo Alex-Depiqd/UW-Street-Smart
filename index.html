@@ -8,7 +8,7 @@
     <meta name="author" content="UW Partners">
     <meta name="application-name" content="Street Smart PWA">
     <meta name="theme-color" content="#7c3aed">
-    <link rel="canonical" href="https://uwstreetsmart.netlify.app/">
+    <link rel="canonical" href="https://getstreetsmart.app/">
     
     <!-- Google Search Console Verification -->
     <meta name="google-site-verification" content="FS8MjCJLB0E2uQw5mIH-V4IMdyJ-srzovzhUdV4VnqE" />
@@ -23,14 +23,14 @@
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://uwstreetsmart.netlify.app/">
+    <meta property="og:url" content="https://getstreetsmart.app/">
     <meta property="og:title" content="UW Street Smart - NL Activity Tracker">
     <meta property="og:description" content="Track and manage Neighbourhood Letters campaigns efficiently">
     <meta property="og:image" content="/icons/icon-512x512.png">
     
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://uwstreetsmart.netlify.app/">
+    <meta property="twitter:url" content="https://getstreetsmart.app/">
     <meta property="twitter:title" content="UW Street Smart - NL Activity Tracker">
     <meta property="twitter:description" content="Track and manage Neighbourhood Letters campaigns efficiently">
     <meta property="twitter:image" content="/icons/icon-512x512.png">
@@ -81,33 +81,32 @@
       });
     </script>
     
-    <!-- Auto-restore viewport after input -->
+    <!-- Reset iOS zoom after leaving a text field (pinch-out workaround) -->
     <script>
-      // Function to restore viewport to normal
+      var VIEWPORT_NORMAL =
+        'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover';
+      var VIEWPORT_RESET =
+        'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+
       function restoreViewport() {
-        const viewport = document.querySelector('meta[name="viewport"]');
-        if (viewport) {
-          viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover');
-        }
+        var viewport = document.querySelector('meta[name="viewport"]');
+        if (!viewport) return;
+        // Briefly lock scale, then restore — forces iOS to drop focus zoom
+        viewport.setAttribute('content', VIEWPORT_RESET);
+        setTimeout(function () {
+          viewport.setAttribute('content', VIEWPORT_NORMAL);
+        }, 50);
       }
-      
-      // Restore viewport when input loses focus
-      document.addEventListener('blur', function(e) {
-        if (e.target.matches('input, textarea, select')) {
-          // Small delay to ensure the input has finished
+
+      document.addEventListener('blur', function (e) {
+        if (e.target && e.target.matches && e.target.matches('input, textarea, select')) {
           setTimeout(restoreViewport, 100);
         }
       }, true);
-      
-      // Also restore on page visibility change (when user switches back to app)
-      document.addEventListener('visibilitychange', function() {
-        if (!document.hidden) {
-          restoreViewport();
-        }
+
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) restoreViewport();
       });
-      
-      // Restore on window focus (when user returns to the tab)
-      window.addEventListener('focus', restoreViewport);
     </script>
     
     <!-- Service Worker Registration (minimal SW for installability only) -->

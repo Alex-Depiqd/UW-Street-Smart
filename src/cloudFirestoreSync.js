@@ -88,6 +88,13 @@ export function applyPayloadToStores(data, handlers) {
 
 export function formatCloudUpdatedAt(data) {
   const ts = data?.updatedAt;
+  if (typeof ts === "string") {
+    try {
+      return new Date(ts).toLocaleString();
+    } catch {
+      return null;
+    }
+  }
   if (ts && typeof ts.toDate === "function") {
     try {
       return ts.toDate().toLocaleString();
@@ -98,9 +105,13 @@ export function formatCloudUpdatedAt(data) {
   return null;
 }
 
-/** Milliseconds from Firestore `updatedAt`, or 0 if missing. */
+/** Milliseconds from cloud `updatedAt`, or 0 if missing. */
 export function getCloudUpdatedAtMs(data) {
   const ts = data?.updatedAt;
+  if (typeof ts === "string") {
+    const ms = Date.parse(ts);
+    return Number.isNaN(ms) ? 0 : ms;
+  }
   if (ts && typeof ts.toDate === "function") {
     try {
       return ts.toDate().getTime();

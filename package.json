@@ -1,6 +1,6 @@
 {
   "name": "uw-street-smart-nl-tracker",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "UW Street Smart - Track and manage Neighbourhood Letters campaigns efficiently",
   "type": "module",
   "scripts": {
@@ -8,9 +8,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext js,jsx,ts,tsx",
-    "lint:fix": "eslint . --ext js,jsx,ts,tsx --fix"
+    "lint:fix": "eslint . --ext js,jsx,ts,tsx --fix",
+    "version:print": "node scripts/app-version.mjs --print"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
     "date-fns": "^2.30.0",
     "dexie": "^3.2.4",
     "firebase": "^11.10.0",
