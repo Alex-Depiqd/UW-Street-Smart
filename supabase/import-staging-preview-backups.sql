@@ -31,4 +31,8 @@ on conflict (email) do update
   set
     payload = excluded.payload,
     source_updated_at = excluded.source_updated_at,
-    source_user_id = excluded.source_user_id;
+    source_user_id = excluded.source_user_id
+returning
+  email,
+  source_updated_at,
+  coalesce(jsonb_array_length(payload -> 'campaigns'), 0) as campaigns;
