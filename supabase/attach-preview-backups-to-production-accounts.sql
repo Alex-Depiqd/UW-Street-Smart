@@ -1,6 +1,8 @@
 -- StreetSmart PRODUCTION → SQL Editor.
 -- Sign out of getstreetsmart.app first, then run this, then sign back in.
 
+grant usage on schema public to authenticated;
+grant select, insert, update on table public.user_app_state to authenticated;
 grant select on table public.preview_user_backups to authenticated;
 
 drop policy if exists "Users read own preview backup" on public.preview_user_backups;
